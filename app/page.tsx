@@ -12,15 +12,28 @@ const schedule = [
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
 
+type ClassLearner = {
+  id: string;
+  name: string;
+  grade: number;
+};
+
 type TeachingClass = {
   id: string;
   name: string;
   grades: number[];
-  subject: string;
+  subjects: string[];
   quarter: string;
   meetingDays: string;
   startTime: string;
-  learnerCount: number;
+  learners: ClassLearner[];
+};
+
+type LegacyTeachingClass = Partial<TeachingClass> & {
+  id: string;
+  name: string;
+  subject?: string;
+  learnerCount?: number;
 };
 
 type PlanSlot = {
@@ -42,15 +55,48 @@ type SavedPlan = {
   savedAt: string;
 };
 
+const commonSubjects = ["Mathematics", "Science", "English", "Filipino", "Araling Panlipunan", "MAPEH", "Edukasyon sa Pagpapakatao", "TLE"];
+const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino", "Mariel C. Torres", "Noel B. Pangan", "Olivia R. Cabahug", "Paolo S. Evasco", "Queenie M. Dayao", "Ramon L. Flores"];
+
+function createSampleLearners(grades: number[], count: number): ClassLearner[] {
+  const safeGrades = grades.length ? grades : [1];
+  return Array.from({ length: count }, (_, index) => ({
+    id: `learner-${index + 1}`,
+    name: learnerNames[index] || `Learner ${String(index + 1).padStart(2, "0")}`,
+    grade: safeGrades[index % safeGrades.length],
+  }));
+}
+
+function normalizeClass(item: LegacyTeachingClass): TeachingClass {
+  const grades = Array.isArray(item.grades) && item.grades.length ? item.grades : [1];
+  const subjects = Array.isArray(item.subjects) && item.subjects.length
+    ? item.subjects.filter(Boolean)
+    : [item.subject || "Mathematics"];
+  const learners = Array.isArray(item.learners) && item.learners.length
+    ? item.learners.map((learner, index) => ({ id: learner.id || `${item.id}-learner-${index + 1}`, name: learner.name, grade: learner.grade || grades[0] }))
+    : createSampleLearners(grades, Math.max(0, item.learnerCount || 0)).map((learner) => ({ ...learner, id: `${item.id}-${learner.id}` }));
+
+  return {
+    id: item.id,
+    name: item.name,
+    grades,
+    subjects,
+    quarter: item.quarter || "Quarter 1",
+    meetingDays: item.meetingDays || "Monday to Friday",
+    startTime: item.startTime || "8:00 AM",
+    learners,
+  };
+}
+
 const sampleClass: TeachingClass = {
   id: "sample-morning",
   name: "Morning Multigrade Class",
   grades: [3, 4, 5],
-  subject: "Mathematics",
+  subjects: ["Mathematics", "Science", "English", "Filipino"],
   quarter: "Quarter 1",
   meetingDays: "Monday to Friday",
   startTime: "8:00 AM",
-  learnerCount: 18,
+  learners: createSampleLearners([3, 4, 5], 18),
 };
 
 export default function Home() {
@@ -74,7 +120,7 @@ export default function Home() {
       const storedResources = window.localStorage.getItem("kalinga-saved-resources");
       const storedAttendance = window.localStorage.getItem("kalinga-attendance");
       if (storedClasses) {
-        const parsed = JSON.parse(storedClasses) as TeachingClass[];
+        const parsed = (JSON.parse(storedClasses) as LegacyTeachingClass[]).map(normalizeClass);
         setClasses(parsed);
         setActiveClassId(storedActiveClass || parsed[0]?.id || "");
       }
@@ -214,7 +260,7 @@ export default function Home() {
                 <span className="pill orange">{latestPlan ? "SAVED LESSON" : "READY TO PLAN"}</span>
                 <span className="saved">{latestPlan ? "● Saved on this device" : "○ No lesson saved yet"}</span>
               </div>
-              <p className="muted">{activeClass.subject.toUpperCase()} · GRADES {activeClass.grades.join(", ")}</p>
+              <p className="muted">{activeClass.subjects.join(" · ").toUpperCase()} · GRADES {activeClass.grades.join(", ")}</p>
               <h2>{latestPlan?.title || activeClass.name}</h2>
               <p>{latestPlan ? `${latestPlan.quarter} · ${latestPlan.duration} · ${latestPlan.slots.length} editable schedule blocks` : "No saved lesson yet. Start a coordinated plan for this class."}</p>
               <div className="progress-copy"><strong>Lesson plan progress</strong><span>{latestPlan ? "Saved and editable" : "Not started"}</span></div>
@@ -408,38 +454,62 @@ function ClassZeroState({ onSetUp, onLoadSample }: { onSetUp: () => void; onLoad
 function ClassesView({ classes, onSave, onLoadSample }: { classes: TeachingClass[]; onSave: (item: Omit<TeachingClass, "id">) => void; onLoadSample: () => void }) {
   const [name, setName] = useState("");
   const [grades, setGrades] = useState<number[]>([]);
-  const [subject, setSubject] = useState("Mathematics");
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [customSubject, setCustomSubject] = useState("");
   const [quarter, setQuarter] = useState("Quarter 1");
   const [meetingDays, setMeetingDays] = useState("Monday to Friday");
   const [startTime, setStartTime] = useState("8:00 AM");
-  const [learnerCount, setLearnerCount] = useState(15);
+  const [learners, setLearners] = useState<ClassLearner[]>([]);
 
   function toggleGrade(grade: number) {
-    setGrades((current) => current.includes(grade) ? current.filter((item) => item !== grade) : [...current, grade].sort());
+    setGrades((current) => {
+      const next = current.includes(grade) ? current.filter((item) => item !== grade) : [...current, grade].sort();
+      setLearners((items) => items.map((learner) => next.includes(learner.grade) ? learner : { ...learner, grade: next[0] || learner.grade }));
+      return next;
+    });
+  }
+
+  function toggleSubject(subject: string) {
+    setSubjects((current) => current.includes(subject) ? current.filter((item) => item !== subject) : [...current, subject]);
+  }
+
+  function addCustomSubject() {
+    const next = customSubject.trim();
+    if (!next) return;
+    setSubjects((current) => current.some((item) => item.toLowerCase() === next.toLowerCase()) ? current : [...current, next]);
+    setCustomSubject("");
+  }
+
+  function addLearner() {
+    setLearners((current) => [...current, { id: `learner-${Date.now()}-${current.length}`, name: "", grade: grades[0] || 1 }]);
+  }
+
+  function updateLearner(id: string, field: "name" | "grade", value: string | number) {
+    setLearners((current) => current.map((learner) => learner.id === id ? { ...learner, [field]: value } : learner));
   }
 
   function submitClass(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim() || !grades.length) return;
-    onSave({ name: name.trim(), grades, subject, quarter, meetingDays, startTime, learnerCount });
+    if (!name.trim() || !grades.length || !subjects.length) return;
+    onSave({ name: name.trim(), grades, subjects, quarter, meetingDays, startTime, learners: learners.filter((learner) => learner.name.trim()).map((learner) => ({ ...learner, name: learner.name.trim() })) });
   }
 
   return (
     <div className="view-page">
       <PageIntro eyebrow="MY CLASSES" title="Set up once, use everywhere" description="These details connect lesson planning, schedules, attendance, and relevant resources." />
-      {!!classes.length && <section className="saved-classes"><div className="section-title inline"><div><p className="eyebrow">SAVED CLASSES</p><h2>{classes.length} {classes.length === 1 ? "class" : "classes"} ready</h2></div></div><div className="saved-class-grid">{classes.map((item) => <article key={item.id}><span>GRADES {item.grades.join(" · ")}</span><h3>{item.name}</h3><p>{item.subject} · {item.quarter}</p><small>{item.meetingDays} · {item.startTime} · {item.learnerCount} learners</small></article>)}</div></section>}
+      {!!classes.length && <section className="saved-classes"><div className="section-title inline"><div><p className="eyebrow">SAVED CLASSES</p><h2>{classes.length} {classes.length === 1 ? "class" : "classes"} ready</h2></div></div><div className="saved-class-grid">{classes.map((item) => <article key={item.id}><span>GRADES {item.grades.join(" · ")}</span><h3>{item.name}</h3><p>{item.subjects.join(" · ")} · {item.quarter}</p><small>{item.meetingDays} · {item.startTime} · {item.learners.length} named learners</small></article>)}</div></section>}
       <form className="class-setup-card" onSubmit={submitClass}>
         <div className="class-setup-heading"><span>1</span><div><h2>{classes.length ? "Add another class" : "Tell us about your first class"}</h2><p>You can change lesson-specific details later without changing the saved class.</p></div></div>
         <div className="form-grid class-form-grid">
           <label>Class or section name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Morning Multigrade Class" required /></label>
-          <label>Main subject<select value={subject} onChange={(event) => setSubject(event.target.value)}><option>Mathematics</option><option>Science</option><option>English</option><option>Filipino</option><option>Multiple subjects</option></select></label>
           <label>Current quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
           <label>Meeting days<select value={meetingDays} onChange={(event) => setMeetingDays(event.target.value)}><option>Monday to Friday</option><option>Monday, Wednesday, Friday</option><option>Tuesday and Thursday</option><option>Custom schedule</option></select></label>
           <label>Usual start time<input value={startTime} onChange={(event) => setStartTime(event.target.value)} placeholder="8:00 AM" /></label>
-          <label>Number of learners<input type="number" min="1" max="100" value={learnerCount} onChange={(event) => setLearnerCount(Number(event.target.value))} /></label>
         </div>
         <div className="field-group"><label>Which grades learn together?</label><div className="grade-picker">{[1, 2, 3, 4, 5, 6].map((grade) => <button className={grades.includes(grade) ? "selected" : ""} type="button" key={grade} onClick={() => toggleGrade(grade)}><span>{grades.includes(grade) ? "✓" : grade}</span>Grade {grade}</button>)}</div></div>
-        <footer className="builder-footer"><span>{grades.length ? `${grades.length} grade groups selected` : "Select at least one grade level."}</span><button className="primary-button" type="submit" disabled={!name.trim() || !grades.length}>Save class and continue →</button></footer>
+        <div className="field-group subject-setup"><label>What subjects do you teach this class?<small>Select every subject that applies, or add the exact subject name you use.</small></label><div className="subject-options">{commonSubjects.map((subject) => <button className={subjects.includes(subject) ? "selected" : ""} type="button" onClick={() => toggleSubject(subject)} key={subject}>{subjects.includes(subject) ? "✓ " : "+ "}{subject}</button>)}</div><div className="custom-subject"><input value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomSubject(); } }} placeholder="Another subject (e.g. Mother Tongue)" /><button className="secondary-button" type="button" onClick={addCustomSubject}>Add subject</button></div>{!!subjects.length && <div className="selected-subjects">{subjects.map((subject) => <button type="button" onClick={() => toggleSubject(subject)} key={subject}>{subject} ×</button>)}</div>}</div>
+        <div className="field-group roster-builder"><div className="roster-heading"><label>Who are the learners in this class?<small>Add names now so attendance is ready. You can also save the class and add them later.</small></label><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>No learner names yet</b><small>Select a grade, then add each learner and assign their grade level.</small></p></div> : <div className="roster-rows">{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", Number(event.target.value))}>{grades.map((grade) => <option value={grade} key={grade}>Grade {grade}</option>)}</select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
+        <footer className="builder-footer"><span>{!grades.length ? "Select at least one grade level." : !subjects.length ? "Select or add at least one subject." : `${grades.length} grade groups · ${subjects.length} subjects · ${learners.filter((learner) => learner.name.trim()).length} named learners`}</span><button className="primary-button" type="submit" disabled={!name.trim() || !grades.length || !subjects.length}>Save class and continue →</button></footer>
       </form>
       {!classes.length && <button className="sample-data-button" type="button" onClick={onLoadSample}>Not ready to enter data? Load one sample class</button>}
     </div>
@@ -462,7 +532,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const [grades, setGrades] = useState(initialPlan?.grades || selectedClass?.grades || []);
-  const [subject, setSubject] = useState(initialPlan?.subject || selectedClass?.subject || "Mathematics");
+  const [subject, setSubject] = useState(initialPlan?.subject || selectedClass?.subjects[0] || "");
   const [quarter, setQuarter] = useState(initialPlan?.quarter || selectedClass?.quarter || "Quarter 1");
   const [duration, setDuration] = useState(initialPlan?.duration || "80 minutes");
   const [lessonTitle, setLessonTitle] = useState(initialPlan?.title || "Fractions in our surroundings");
@@ -478,7 +548,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     setSelectedClassId(classId);
     if (!nextClass) return;
     setGrades(nextClass.grades);
-    setSubject(nextClass.subject);
+    setSubject(nextClass.subjects[0] || "");
     setQuarter(nextClass.quarter);
     setSlots(createSchedule(nextClass.grades, nextClass.startTime));
     setSaved(false);
@@ -536,7 +606,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
               </div>
             </div>
             <div className="form-grid">
-              <label>Subject<select value={subject} onChange={(event) => setSubject(event.target.value)}><option>Mathematics</option><option>Science</option><option>English</option><option>Filipino</option></select></label>
+              <label>Lesson subject<input list="class-subject-options" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Choose or type any subject" /><datalist id="class-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist></label>
               <label>Total class time<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>60 minutes</option><option>80 minutes</option><option>100 minutes</option></select></label>
               <label>Language<select><option>English & Filipino</option><option>English</option><option>Filipino</option></select></label>
               <label>Quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
@@ -599,10 +669,10 @@ function LibraryView({ classes, activeClassId, savedResourceIds, onToggleSaved, 
 
   return <div className="view-page">
     <PageIntro eyebrow="SHARED LIBRARY" title="Resources made by teachers" description="Find materials that fit your grades, competencies, and classroom context." action={<button className="primary-button" type="button">↑ Share a resource</button>} />
-    <section className="library-context"><div><p className="eyebrow">RECOMMENDATIONS FOR</p>{selectedClass ? <label><select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select><span>Grades {selectedClass.grades.join(", ")} · {selectedClass.subject} · {selectedClass.quarter}</span></label> : <div className="library-no-class"><span>Add a class to receive relevant recommendations.</span><button type="button" onClick={onSetUpClass}>Set up class →</button></div>}</div><p><b>{savedResourceIds.length}</b><span>saved on this device</span></p></section>
+    <section className="library-context"><div><p className="eyebrow">RECOMMENDATIONS FOR</p>{selectedClass ? <label><select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select><span>Grades {selectedClass.grades.join(", ")} · {selectedClass.subjects.join(", ")} · {selectedClass.quarter}</span></label> : <div className="library-no-class"><span>Add a class to receive relevant recommendations.</span><button type="button" onClick={onSetUpClass}>Set up class →</button></div>}</div><p><b>{savedResourceIds.length}</b><span>saved on this device</span></p></section>
     <aside className="prototype-disclosure"><span>i</span><p><b>Prototype offline behavior</b> Your saved selection persists on this device. The production app would also cache the actual files so they open without a connection.</p></aside>
     <section className="library-tools"><label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by lesson, competency, keyword, or author" /></label><div className="filter-row">{["All resources", "Saved on device", "Mathematics", "Science", "English"].map((item) => <button className={filter === item ? "active" : ""} type="button" onClick={() => setFilter(item)} key={item}>{item}</button>)}</div><button className="filter-button" type="button">☷ More filters <span>3</span></button></section>
-    <div className="library-summary"><p><strong>{visible.length} {filter === "Saved on device" ? "saved" : "recommended"} resources</strong><span>{selectedClass ? `Matched to Grades ${selectedClass.grades.join(", ")} · ${selectedClass.subject} · Agusan del Sur` : "Browse the shared teacher repository"}</span></p><select aria-label="Sort resources"><option>Most relevant</option><option>Highest rated</option><option>Most saved</option></select></div>
+    <div className="library-summary"><p><strong>{visible.length} {filter === "Saved on device" ? "saved" : "recommended"} resources</strong><span>{selectedClass ? `Matched to Grades ${selectedClass.grades.join(", ")} · ${selectedClass.subjects.join(", ")} · Agusan del Sur` : "Browse the shared teacher repository"}</span></p><select aria-label="Sort resources"><option>Most relevant</option><option>Highest rated</option><option>Most saved</option></select></div>
     <section className="resource-grid">
       {visible.map((resource) => <article className="library-card" key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.type}</span></div><div className="library-body"><div className="library-badges">{resource.verified && <span className="verified">✓ Verified</span>}<span>Shared by Teacher Lina</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.subject}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="library-stats"><span>★ {resource.rating}</span><span>{resource.saves} saves</span><span>Updated 2 days ago</span></div><div className="library-actions"><button className="secondary-button" type="button">Preview</button><button className={savedResourceIds.includes(resource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => onToggleSaved(resource.id)}>{savedResourceIds.includes(resource.id) ? "✓ Saved on device" : "Save to device"}</button></div></div></article>)}
     </section>
@@ -610,11 +680,12 @@ function LibraryView({ classes, activeClassId, savedResourceIds, onToggleSaved, 
   </div>;
 }
 
-const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino"];
-
 function learnersForClass(item: TeachingClass, grade: number) {
-  const count = Math.max(1, Math.ceil(item.learnerCount / item.grades.length));
-  return Array.from({ length: count }, (_, index) => learnerNames[index] || `Learner ${String(index + 1).padStart(2, "0")} · Grade ${grade}`);
+  return item.learners.filter((learner) => learner.grade === grade);
+}
+
+function attendanceForLearners(learners: ClassLearner[], stored: Record<string, string> = {}) {
+  return Object.fromEntries(learners.map((learner) => [learner.id, stored[learner.id] || stored[learner.name] || "Present"]));
 }
 
 function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; attendanceRecords: Record<string, Record<string, string>>; onSave: (key: string, statuses: Record<string, string>) => void; onSetUpClass: () => void }) {
@@ -623,11 +694,11 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onS
   const [grade, setGrade] = useState(selectedClass?.grades[0] || 1);
   const learners = selectedClass ? learnersForClass(selectedClass, grade) : [];
   const recordKey = `${selectedClassId}-grade-${grade}`;
-  const [statuses, setStatuses] = useState<Record<string, string>>(() => attendanceRecords[recordKey] || Object.fromEntries(learners.map((name) => [name, "Present"])));
+  const [statuses, setStatuses] = useState<Record<string, string>>(() => attendanceForLearners(learners, attendanceRecords[recordKey]));
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setStatuses(attendanceRecords[recordKey] || Object.fromEntries(learners.map((name) => [name, "Present"])));
+    setStatuses(attendanceForLearners(learners, attendanceRecords[recordKey]));
     setSaved(Boolean(attendanceRecords[recordKey]));
   }, [recordKey]);
 
@@ -639,10 +710,10 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onS
 
   if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><p className="eyebrow">RECORD ATTENDANCE</p><h1>Add a class first</h1><p>Attendance uses the classes and grade groups you manage, so there is nothing to record until a class is set up.</p><div><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
-  const counts = learners.reduce<Record<string, number>>((total, name) => ({ ...total, [statuses[name]]: (total[statuses[name]] || 0) + 1 }), {});
+  const counts = learners.reduce<Record<string, number>>((total, learner) => ({ ...total, [statuses[learner.id]]: (total[statuses[learner.id]] || 0) + 1 }), {});
   return <div className="view-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title="Today’s attendance" description={`Monday, August 17 · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={() => { onSave(recordKey, statuses); setSaved(true); }}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
     <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><span>{selectedClass.meetingDays} · starts {selectedClass.startTime}</span></section>
-    <div className="attendance-grid"><section className="attendance-main"><div className="attendance-toolbar"><div className="grade-tabs">{selectedClass.grades.map((item) => <button className={grade === item ? "active" : ""} type="button" onClick={() => setGrade(item)} key={item}>Grade {item}<small>{learnersForClass(selectedClass, item).length} learners</small></button>)}</div><button className="text-button" type="button" onClick={() => { setStatuses(Object.fromEntries(learners.map((name) => [name, "Present"]))); setSaved(false); }}>Mark all present</button></div><div className="student-list"><div className="student-head"><span>Learner</span><span>Status</span></div>{learners.map((name, index) => <div className="student-row" key={name}><div><span className="student-avatar">{name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><p><strong>{name}</strong><small>LRN •••• {2041 + index}</small></p></div><div className="status-options">{["Present", "Absent", "Late", "Leave"].map((status) => <button className={statuses[name] === status ? `active ${status.toLowerCase()}` : ""} type="button" onClick={() => { setStatuses((current) => ({ ...current, [name]: status })); setSaved(false); }} key={status}>{status}</button>)}</div></div>)}</div></section><aside className="attendance-summary"><p className="eyebrow">GRADE {grade} SUMMARY</p><h3>{learners.length} learners</h3><div className="summary-ring"><strong>{Math.round(((counts.Present || 0) / learners.length) * 100)}%</strong><span>present</span></div>{["Present", "Absent", "Late", "Leave"].map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Saved locally first</b><small>Records persist on this device and can sync when a connection returns.</small></p></div></aside></div>
+    <div className="attendance-grid"><section className="attendance-main"><div className="attendance-toolbar"><div className="grade-tabs">{selectedClass.grades.map((item) => <button className={grade === item ? "active" : ""} type="button" onClick={() => setGrade(item)} key={item}>Grade {item}<small>{learnersForClass(selectedClass, item).length} learners</small></button>)}</div><button className="text-button" type="button" onClick={() => { setStatuses(Object.fromEntries(learners.map((learner) => [learner.id, "Present"]))); setSaved(false); }}>Mark all present</button></div><div className="student-list"><div className="student-head"><span>Learner</span><span>Status</span></div>{learners.map((learner, index) => <div className="student-row" key={learner.id}><div><span className="student-avatar">{learner.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><p><strong>{learner.name}</strong><small>LRN •••• {2041 + index}</small></p></div><div className="status-options">{["Present", "Absent", "Late", "Leave"].map((status) => <button className={statuses[learner.id] === status ? `active ${status.toLowerCase()}` : ""} type="button" onClick={() => { setStatuses((current) => ({ ...current, [learner.id]: status })); setSaved(false); }} key={status}>{status}</button>)}</div></div>)}{!learners.length && <div className="attendance-empty"><span>◎</span><p><b>No Grade {grade} learners yet</b><small>Add learner names to {selectedClass.name} and they will appear here automatically.</small></p><button className="secondary-button" type="button" onClick={onSetUpClass}>Edit class roster</button></div>}</div></section><aside className="attendance-summary"><p className="eyebrow">GRADE {grade} SUMMARY</p><h3>{learners.length} learners</h3><div className="summary-ring"><strong>{learners.length ? Math.round(((counts.Present || 0) / learners.length) * 100) : 0}%</strong><span>present</span></div>{["Present", "Absent", "Late", "Leave"].map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Saved locally first</b><small>Records persist on this device and can sync when a connection returns.</small></p></div></aside></div>
   </div>;
 }
 
