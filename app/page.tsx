@@ -196,8 +196,8 @@ export default function Home() {
     setSavedResourceIds((current) => current.includes(resourceId) ? current.filter((id) => id !== resourceId) : [...current, resourceId]);
   }
 
-  function saveAttendance(recordKey: string, statuses: Record<string, string>) {
-    setAttendanceRecords((current) => ({ ...current, [recordKey]: statuses }));
+  function saveAttendance(updates: Record<string, Record<string, string>>) {
+    setAttendanceRecords((current) => ({ ...current, ...updates }));
   }
 
   if (!hasEntered) {
@@ -208,7 +208,7 @@ export default function Home() {
     <main className="app-shell">
       <aside className="sidebar" aria-label="Main navigation">
         <button className="brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}>
-          <Image src="/kalinga-brand.svg" width={180} height={60} alt="Kalinga" priority />
+          <Image src="/ChatGPT Image Aug 18, 2026, 09_33_48 AM.png" width={1536} height={1024} alt="Kalinga" priority />
         </button>
 
         <nav className="nav-list">
@@ -236,7 +236,7 @@ export default function Home() {
 
       <section className="workspace">
         <header className="topbar">
-          <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-brand.svg" width={116} height={39} alt="Kalinga" priority /></button>
+          <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/ChatGPT Image Aug 18, 2026, 09_33_48 AM.png" width={1536} height={1024} alt="Kalinga" priority /></button>
           <label className="search">
             <span aria-hidden="true">⌕</span>
             <input aria-label="Search lessons and resources" placeholder="Search lessons, competencies, or resources" />
@@ -380,7 +380,7 @@ function LoginScreen({ onContinue }: { onContinue: () => void }) {
 function StackedKalingaLogo() {
   return (
     <div className="stacked-logo" aria-label="Kalinga">
-      <Image src="/kalinga-stacked.svg" width={200} height={188} alt="" priority />
+      <Image src="/ChatGPT Image Aug 18, 2026, 09_33_48 AM.png" width={1536} height={1024} alt="" priority />
     </div>
   );
 }
@@ -719,36 +719,55 @@ function learnersForClass(item: TeachingClass, grade: number) {
   return item.learners.filter((learner) => learner.grade === grade);
 }
 
-function attendanceForLearners(learners: ClassLearner[], stored: Record<string, string> = {}) {
-  return Object.fromEntries(learners.map((learner) => [learner.id, stored[learner.id] || stored[learner.name] || "Present"]));
+function learnerCountLabel(count: number) {
+  return `${count} ${count === 1 ? "learner" : "learners"}`;
 }
 
-function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; attendanceRecords: Record<string, Record<string, string>>; onSave: (key: string, statuses: Record<string, string>) => void; onSetUpClass: () => void }) {
+function attendanceForClass(item: TeachingClass, attendanceRecords: Record<string, Record<string, string>>) {
+  return Object.fromEntries(item.learners.map((learner) => {
+    const stored = attendanceRecords[`${item.id}-grade-${learner.grade}`] || {};
+    return [learner.id, stored[learner.id] || stored[learner.name] || "Present"];
+  }));
+}
+
+function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; attendanceRecords: Record<string, Record<string, string>>; onSave: (updates: Record<string, Record<string, string>>) => void; onSetUpClass: () => void }) {
   const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
-  const [grade, setGrade] = useState(selectedClass?.grades[0] || 1);
-  const learners = selectedClass ? learnersForClass(selectedClass, grade) : [];
-  const recordKey = `${selectedClassId}-grade-${grade}`;
-  const [statuses, setStatuses] = useState<Record<string, string>>(() => attendanceForLearners(learners, attendanceRecords[recordKey]));
+  const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
+  const allLearners = selectedClass ? selectedClass.learners : [];
+  const learners = gradeFilter === "all" ? allLearners : allLearners.filter((learner) => learner.grade === gradeFilter);
+  const [statuses, setStatuses] = useState<Record<string, string>>(() => selectedClass ? attendanceForClass(selectedClass, attendanceRecords) : {});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setStatuses(attendanceForLearners(learners, attendanceRecords[recordKey]));
-    setSaved(Boolean(attendanceRecords[recordKey]));
-  }, [recordKey]);
+    if (!selectedClass) return;
+    setStatuses(attendanceForClass(selectedClass, attendanceRecords));
+    setSaved(selectedClass.grades.some((grade) => Boolean(attendanceRecords[`${selectedClass.id}-grade-${grade}`])));
+  }, [selectedClassId]);
 
   function chooseClass(classId: string) {
-    const item = classes.find((entry) => entry.id === classId);
     setSelectedClassId(classId);
-    setGrade(item?.grades[0] || 1);
+    setGradeFilter("all");
+    setSaved(false);
+  }
+
+  function saveVisibleAttendance() {
+    if (!selectedClass) return;
+    const updates = Object.fromEntries(selectedClass.grades.map((grade) => {
+      const key = `${selectedClass.id}-grade-${grade}`;
+      const gradeLearners = learnersForClass(selectedClass, grade);
+      return [key, Object.fromEntries(gradeLearners.map((learner) => [learner.id, statuses[learner.id] || "Present"]))];
+    }));
+    onSave(updates);
+    setSaved(true);
   }
 
   if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><p className="eyebrow">RECORD ATTENDANCE</p><h1>Add a class first</h1><p>Attendance uses the classes and grade groups you manage, so there is nothing to record until a class is set up.</p><div><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
   const counts = learners.reduce<Record<string, number>>((total, learner) => ({ ...total, [statuses[learner.id]]: (total[statuses[learner.id]] || 0) + 1 }), {});
-  return <div className="view-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title="Today’s attendance" description={`Monday, August 17 · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={() => { onSave(recordKey, statuses); setSaved(true); }}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
+  return <div className="view-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title="Today’s attendance" description={`Monday, August 17 · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
     <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><span>{selectedClass.meetingDays} · starts {selectedClass.startTime}</span></section>
-    <div className="attendance-grid"><section className="attendance-main"><div className="attendance-toolbar"><div className="grade-tabs">{selectedClass.grades.map((item) => <button className={grade === item ? "active" : ""} type="button" onClick={() => setGrade(item)} key={item}>Grade {item}<small>{learnersForClass(selectedClass, item).length} learners</small></button>)}</div><button className="text-button" type="button" onClick={() => { setStatuses(Object.fromEntries(learners.map((learner) => [learner.id, "Present"]))); setSaved(false); }}>Mark all present</button></div><div className="student-list"><div className="student-head"><span>Learner</span><span>Status</span></div>{learners.map((learner, index) => <div className="student-row" key={learner.id}><div><span className="student-avatar">{learner.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><p><strong>{learner.name}</strong><small>LRN •••• {2041 + index}</small></p></div><div className="status-options">{["Present", "Absent", "Late", "Leave"].map((status) => <button className={statuses[learner.id] === status ? `active ${status.toLowerCase()}` : ""} type="button" onClick={() => { setStatuses((current) => ({ ...current, [learner.id]: status })); setSaved(false); }} key={status}>{status}</button>)}</div></div>)}{!learners.length && <div className="attendance-empty"><span>◎</span><p><b>No Grade {grade} learners yet</b><small>Add learner names to {selectedClass.name} and they will appear here automatically.</small></p><button className="secondary-button" type="button" onClick={onSetUpClass}>Edit class roster</button></div>}</div></section><aside className="attendance-summary"><p className="eyebrow">GRADE {grade} SUMMARY</p><h3>{learners.length} learners</h3><div className="summary-ring"><strong>{learners.length ? Math.round(((counts.Present || 0) / learners.length) * 100) : 0}%</strong><span>present</span></div>{["Present", "Absent", "Late", "Leave"].map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Saved locally first</b><small>Records persist on this device and can sync when a connection returns.</small></p></div></aside></div>
+    <div className="attendance-grid"><section className="attendance-main"><div className="attendance-toolbar"><div className="grade-tabs"><button className={gradeFilter === "all" ? "active" : ""} type="button" onClick={() => setGradeFilter("all")}>All students<small>{learnerCountLabel(allLearners.length)}</small></button>{selectedClass.grades.map((item) => { const count = learnersForClass(selectedClass, item).length; return <button className={gradeFilter === item ? "active" : ""} type="button" onClick={() => setGradeFilter(item)} key={item}>Grade {item}<small>{learnerCountLabel(count)}</small></button>; })}</div><button className="text-button" type="button" onClick={() => { setStatuses((current) => ({ ...current, ...Object.fromEntries(learners.map((learner) => [learner.id, "Present"])) })); setSaved(false); }}>Mark {gradeFilter === "all" ? "all" : `Grade ${gradeFilter}`} present</button></div><div className="student-list"><div className="student-head"><span>Learner</span><span>Status</span></div>{learners.map((learner, index) => <div className="student-row" key={learner.id}><div><span className="student-avatar">{learner.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><p><strong>{learner.name}</strong><small>Grade {learner.grade} · LRN •••• {2041 + index}</small></p></div><div className="status-options">{["Present", "Absent", "Late", "Leave"].map((status) => <button className={statuses[learner.id] === status ? `active ${status.toLowerCase()}` : ""} type="button" onClick={() => { setStatuses((current) => ({ ...current, [learner.id]: status })); setSaved(false); }} key={status}>{status}</button>)}</div></div>)}{!learners.length && <div className="attendance-empty"><span>◎</span><p><b>{gradeFilter === "all" ? "No learners added yet" : `No Grade ${gradeFilter} learners yet`}</b><small>Add learner names to {selectedClass.name} and they will appear here automatically.</small></p><button className="secondary-button" type="button" onClick={onSetUpClass}>Edit class roster</button></div>}</div></section><aside className="attendance-summary"><p className="eyebrow">{gradeFilter === "all" ? "ALL STUDENTS" : `GRADE ${gradeFilter}`} SUMMARY</p><h3>{learnerCountLabel(learners.length)}</h3><div className="summary-ring"><strong>{learners.length ? Math.round(((counts.Present || 0) / learners.length) * 100) : 0}%</strong><span>present</span></div>{["Present", "Absent", "Late", "Leave"].map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Saved locally first</b><small>Records persist on this device and can sync when a connection returns.</small></p></div></aside></div>
   </div>;
 }
 
