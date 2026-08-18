@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 const schedule = [
@@ -10,13 +10,62 @@ const schedule = [
   { time: "9:05", title: "Guide Grade 5", detail: "Grades 3–4 complete checks", tone: "grade5" },
 ];
 
-type View = "home" | "plan" | "library" | "attendance" | "community";
+type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
+
+type TeachingClass = {
+  id: string;
+  name: string;
+  grades: number[];
+  subject: string;
+  quarter: string;
+  meetingDays: string;
+  startTime: string;
+  learnerCount: number;
+};
+
+const sampleClass: TeachingClass = {
+  id: "sample-morning",
+  name: "Morning Multigrade Class",
+  grades: [3, 4, 5],
+  subject: "Mathematics",
+  quarter: "Quarter 1",
+  meetingDays: "Monday to Friday",
+  startTime: "8:00 AM",
+  learnerCount: 18,
+};
 
 export default function Home() {
   const [notice, setNotice] = useState("");
   const [view, setView] = useState<View>("home");
   const [hasEntered, setHasEntered] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [classes, setClasses] = useState<TeachingClass[]>([]);
+  const [activeClassId, setActiveClassId] = useState("");
+  const [classDataReady, setClassDataReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const storedClasses = window.localStorage.getItem("kalinga-classes");
+      const storedActiveClass = window.localStorage.getItem("kalinga-active-class");
+      if (storedClasses) {
+        const parsed = JSON.parse(storedClasses) as TeachingClass[];
+        setClasses(parsed);
+        setActiveClassId(storedActiveClass || parsed[0]?.id || "");
+      }
+    } catch {
+      // A clean zero state is safer than blocking the prototype on damaged local data.
+    } finally {
+      setClassDataReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!classDataReady) return;
+    window.localStorage.setItem("kalinga-classes", JSON.stringify(classes));
+    window.localStorage.setItem("kalinga-active-class", activeClassId);
+  }, [classes, activeClassId, classDataReady]);
+
+  const activeClass = classes.find((item) => item.id === activeClassId) || classes[0];
 
   function beginPlan() {
     setView("plan");
@@ -28,6 +77,21 @@ export default function Home() {
     setView("home");
     setNotice("");
     setHasEntered(false);
+  }
+
+  function saveClass(newClass: Omit<TeachingClass, "id">) {
+    const item = { ...newClass, id: `class-${Date.now()}` };
+    setClasses((current) => [...current, item]);
+    setActiveClassId(item.id);
+    setView("home");
+    setNotice(`${item.name} is ready across planning, attendance, and resources.`);
+  }
+
+  function loadSampleClass() {
+    setClasses([sampleClass]);
+    setActiveClassId(sampleClass.id);
+    setView("home");
+    setNotice("Sample school data loaded. You can edit or add classes anytime.");
   }
 
   if (!hasEntered) {
@@ -43,6 +107,7 @@ export default function Home() {
 
         <nav className="nav-list">
           <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" onClick={() => setView("home")}><span className="nav-icon">⌂</span> Home</button>
+          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}><span className="nav-icon">▦</span> My classes</button>
           <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={beginPlan}><span className="nav-icon">＋</span> Create</button>
           <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}><span className="nav-icon">▱</span> Resources</button>
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => setView("community")}><span className="nav-icon">♧</span> Community</button>
@@ -82,14 +147,14 @@ export default function Home() {
         </header>
 
         <div className="content">
-          {view === "home" ? <>
+          {view === "home" && !activeClass ? <ClassZeroState onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} /> : view === "home" && activeClass ? <>
           <section className="welcome-row">
             <div>
               <p className="eyebrow">MONDAY · AUGUST 17</p>
               <h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>Teacher Ana!</em></h1>
-              <p className="lead">Your three grade groups are ready for today.</p>
+              <p className="lead">Choose a saved class to see its plans, schedule, and records.</p>
             </div>
-            <button className="primary-button" type="button" onClick={beginPlan}><span>＋</span> Plan a multigrade lesson</button>
+            <div className="welcome-actions"><label>Viewing class<select value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><button className="primary-button" type="button" onClick={beginPlan}><span>＋</span> Plan a lesson</button></div>
           </section>
 
           {notice && <p className="notice" role="status">{notice}</p>}
@@ -100,24 +165,24 @@ export default function Home() {
                 <span className="pill orange">CONTINUE YOUR WORK</span>
                 <span className="saved">● Saved offline</span>
               </div>
-              <p className="muted">MATHEMATICS · GRADES 3, 4 & 5</p>
-              <h2>Fractions in our surroundings</h2>
-              <p>One coordinated lesson with activities adapted for every grade.</p>
+              <p className="muted">{activeClass.subject.toUpperCase()} · GRADES {activeClass.grades.join(", ")}</p>
+              <h2>{activeClass.name}</h2>
+              <p>No saved lesson yet. Start a coordinated plan for this class, or continue the latest draft.</p>
               <div className="progress-copy"><strong>Lesson plan progress</strong><span>3 of 4 steps</span></div>
               <div className="progress-track"><span /></div>
               <div className="continue-actions">
-                <button className="dark-button" type="button">Continue planning <span>→</span></button>
-                <small>Edited 20 minutes ago</small>
+                <button className="dark-button" type="button" onClick={beginPlan}>Open class planner <span>→</span></button>
+                <small>{activeClass.quarter}</small>
               </div>
             </article>
 
             <article className="class-card">
               <div className="card-heading">
-                <div><p className="eyebrow">TODAY’S CLASS</p><h2>One class, three learning paths</h2></div>
+                <div><p className="eyebrow">TODAY’S CLASS · {activeClass.startTime}</p><h2>{activeClass.name}</h2></div>
                 <button className="text-button" type="button">View plan →</button>
               </div>
               <div className="grade-legend" aria-label="Grade color legend">
-                <span><i className="g3" /> Grade 3</span><span><i className="g4" /> Grade 4</span><span><i className="g5" /> Grade 5</span>
+                {activeClass.grades.map((grade) => <span key={grade}><i className={`g${grade}`} /> Grade {grade}</span>)}
               </div>
               <div className="timeline">
                 {schedule.map((item) => (
@@ -153,11 +218,11 @@ export default function Home() {
               <div className="resource-meta"><span>★ 4.8</span><small>132 teachers saved this</small><button type="button">Save offline</button></div>
             </article>
           </section>
-          </> : view === "plan" ? <PlanView onBack={() => setView("home")} /> : view === "library" ? <LibraryView /> : view === "attendance" ? <AttendanceView /> : <CommunityView />}
+          </> : view === "classes" ? <ClassesView classes={classes} onSave={saveClass} onLoadSample={loadSampleClass} /> : view === "plan" ? <PlanView onBack={() => setView("home")} /> : view === "library" ? <LibraryView /> : view === "attendance" ? <AttendanceView /> : <CommunityView />}
         </div>
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Home</button><button className={view === "plan" ? "active" : ""} type="button" onClick={beginPlan}><span>＋</span>Create</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Library</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Community</button>
+          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Home</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={beginPlan}><span>＋</span>Create</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Library</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Community</button>
         </nav>
       </section>
     </main>
@@ -270,6 +335,60 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
       <div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lead">{description}</p></div>
       {action}
     </header>
+  );
+}
+
+function ClassZeroState({ onSetUp, onLoadSample }: { onSetUp: () => void; onLoadSample: () => void }) {
+  return (
+    <section className="class-zero-state">
+      <span className="zero-icon">▦</span>
+      <p className="eyebrow">START WITH YOUR REAL CLASSROOM</p>
+      <h1>No classes set up yet</h1>
+      <p>Add each class once. Kalinga will reuse its grade levels, schedule, quarter, and learner count everywhere—so you do not have to enter the same details again.</p>
+      <div><button className="primary-button" type="button" onClick={onSetUp}>＋ Set up my first class</button><button className="secondary-button" type="button" onClick={onLoadSample}>Preview with sample data</button></div>
+      <small>Your classes are saved on this device for the prototype.</small>
+    </section>
+  );
+}
+
+function ClassesView({ classes, onSave, onLoadSample }: { classes: TeachingClass[]; onSave: (item: Omit<TeachingClass, "id">) => void; onLoadSample: () => void }) {
+  const [name, setName] = useState("");
+  const [grades, setGrades] = useState<number[]>([]);
+  const [subject, setSubject] = useState("Mathematics");
+  const [quarter, setQuarter] = useState("Quarter 1");
+  const [meetingDays, setMeetingDays] = useState("Monday to Friday");
+  const [startTime, setStartTime] = useState("8:00 AM");
+  const [learnerCount, setLearnerCount] = useState(15);
+
+  function toggleGrade(grade: number) {
+    setGrades((current) => current.includes(grade) ? current.filter((item) => item !== grade) : [...current, grade].sort());
+  }
+
+  function submitClass(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim() || !grades.length) return;
+    onSave({ name: name.trim(), grades, subject, quarter, meetingDays, startTime, learnerCount });
+  }
+
+  return (
+    <div className="view-page">
+      <PageIntro eyebrow="MY CLASSES" title="Set up once, use everywhere" description="These details connect lesson planning, schedules, attendance, and relevant resources." />
+      {!!classes.length && <section className="saved-classes"><div className="section-title inline"><div><p className="eyebrow">SAVED CLASSES</p><h2>{classes.length} {classes.length === 1 ? "class" : "classes"} ready</h2></div></div><div className="saved-class-grid">{classes.map((item) => <article key={item.id}><span>GRADES {item.grades.join(" · ")}</span><h3>{item.name}</h3><p>{item.subject} · {item.quarter}</p><small>{item.meetingDays} · {item.startTime} · {item.learnerCount} learners</small></article>)}</div></section>}
+      <form className="class-setup-card" onSubmit={submitClass}>
+        <div className="class-setup-heading"><span>1</span><div><h2>{classes.length ? "Add another class" : "Tell us about your first class"}</h2><p>You can change lesson-specific details later without changing the saved class.</p></div></div>
+        <div className="form-grid class-form-grid">
+          <label>Class or section name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Morning Multigrade Class" required /></label>
+          <label>Main subject<select value={subject} onChange={(event) => setSubject(event.target.value)}><option>Mathematics</option><option>Science</option><option>English</option><option>Filipino</option><option>Multiple subjects</option></select></label>
+          <label>Current quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
+          <label>Meeting days<select value={meetingDays} onChange={(event) => setMeetingDays(event.target.value)}><option>Monday to Friday</option><option>Monday, Wednesday, Friday</option><option>Tuesday and Thursday</option><option>Custom schedule</option></select></label>
+          <label>Usual start time<input value={startTime} onChange={(event) => setStartTime(event.target.value)} placeholder="8:00 AM" /></label>
+          <label>Number of learners<input type="number" min="1" max="100" value={learnerCount} onChange={(event) => setLearnerCount(Number(event.target.value))} /></label>
+        </div>
+        <div className="field-group"><label>Which grades learn together?</label><div className="grade-picker">{[1, 2, 3, 4, 5, 6].map((grade) => <button className={grades.includes(grade) ? "selected" : ""} type="button" key={grade} onClick={() => toggleGrade(grade)}><span>{grades.includes(grade) ? "✓" : grade}</span>Grade {grade}</button>)}</div></div>
+        <footer className="builder-footer"><span>{grades.length ? `${grades.length} grade groups selected` : "Select at least one grade level."}</span><button className="primary-button" type="submit" disabled={!name.trim() || !grades.length}>Save class and continue →</button></footer>
+      </form>
+      {!classes.length && <button className="sample-data-button" type="button" onClick={onLoadSample}>Not ready to enter data? Load one sample class</button>}
+    </div>
   );
 }
 
