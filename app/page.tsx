@@ -1,14 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Image from "next/image";
-
-const schedule = [
-  { time: "8:00", title: "Shared warm-up", detail: "Fractions around us", tone: "shared" },
-  { time: "8:15", title: "Guide Grade 3", detail: "Grades 4–5 work independently", tone: "grade3" },
-  { time: "8:40", title: "Guide Grade 4", detail: "Grades 3 & 5 continue activities", tone: "grade4" },
-  { time: "9:05", title: "Guide Grade 5", detail: "Grades 3–4 complete checks", tone: "grade5" },
-];
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
 
@@ -51,6 +44,9 @@ type SavedPlan = {
   quarter: string;
   grades: number[];
   duration: string;
+  startTime?: string;
+  language?: string;
+  competencies?: Record<number, string>;
   slots: PlanSlot[];
   savedAt: string;
 };
@@ -121,6 +117,8 @@ export default function Home() {
       const storedAttendance = window.localStorage.getItem("kalinga-attendance");
       if (storedClasses) {
         const parsed = (JSON.parse(storedClasses) as LegacyTeachingClass[]).map(normalizeClass);
+        // Hydrate device-only prototype data after the client mounts.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setClasses(parsed);
         setActiveClassId(storedActiveClass || parsed[0]?.id || "");
       }
@@ -146,6 +144,9 @@ export default function Home() {
   const activeClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
   const latestPlan = activePlans[0];
+  const activeAttendance = activeClass
+    ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${activeClass.id}-grade-`)).flatMap(([, records]) => Object.values(records))
+    : [];
 
   function beginPlan(planId?: string) {
     setEditingPlanId(typeof planId === "string" ? planId : "");
@@ -164,7 +165,7 @@ export default function Home() {
     const item = { ...newClass, id: classId || `class-${Date.now()}` };
     setClasses((current) => classId ? current.map((entry) => entry.id === classId ? item : entry) : [...current, item]);
     setActiveClassId(item.id);
-    setView("home");
+    setView("classes");
     setNotice(`${item.name} ${classId ? "was updated" : "is ready"} across planning, attendance, and resources.`);
   }
 
@@ -182,7 +183,7 @@ export default function Home() {
   function loadSampleClass() {
     setClasses([sampleClass]);
     setActiveClassId(sampleClass.id);
-    setView("home");
+    setView("classes");
     setNotice("Sample school data loaded. You can edit or add classes anytime.");
   }
 
@@ -254,82 +255,30 @@ export default function Home() {
 
         <div className="content">
           {view === "home" && !activeClass ? <ClassZeroState onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} /> : view === "home" && activeClass ? <>
-          <section className="welcome-row">
-            <div>
-              <p className="eyebrow">MONDAY · AUGUST 17</p>
-              <h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>Teacher Ana!</em></h1>
-              <p className="lead">Choose a saved class to see its plans, schedule, and records.</p>
-            </div>
-            <div className="welcome-actions"><label>Viewing class<select value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><button className="primary-button" type="button" onClick={() => beginPlan()}><span>＋</span> Plan a lesson</button></div>
-          </section>
-
-          {notice && <p className="notice" role="status">{notice}</p>}
-
-          <section className="hero-grid">
-            <article className="continue-card">
-              <div className="card-label-row">
-                <span className="pill orange">{latestPlan ? "SAVED LESSON" : "READY TO PLAN"}</span>
-                <span className="saved">{latestPlan ? "● Saved on this device" : "○ No lesson saved yet"}</span>
-              </div>
-              <p className="muted">{activeClass.subjects.join(" · ").toUpperCase()} · GRADES {activeClass.grades.join(", ")}</p>
-              <h2>{latestPlan?.title || activeClass.name}</h2>
-              <p>{latestPlan ? `${latestPlan.quarter} · ${latestPlan.duration} · ${latestPlan.slots.length} editable schedule blocks` : "No saved lesson yet. Start a coordinated plan for this class."}</p>
-              <div className="progress-copy"><strong>Lesson plan progress</strong><span>{latestPlan ? "Saved and editable" : "Not started"}</span></div>
-              <div className={`progress-track ${latestPlan ? "complete" : "empty"}`}><span /></div>
-              <div className="continue-actions">
-                <button className="dark-button" type="button" onClick={() => beginPlan(latestPlan?.id)}>{latestPlan ? "Edit lesson & schedule" : "Create first lesson"} <span>→</span></button>
-                <small>{latestPlan ? `Saved ${latestPlan.savedAt}` : activeClass.quarter}</small>
-              </div>
-            </article>
-
-            <article className="class-card">
-              <div className="card-heading">
-                <div><p className="eyebrow">TODAY’S CLASS · {activeClass.startTime}</p><h2>{activeClass.name}</h2></div>
-                <button className="text-button" type="button" onClick={() => latestPlan ? beginPlan(latestPlan.id) : beginPlan()}>{latestPlan ? "Edit schedule →" : "Build schedule →"}</button>
-              </div>
-              <div className="grade-legend" aria-label="Grade color legend">
-                {activeClass.grades.map((grade) => <span key={grade}><i className={`g${grade}`} /> Grade {grade}</span>)}
-              </div>
-              <div className="timeline">
-                {(latestPlan ? latestPlan.slots.slice(0, 4).map((slot, index) => ({ time: slot.time, title: slot.teacherFocus, detail: Object.values(slot.gradeTasks).join(" · "), tone: index ? `grade${activeClass.grades[index - 1] || activeClass.grades[0]}` : "shared" })) : schedule).map((item) => (
-                  <div className="timeline-row" key={item.time}>
-                    <time>{item.time}</time>
-                    <div className={`timeline-event ${item.tone}`}><strong>{item.title}</strong><small>{item.detail}</small></div>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
-
-          <section className="saved-plans-section">
-            <div className="section-title inline"><div><p className="eyebrow">{activeClass.name.toUpperCase()}</p><h2>Saved lesson plans</h2></div><button className="text-button" type="button" onClick={() => beginPlan()}>＋ New lesson</button></div>
-            {activePlans.length ? <div className="saved-plan-list">{activePlans.map((plan) => <button type="button" key={plan.id} onClick={() => beginPlan(plan.id)}><span><b>{plan.title}</b><small>{plan.subject} · {plan.quarter} · Grades {plan.grades.join(", ")}</small></span><span>{plan.slots.length} schedule blocks →</span></button>)}</div> : <div className="inline-empty"><span>○</span><p><b>No saved plans for this class</b><small>Create one and it will appear here with its editable schedule.</small></p><button className="secondary-button" type="button" onClick={() => beginPlan()}>Create lesson</button></div>}
-          </section>
-
-          <section className="section-block">
-            <div className="section-title"><div><p className="eyebrow">QUICK ACTIONS</p><h2>What would you like to do?</h2></div></div>
-            <div className="quick-grid">
-              <button className="quick-card" type="button" onClick={() => beginPlan()}><span className="quick-icon orange-icon">＋</span><span><strong>Create a lesson</strong><small>Build for multiple grades</small></span><b>→</b></button>
-              <button className="quick-card" type="button" onClick={() => setView("attendance")}><span className="quick-icon teal-icon">✓</span><span><strong>Record attendance</strong><small>Mark today’s class</small></span><b>→</b></button>
-              <button className="quick-card" type="button" onClick={() => setView("library")}><span className="quick-icon blue-icon">▤</span><span><strong>Find materials</strong><small>Search the shared library</small></span><b>→</b></button>
-            </div>
-          </section>
-
-          <section className="recommended">
-            <div className="section-title inline">
-              <div><p className="eyebrow">RECOMMENDED FOR YOUR CLASS</p><h2>Ready-to-use resources</h2></div>
-              <button className="text-button" type="button" onClick={() => setView("library")}>Browse library →</button>
-            </div>
-            <article className="resource-card">
-              <div className="resource-thumb">½</div>
-              <div className="resource-copy">
-                <span className="verified">✓ Verified resource</span><h3>Fractions using local objects</h3><p>Activity sheet · Grades 3–5 · Mathematics</p>
-                <div className="tags"><span>Multigrade</span><span>No printer</span><span>Manobo</span></div>
-              </div>
-              <div className="resource-meta"><span>★ 4.8</span><small>132 teachers saved this</small><button type="button" onClick={() => toggleSavedResource(1)}>{savedResourceIds.includes(1) ? "✓ Saved on device" : "Save to device"}</button></div>
-            </article>
-          </section>
-          </> : view === "classes" ? <ClassesView classes={classes} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
+            <section className="welcome-row home-welcome">
+              <div><p className="eyebrow">MONDAY · AUGUST 17</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>Teacher Ana!</em></h1><p className="lead">Here is what needs your attention today. Full class details stay in My Classes.</p></div>
+              <div className="welcome-actions"><label>Today’s class<select value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div>
+            </section>
+            {notice && <p className="notice" role="status">{notice}</p>}
+            <section className="home-command-grid">
+              <article className="home-today-card">
+                <div className="card-label-row"><span className="pill orange">NEXT CLASS · {activeClass.startTime}</span><span className="saved">{activeClass.meetingDays}</span></div>
+                <p className="muted">GRADES {activeClass.grades.join(", ")} · {activeClass.subjects.length} SUBJECTS · {activeClass.learners.length} LEARNERS</p>
+                <h2>{activeClass.name}</h2>
+                <div className="home-readiness-list">
+                  <div><span className={latestPlan ? "ready-dot complete" : "ready-dot"} /><p><b>Lesson plan</b><small>{latestPlan ? `${latestPlan.title} is ready and editable` : "No lesson prepared yet"}</small></p><button type="button" onClick={() => beginPlan(latestPlan?.id)}>{latestPlan ? "Review" : "Create"} →</button></div>
+                  <div><span className={activeAttendance.length ? "ready-dot complete" : "ready-dot"} /><p><b>Attendance</b><small>{activeAttendance.length ? `${activeAttendance.length} learner records saved` : "Ready for today’s class"}</small></p><button type="button" onClick={() => setView("attendance")}>Open →</button></div>
+                </div>
+                <button className="dark-button home-class-button" type="button" onClick={() => setView("classes")}>Open {activeClass.name} <span>→</span></button>
+              </article>
+              <aside className="home-shortcuts">
+                <p className="eyebrow">QUICK START</p><h2>Do one thing now</h2><p>Open the exact tool you need without scrolling through class records.</p>
+                <button type="button" onClick={() => beginPlan()}><span>＋</span><p><b>Plan a lesson</b><small>Start from this saved class</small></p><b>→</b></button>
+                <button type="button" onClick={() => setView("attendance")}><span>✓</span><p><b>Take attendance</b><small>{activeClass.learners.length} learners ready</small></p><b>→</b></button>
+                <button type="button" onClick={() => setView("library")}><span>▤</span><p><b>Find a resource</b><small>Search the teacher library</small></p><b>→</b></button>
+              </aside>
+            </section>
+          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("classes")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
         </div>
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -459,7 +408,8 @@ function ClassZeroState({ onSetUp, onLoadSample }: { onSetUp: () => void; onLoad
   );
 }
 
-function ClassesView({ classes, onSave, onDelete, onLoadSample }: { classes: TeachingClass[]; onSave: (item: Omit<TeachingClass, "id">, classId?: string) => void; onDelete: (classId: string) => void; onLoadSample: () => void }) {
+function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, onSelectClass, onSave, onDelete, onLoadSample, onPlan, onAttendance }: { classes: TeachingClass[]; activeClassId: string; savedPlans: SavedPlan[]; attendanceRecords: Record<string, Record<string, string>>; onSelectClass: (classId: string) => void; onSave: (item: Omit<TeachingClass, "id">, classId?: string) => void; onDelete: (classId: string) => void; onLoadSample: () => void; onPlan: (planId?: string) => void; onAttendance: () => void }) {
+  const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState("");
   const [deleteCandidateId, setDeleteCandidateId] = useState("");
   const [name, setName] = useState("");
@@ -470,6 +420,10 @@ function ClassesView({ classes, onSave, onDelete, onLoadSample }: { classes: Tea
   const [meetingDays, setMeetingDays] = useState("Monday to Friday");
   const [startTime, setStartTime] = useState("8:00 AM");
   const [learners, setLearners] = useState<ClassLearner[]>([]);
+  const selectedClass = classes.find((item) => item.id === activeClassId) || classes[0];
+  const selectedPlans = savedPlans.filter((plan) => plan.classId === selectedClass?.id);
+  const currentPlan = selectedPlans[0];
+  const attendanceCount = selectedClass ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${selectedClass.id}-grade-`)).flatMap(([, records]) => Object.values(records)).length : 0;
 
   function resetForm() {
     setEditingId("");
@@ -493,6 +447,7 @@ function ClassesView({ classes, onSave, onDelete, onLoadSample }: { classes: Tea
     setMeetingDays(item.meetingDays);
     setStartTime(item.startTime);
     setLearners(item.learners.map((learner) => ({ ...learner })));
+    setFormOpen(true);
     window.requestAnimationFrame(() => document.querySelector(".class-setup-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
@@ -527,35 +482,102 @@ function ClassesView({ classes, onSave, onDelete, onLoadSample }: { classes: Tea
     event.preventDefault();
     if (!name.trim() || !grades.length || !subjects.length) return;
     onSave({ name: name.trim(), grades, subjects, quarter, meetingDays, startTime, learners: learners.filter((learner) => learner.name.trim()).map((learner) => ({ ...learner, name: learner.name.trim() })) }, editingId || undefined);
+    resetForm();
+    setFormOpen(false);
   }
 
   return (
-    <div className="view-page">
-      <PageIntro eyebrow="MY CLASSES" title="Set up once, use everywhere" description="These details connect lesson planning, schedules, attendance, and relevant resources." />
-      {!!classes.length && <section className="saved-classes"><div className="section-title inline"><div><p className="eyebrow">SAVED CLASSES</p><h2>{classes.length} {classes.length === 1 ? "class" : "classes"} ready</h2></div></div><div className="saved-class-grid">{classes.map((item) => <article className={editingId === item.id ? "editing" : ""} key={item.id}><span>GRADES {item.grades.join(" · ")}</span><h3>{item.name}</h3><p>{item.subjects.join(" · ")} · {item.quarter}</p><small>{item.meetingDays} · {item.startTime} · {item.learners.length} named learners</small><div className="class-card-actions"><button className="edit-class-button" type="button" onClick={() => editClass(item)}>✎ Edit class</button><button className="delete-class-button" type="button" onClick={() => setDeleteCandidateId(item.id)}>Delete</button></div>{deleteCandidateId === item.id && <div className="delete-confirm" role="alert"><div><b>Delete {item.name}?</b><span>This also removes its saved lesson plans and attendance records.</span></div><div><button type="button" onClick={() => setDeleteCandidateId("")}>Keep class</button><button type="button" onClick={() => onDelete(item.id)}>Delete class</button></div></div>}</article>)}</div></section>}
-      <form className="class-setup-card" onSubmit={submitClass}>
-        <div className="class-setup-heading"><span>{editingId ? "✓" : "1"}</span><div><h2>{editingId ? `Edit ${name}` : classes.length ? "Add another class" : "Tell us about your first class"}</h2><p>{editingId ? "Changes to subjects and learner names will appear throughout the prototype." : "You can change lesson-specific details later without changing the saved class."}</p></div>{editingId && <button className="text-button cancel-edit" type="button" onClick={resetForm}>Cancel editing</button>}</div>
+    <div className="view-page classes-page">
+      <PageIntro eyebrow="MY CLASSES" title="Your classes, ready to teach" description="Choose a class to manage its schedule, lesson plans, learners, and attendance in one place." action={classes.length ? <button className="primary-button" type="button" onClick={() => { resetForm(); setFormOpen(true); }}>＋ Add another class</button> : undefined} />
+      {!!classes.length && selectedClass && <section className="class-hub">
+        <nav className="class-switcher" aria-label="Saved classes">
+          <p className="eyebrow">YOUR CLASSES</p>
+          {classes.map((item) => <button className={item.id === selectedClass.id ? "active" : ""} type="button" key={item.id} onClick={() => onSelectClass(item.id)}><span><b>{item.name}</b><small>Grades {item.grades.join(", ")} · {item.startTime}</small></span><span>→</span></button>)}
+        </nav>
+        <div className="class-workspace">
+          <header className="class-workspace-head">
+            <div><p className="eyebrow">{selectedClass.quarter} · {selectedClass.meetingDays}</p><h2>{selectedClass.name}</h2><p>Grades {selectedClass.grades.join(", ")} · {selectedClass.subjects.join(" · ")} · {selectedClass.learners.length} learners</p></div>
+            <div><button className="secondary-button" type="button" onClick={() => editClass(selectedClass)}>✎ Edit class</button><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button></div>
+          </header>
+          <div className="class-action-strip">
+            <button type="button" onClick={onAttendance}><span>✓</span><p><b>Take attendance</b><small>{attendanceCount ? `${attendanceCount} records saved` : `${selectedClass.learners.length} learners ready`}</small></p><b>→</b></button>
+            <button type="button" onClick={() => onPlan(currentPlan?.id)}><span>▦</span><p><b>{currentPlan ? "Open today’s schedule" : "Build the first schedule"}</b><small>{currentPlan ? `${currentPlan.startTime || selectedClass.startTime} · ${currentPlan.slots.length} blocks` : `Starts at ${selectedClass.startTime}`}</small></p><b>→</b></button>
+            <button type="button" onClick={() => editClass(selectedClass)}><span>◎</span><p><b>Manage learners</b><small>Add names or change grade levels</small></p><b>→</b></button>
+          </div>
+          <div className="class-detail-grid">
+            <article className="class-schedule-panel">
+              <div className="section-title inline"><div><p className="eyebrow">CLASS SCHEDULE</p><h3>{currentPlan?.title || "No lesson scheduled yet"}</h3></div>{currentPlan && <button className="text-button" type="button" onClick={() => onPlan(currentPlan.id)}>Edit schedule →</button>}</div>
+              {currentPlan ? <div className="timeline compact-timeline">{currentPlan.slots.map((slot, index) => <div className="timeline-row" key={slot.id}><time>{slot.time}</time><div className={`timeline-event ${index ? `grade${selectedClass.grades[index - 1] || selectedClass.grades[0]}` : "shared"}`}><strong>{slot.teacherFocus}</strong><small>{Object.values(slot.gradeTasks).filter(Boolean).join(" · ") || "Activities not added yet"}</small></div></div>)}</div> : <div className="class-panel-empty"><span>○</span><p><b>Nothing to follow yet</b><small>Create a lesson and its editable timetable will appear here.</small></p><button className="secondary-button" type="button" onClick={() => onPlan()}>Create lesson</button></div>}
+            </article>
+            <aside className="class-plans-panel">
+              <div className="section-title inline"><div><p className="eyebrow">LESSON PLANS</p><h3>{selectedPlans.length} saved</h3></div></div>
+              {selectedPlans.length ? <div className="class-plan-links">{selectedPlans.map((plan) => <button type="button" key={plan.id} onClick={() => onPlan(plan.id)}><span><b>{plan.title}</b><small>{plan.subject} · {plan.quarter}</small></span><span>→</span></button>)}</div> : <p className="class-plan-empty">Saved plans for this class will stay together here.</p>}
+              <div className="class-roster-summary"><span>{selectedClass.learners.length}</span><p><b>Named learners</b><small>Attendance is connected to this roster.</small></p><button type="button" onClick={onAttendance}>Open attendance →</button></div>
+              <button className="delete-class-button hub-delete" type="button" onClick={() => setDeleteCandidateId(selectedClass.id)}>Delete class</button>
+              {deleteCandidateId === selectedClass.id && <div className="delete-confirm" role="alert"><div><b>Delete {selectedClass.name}?</b><span>This also removes its saved lesson plans and attendance records.</span></div><div><button type="button" onClick={() => setDeleteCandidateId("")}>Keep class</button><button type="button" onClick={() => onDelete(selectedClass.id)}>Delete class</button></div></div>}
+            </aside>
+          </div>
+        </div>
+      </section>}
+      {(formOpen || !classes.length) && <form className="class-setup-card class-form-drawer" onSubmit={submitClass}>
+        <div className="class-setup-heading"><span>{editingId ? "✓" : "1"}</span><div><h2>{editingId ? `Edit ${name}` : classes.length ? "Add another class" : "Tell us about your first class"}</h2><p>{editingId ? "Changes to subjects and learner names will appear throughout the prototype." : "You can change lesson-specific details later without changing the saved class."}</p></div>{editingId && <button className="text-button cancel-edit" type="button" onClick={() => { resetForm(); setFormOpen(false); }}>Cancel editing</button>}</div>
         <div className="form-grid class-form-grid">
           <label>Class or section name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Morning Multigrade Class" required /></label>
           <label>Current quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
           <label>Meeting days<select value={meetingDays} onChange={(event) => setMeetingDays(event.target.value)}><option>Monday to Friday</option><option>Monday, Wednesday, Friday</option><option>Tuesday and Thursday</option><option>Custom schedule</option></select></label>
-          <label>Usual start time<input value={startTime} onChange={(event) => setStartTime(event.target.value)} placeholder="8:00 AM" /></label>
+          <div className="time-field"><span>Usual start time</span><TimePicker value={startTime} onChange={setStartTime} /></div>
         </div>
-        <div className="field-group"><label>Which grades learn together?</label><div className="grade-picker">{[1, 2, 3, 4, 5, 6].map((grade) => <button className={grades.includes(grade) ? "selected" : ""} type="button" key={grade} onClick={() => toggleGrade(grade)}><span>{grades.includes(grade) ? "✓" : grade}</span>Grade {grade}</button>)}</div></div>
-        <div className="field-group subject-setup"><label>What subjects do you teach this class?<small>Select every subject that applies, or add the exact subject name you use.</small></label><div className="subject-options">{commonSubjects.map((subject) => <button className={subjects.includes(subject) ? "selected" : ""} type="button" onClick={() => toggleSubject(subject)} key={subject}>{subjects.includes(subject) ? "✓ " : "+ "}{subject}</button>)}</div><div className="custom-subject"><input value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomSubject(); } }} placeholder="Another subject (e.g. Mother Tongue)" /><button className="secondary-button" type="button" onClick={addCustomSubject}>Add subject</button></div>{!!subjects.length && <div className="selected-subjects">{subjects.map((subject) => <button type="button" onClick={() => toggleSubject(subject)} key={subject}>{subject} ×</button>)}</div>}</div>
-        <div className="field-group roster-builder"><div className="roster-heading"><label>Who are the learners in this class?<small>Add names now so attendance is ready. You can also save the class and add them later.</small></label><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>No learner names yet</b><small>Select a grade, then add each learner and assign their grade level.</small></p></div> : <div className="roster-rows">{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", Number(event.target.value))}>{grades.map((grade) => <option value={grade} key={grade}>Grade {grade}</option>)}</select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
+        <div className="field-group"><p className="group-label">Which grades learn together?</p><div className="grade-picker">{[1, 2, 3, 4, 5, 6].map((grade) => <button className={grades.includes(grade) ? "selected" : ""} type="button" key={grade} onClick={() => toggleGrade(grade)}><span>{grades.includes(grade) ? "✓" : grade}</span>Grade {grade}</button>)}</div></div>
+        <div className="field-group subject-setup"><p className="group-label">What subjects do you teach this class?<small>Select every subject that applies, or add the exact subject name you use.</small></p><div className="subject-options">{commonSubjects.map((subject) => <button className={subjects.includes(subject) ? "selected" : ""} type="button" onClick={() => toggleSubject(subject)} key={subject}>{subjects.includes(subject) ? "✓ " : "+ "}{subject}</button>)}</div><div className="custom-subject"><input value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomSubject(); } }} placeholder="Another subject (e.g. Mother Tongue)" /><button className="secondary-button" type="button" onClick={addCustomSubject}>Add subject</button></div>{!!subjects.length && <div className="selected-subjects">{subjects.map((subject) => <button type="button" onClick={() => toggleSubject(subject)} key={subject}>{subject} ×</button>)}</div>}</div>
+        <div className="field-group roster-builder"><div className="roster-heading"><p className="group-label">Who are the learners in this class?<small>Add names now so attendance is ready. You can also save the class and add them later.</small></p><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>No learner names yet</b><small>Select a grade, then add each learner and assign their grade level.</small></p></div> : <div className="roster-rows">{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", Number(event.target.value))}>{grades.map((grade) => <option value={grade} key={grade}>Grade {grade}</option>)}</select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
         <footer className="builder-footer"><span>{!grades.length ? "Select at least one grade level." : !subjects.length ? "Select or add at least one subject." : `${grades.length} grade groups · ${subjects.length} subjects · ${learners.filter((learner) => learner.name.trim()).length} named learners`}</span><button className="primary-button" type="submit" disabled={!name.trim() || !grades.length || !subjects.length}>{editingId ? "Save class changes" : "Save class and continue →"}</button></footer>
-      </form>
+        {classes.length && <button className="close-class-form" type="button" onClick={() => { resetForm(); setFormOpen(false); }}>Close without saving</button>}
+      </form>}
       {!classes.length && <button className="sample-data-button" type="button" onClick={onLoadSample}>Not ready to enter data? Load one sample class</button>}
     </div>
   );
 }
 
-function createSchedule(grades: number[], startTime = "8:00 AM"): PlanSlot[] {
+function parseTime(time: string) {
+  const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return { hour: 8, minute: 0, period: "AM" as "AM" | "PM" };
+  return { hour: Math.min(12, Math.max(1, Number(match[1]))), minute: Math.min(59, Math.max(0, Number(match[2]))), period: match[3].toUpperCase() as "AM" | "PM" };
+}
+
+function toMinutes(time: string) {
+  const { hour, minute, period } = parseTime(time);
+  return (hour % 12) * 60 + minute + (period === "PM" ? 720 : 0);
+}
+
+function formatTime(totalMinutes: number) {
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const period = normalized >= 720 ? "PM" : "AM";
+  const hour = Math.floor(normalized / 60) % 12 || 12;
+  return `${hour}:${String(normalized % 60).padStart(2, "0")} ${period}`;
+}
+
+function durationMinutes(duration: string) {
+  return Number.parseInt(duration, 10) || 80;
+}
+
+function TimePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const parts = parseTime(value);
+  function update(next: Partial<typeof parts>) {
+    const merged = { ...parts, ...next };
+    onChange(`${merged.hour}:${String(merged.minute).padStart(2, "0")} ${merged.period}`);
+  }
+  return <div className="time-picker" aria-label="Choose time"><select aria-label="Hour" value={parts.hour} onChange={(event) => update({ hour: Number(event.target.value) })}>{Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => <option value={hour} key={hour}>{hour}</option>)}</select><span>:</span><select aria-label="Minute" value={parts.minute} onChange={(event) => update({ minute: Number(event.target.value) })}>{Array.from({ length: 60 }, (_, minute) => minute).map((minute) => <option value={minute} key={minute}>{String(minute).padStart(2, "0")}</option>)}</select><div className="period-toggle"><button className={parts.period === "AM" ? "active" : ""} type="button" onClick={() => update({ period: "AM" })}>AM</button><button className={parts.period === "PM" ? "active" : ""} type="button" onClick={() => update({ period: "PM" })}>PM</button></div></div>;
+}
+
+function createSchedule(grades: number[], startTime = "8:00 AM", duration = "80 minutes"): PlanSlot[] {
   const sharedTasks = Object.fromEntries(grades.map((grade) => [grade, "Shared introduction"]));
+  const start = toMinutes(startTime);
+  const total = durationMinutes(duration);
+  const sharedMinutes = Math.min(15, Math.max(10, Math.round(total * .2)));
+  const guidedMinutes = grades.length ? (total - sharedMinutes) / grades.length : total - sharedMinutes;
   const guidedSlots = grades.map((focusGrade, index) => ({
     id: `slot-${focusGrade}-${index}`,
-    time: `${8 + Math.floor((15 + index * 25) / 60)}:${String((15 + index * 25) % 60).padStart(2, "0")} AM`,
+    time: formatTime(start + sharedMinutes + Math.round(index * guidedMinutes)),
     teacherFocus: `Guide Grade ${focusGrade}`,
     gradeTasks: Object.fromEntries(grades.map((grade) => [grade, grade === focusGrade ? "Guided lesson" : "Independent task"])),
   }));
@@ -563,6 +585,7 @@ function createSchedule(grades: number[], startTime = "8:00 AM"): PlanSlot[] {
 }
 
 function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void }) {
+  const generatedPlanId = useId();
   const [step, setStep] = useState<1 | 2 | 3>(initialPlan ? 3 : 1);
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
@@ -570,12 +593,19 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [subject, setSubject] = useState(initialPlan?.subject || selectedClass?.subjects[0] || "");
   const [quarter, setQuarter] = useState(initialPlan?.quarter || selectedClass?.quarter || "Quarter 1");
   const [duration, setDuration] = useState(initialPlan?.duration || "80 minutes");
-  const [lessonTitle, setLessonTitle] = useState(initialPlan?.title || "Fractions in our surroundings");
-  const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime));
+  const [startTime, setStartTime] = useState(initialPlan?.startTime || selectedClass?.startTime || "8:00 AM");
+  const [language, setLanguage] = useState(initialPlan?.language || "English & Filipino");
+  const [lessonTitle, setLessonTitle] = useState(initialPlan?.title || "");
+  const [competencies, setCompetencies] = useState<Record<number, string>>(initialPlan?.competencies || Object.fromEntries((selectedClass?.grades || []).map((grade) => [grade, ""])));
+  const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [saved, setSaved] = useState(false);
 
   function toggleGrade(grade: number) {
-    setGrades((current) => current.includes(grade) ? current.filter((item) => item !== grade) : [...current, grade].sort());
+    setGrades((current) => {
+      const next = current.includes(grade) ? current.filter((item) => item !== grade) : [...current, grade].sort();
+      setCompetencies((items) => Object.fromEntries(next.map((item) => [item, items[item] || ""])));
+      return next;
+    });
   }
 
   function chooseClass(classId: string) {
@@ -585,7 +615,15 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     setGrades(nextClass.grades);
     setSubject(nextClass.subjects[0] || "");
     setQuarter(nextClass.quarter);
-    setSlots(createSchedule(nextClass.grades, nextClass.startTime));
+    setStartTime(nextClass.startTime);
+    setCompetencies(Object.fromEntries(nextClass.grades.map((grade) => [grade, ""])));
+    setSlots(createSchedule(nextClass.grades, nextClass.startTime, duration));
+    setSaved(false);
+  }
+
+  function chooseSubject(nextSubject: string) {
+    setSubject(nextSubject);
+    setCompetencies(Object.fromEntries(grades.map((grade) => [grade, ""])));
     setSaved(false);
   }
 
@@ -600,12 +638,12 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   }
 
   function addSlot() {
-    setSlots((current) => [...current, { id: `slot-${Date.now()}`, time: "10:00 AM", teacherFocus: "Teacher focus", gradeTasks: Object.fromEntries(grades.map((grade) => [grade, "Learning activity"])) }]);
+    setSlots((current) => [...current, { id: `slot-${Date.now()}`, time: formatTime(toMinutes(current.at(-1)?.time || startTime) + 15), teacherFocus: "", gradeTasks: Object.fromEntries(grades.map((grade) => [grade, ""])) }]);
   }
 
   function saveCurrentPlan() {
     if (!selectedClass) return;
-    const plan: SavedPlan = { id: initialPlan?.id || `plan-${Date.now()}`, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration, slots, savedAt: "just now" };
+    const plan: SavedPlan = { id: initialPlan?.id || `plan-${generatedPlanId}`, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration, startTime, language, competencies, slots, savedAt: "just now" };
     onSave(plan);
     setSaved(true);
   }
@@ -632,26 +670,27 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
           <div className="builder-main">
             <div className="form-grid planner-class-row">
               <label>Plan for saved class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-              <label>Lesson title<input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} /></label>
+              <label>Lesson title<input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="What is this lesson about?" /></label>
             </div>
             <div className="field-group">
-              <label>Which grades are learning together?</label>
+              <p className="group-label">Which grades are learning together?</p>
               <div className="grade-picker">
                 {[1, 2, 3, 4, 5, 6].map((grade) => <button className={grades.includes(grade) ? "selected" : ""} type="button" key={grade} onClick={() => toggleGrade(grade)}><span>{grades.includes(grade) ? "✓" : grade}</span>Grade {grade}</button>)}
               </div>
             </div>
             <div className="form-grid">
-              <label>Lesson subject<input list="class-subject-options" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Choose or type any subject" /><datalist id="class-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist></label>
-              <label>Total class time<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>60 minutes</option><option>80 minutes</option><option>100 minutes</option></select></label>
-              <label>Language<select><option>English & Filipino</option><option>English</option><option>Filipino</option></select></label>
+              <label>Lesson subject<input list="class-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type any subject" /><datalist id="class-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist><small>Competencies stay blank until you enter this lesson’s actual topic.</small></label>
+              <label>Language<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>English & Filipino</option><option>English</option><option>Filipino</option><option>Mother Tongue</option><option>Other / Mixed</option></select></label>
               <label>Quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
+              <label>Total class time<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>40 minutes</option><option>60 minutes</option><option>80 minutes</option><option>100 minutes</option><option>120 minutes</option></select><small>This is the full time shared by all grade groups—not time per grade.</small></label>
             </div>
+            <div className="lesson-timing-box"><div><p className="eyebrow">WHEN DOES THIS LESSON START?</p><h3>{startTime} for {duration}</h3><p>Kalinga will divide this window into an all-class opening and one teacher-focus block per grade. You can change every block afterward.</p></div><TimePicker value={startTime} onChange={setStartTime} /></div>
             <div className="field-group">
-              <label>What should Kalinga consider?</label>
+              <p className="group-label">What should Kalinga consider?</p>
               <div className="context-pills"><button className="selected" type="button">Multigrade</button><button className="selected" type="button">Low connectivity</button><button type="button">No printing</button><button type="button">Indigenous context</button><button type="button">Limited materials</button></div>
             </div>
           </div>
-          <aside className="builder-help"><span>✦</span><h3>Teacher-first assistance</h3><p>Kalinga prepares suggestions from the details you provide. Nothing is final until you review and edit it.</p><div><b>{grades.length}</b><small>grade groups selected</small></div><div><b>{duration}</b><small>total teaching time</small></div></aside>
+          <aside className="builder-help"><span>✦</span><h3>Teacher-first assistance</h3><p>Kalinga can organize what you enter, but it will not invent a competency when no matching DepEd or AI source is available.</p><div><b>{grades.length}</b><small>grade groups selected</small></div><div><b>{startTime}</b><small>lesson starts · {duration} total</small></div></aside>
           <footer className="builder-footer"><span>Draft saves automatically on this device.</span><button className="primary-button" type="button" disabled={!grades.length} onClick={() => setStep(2)}>Choose competencies →</button></footer>
         </section>
       )}
@@ -659,29 +698,31 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
       {step === 2 && (
         <section className="competency-layout">
           <div className="competency-list">
-            {grades.map((grade, index) => (
+            <aside className="competency-source-note"><span>i</span><p><b>No automatic competency was inserted</b><small>{subject || "This subject"} · {quarter}. Enter the DepEd competency you are actually teaching. When verified curriculum data or AI is unavailable offline, these fields intentionally remain blank.</small></p></aside>
+            {grades.map((grade) => (
               <article className={`competency-card grade-${grade}`} key={grade}>
-                <header><span>GRADE {grade}</span><button type="button">Browse competencies</button></header>
-                <label>Learning competency<textarea defaultValue={index === 0 ? "Visualizes and represents fractions that are equal to one and greater than one." : index === 1 ? "Compares and arranges similar fractions in increasing or decreasing order." : "Adds and subtracts simple fractions and mixed numbers without regrouping."} /></label>
-                <div className="suggestion"><span>✦ Suggested connection</span><p>Use locally available objects to show how parts combine into a whole.</p><button type="button">Use suggestion</button></div>
+                <header><span>GRADE {grade}</span><small>{subject || "Subject not entered"} · {quarter}</small></header>
+                <label>Learning competency<textarea value={competencies[grade] || ""} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact Grade ${grade} competency for this lesson`} /></label>
+                <p className="competency-helper">You may leave this blank and continue offline, then complete it when your competency reference is available.</p>
               </article>
             ))}
           </div>
-          <aside className="overlap-panel"><p className="eyebrow">SHARED OPPORTUNITY</p><h3>Fractions using local objects</h3><p>These competencies can begin with one shared demonstration before each grade moves to an appropriate task.</p><div className="material-list"><span>○ Leaves or bottle caps</span><span>○ Paper strips</span><span>○ Chalkboard</span></div><small>You can still teach the competencies separately.</small></aside>
-          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => setStep(1)}>← Class context</button><button className="primary-button" type="button" onClick={() => { setSlots(createSchedule(grades, selectedClass?.startTime)); setStep(3); }}>Build editable schedule <span>✦</span></button></footer>
+          <aside className="overlap-panel neutral-overlap"><p className="eyebrow">OPTIONAL ASSISTANCE</p><h3>Shared opportunities appear only when supported</h3><p>With connectivity, a future AI service can compare the competencies you entered and suggest a shared opening activity. Offline, Kalinga does not guess.</p><div className="offline-ai-state"><span>○</span><p><b>No suggestion loaded</b><small>Your grade-level fields remain independent and editable.</small></p></div></aside>
+          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => setStep(1)}>← Class context</button><button className="primary-button" type="button" onClick={() => { setSlots(createSchedule(grades, startTime, duration)); setStep(3); }}>Build editable schedule →</button></footer>
         </section>
       )}
 
       {step === 3 && (
         <section className="plan-result">
           <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · Grades {grades.join(", ")}</b></div><div><button className="secondary-button" type="button" onClick={() => setStep(2)}>Edit competencies</button><button className="primary-button" type="button" onClick={saveCurrentPlan}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
-          <div className="plan-title"><div><p className="eyebrow">{quarter} · MULTIGRADE LESSON PLAN</p><input className="plan-title-input" aria-label="Lesson title" value={lessonTitle} onChange={(event) => { setLessonTitle(event.target.value); setSaved(false); }} /><p>{duration} · {slots.length} editable schedule blocks · English & Filipino</p></div><button className="icon-button" type="button" aria-label="More lesson actions">···</button></div>
+          <div className="plan-title"><div><p className="eyebrow">{quarter} · MULTIGRADE LESSON PLAN</p><input className="plan-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); setSaved(false); }} /><p>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} · {duration} total · {language}</p></div><button className="icon-button" type="button" aria-label="More lesson actions">···</button></div>
+          <div className="schedule-window-summary"><span>◎</span><p><b>Your teaching window</b><small>The rows below divide {duration} beginning at {startTime}. Change a row’s hour, minute, or AM/PM directly; nothing is locked.</small></p></div>
           <div className="rotation-table">
             <div className="rotation-head" style={{ "--grade-count": grades.length } as React.CSSProperties}><span>Time</span><span>Teacher focus</span>{grades.map((grade) => <span key={grade}>Grade {grade}</span>)}</div>
-            {slots.map((slot) => <div className="rotation-row editable-row" style={{ "--grade-count": grades.length } as React.CSSProperties} key={slot.id}><input aria-label={`Time for ${slot.teacherFocus}`} value={slot.time} onChange={(event) => updateSlot(slot.id, "time", event.target.value)} /><input aria-label={`Teacher focus at ${slot.time}`} value={slot.teacherFocus} onChange={(event) => updateSlot(slot.id, "teacherFocus", event.target.value)} />{grades.map((grade) => <textarea aria-label={`Grade ${grade} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} onChange={(event) => updateGradeTask(slot.id, grade, event.target.value)} key={grade} />)}</div>)}
+            {slots.map((slot) => <div className="rotation-row editable-row" style={{ "--grade-count": grades.length } as React.CSSProperties} key={slot.id}><div className="slot-time-editor"><TimePicker value={slot.time} onChange={(value) => updateSlot(slot.id, "time", value)} /></div><input aria-label={`Teacher focus at ${slot.time}`} value={slot.teacherFocus} placeholder="Who has teacher support?" onChange={(event) => updateSlot(slot.id, "teacherFocus", event.target.value)} />{grades.map((grade) => <textarea aria-label={`Grade ${grade} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`Grade ${grade} activity`} onChange={(event) => updateGradeTask(slot.id, grade, event.target.value)} key={grade} />)}</div>)}
           </div>
           <div className="schedule-actions"><button className="secondary-button" type="button" onClick={addSlot}>＋ Add schedule block</button><span>Edit any time, teacher focus, or grade activity directly. Kalinga will not lock the suggested rotation.</span></div>
-          <div className="plan-notes"><article><span>✦</span><div><b>You control the timetable</b><p>The generated schedule is only a starting point. Adjust it to your real classroom before saving.</p></div></article><button className="text-button" type="button" onClick={() => setSlots(createSchedule(grades, selectedClass?.startTime))}>Reset suggested timing</button></div>
+          <div className="plan-notes"><article><span>✦</span><div><b>You control the timetable</b><p>The generated blocks are only a starting point based on the lesson window you entered.</p></div></article><button className="text-button" type="button" onClick={() => setSlots(createSchedule(grades, startTime, duration))}>Reset from {startTime}</button></div>
         </section>
       )}
     </div>
@@ -739,16 +780,12 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onS
   const [statuses, setStatuses] = useState<Record<string, string>>(() => selectedClass ? attendanceForClass(selectedClass, attendanceRecords) : {});
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    if (!selectedClass) return;
-    setStatuses(attendanceForClass(selectedClass, attendanceRecords));
-    setSaved(selectedClass.grades.some((grade) => Boolean(attendanceRecords[`${selectedClass.id}-grade-${grade}`])));
-  }, [selectedClassId]);
-
   function chooseClass(classId: string) {
+    const nextClass = classes.find((item) => item.id === classId);
     setSelectedClassId(classId);
     setGradeFilter("all");
-    setSaved(false);
+    setStatuses(nextClass ? attendanceForClass(nextClass, attendanceRecords) : {});
+    setSaved(Boolean(nextClass?.grades.some((grade) => attendanceRecords[`${nextClass.id}-grade-${grade}`])));
   }
 
   function saveVisibleAttendance() {
