@@ -208,7 +208,7 @@ export default function Home() {
     <main className="app-shell">
       <aside className="sidebar" aria-label="Main navigation">
         <button className="brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}>
-          <Image src="/kalinga-logo.png" width={180} height={60} alt="Kalinga" priority />
+          <Image src="/kalinga-brand.svg" width={180} height={60} alt="Kalinga" priority />
         </button>
 
         <nav className="nav-list">
@@ -236,7 +236,7 @@ export default function Home() {
 
       <section className="workspace">
         <header className="topbar">
-          <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={116} height={39} alt="Kalinga" priority /></button>
+          <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-brand.svg" width={116} height={39} alt="Kalinga" priority /></button>
           <label className="search">
             <span aria-hidden="true">⌕</span>
             <input aria-label="Search lessons and resources" placeholder="Search lessons, competencies, or resources" />
@@ -380,10 +380,7 @@ function LoginScreen({ onContinue }: { onContinue: () => void }) {
 function StackedKalingaLogo() {
   return (
     <div className="stacked-logo" aria-label="Kalinga">
-      <span className="stacked-logo-symbol" aria-hidden="true">
-        <Image src="/kalinga-logo.png" width={600} height={200} alt="" priority />
-      </span>
-      <span className="stacked-logo-word" aria-hidden="true">kalinga</span>
+      <Image src="/kalinga-stacked.svg" width={200} height={188} alt="" priority />
     </div>
   );
 }
@@ -535,7 +532,7 @@ function ClassesView({ classes, onSave, onDelete, onLoadSample }: { classes: Tea
   return (
     <div className="view-page">
       <PageIntro eyebrow="MY CLASSES" title="Set up once, use everywhere" description="These details connect lesson planning, schedules, attendance, and relevant resources." />
-      {!!classes.length && <section className="saved-classes"><div className="section-title inline"><div><p className="eyebrow">SAVED CLASSES</p><h2>{classes.length} {classes.length === 1 ? "class" : "classes"} ready</h2></div></div><div className="saved-class-grid">{classes.map((item) => <article className={editingId === item.id ? "editing" : ""} key={item.id}><span>GRADES {item.grades.join(" · ")}</span><h3>{item.name}</h3><p>{item.subjects.join(" · ")} · {item.quarter}</p><small>{item.meetingDays} · {item.startTime} · {item.learners.length} named learners</small><div className="class-card-actions"><button type="button" onClick={() => editClass(item)}>Edit class</button>{deleteCandidateId === item.id ? <div className="delete-confirm"><span>Delete class, plans, and attendance?</span><button type="button" onClick={() => onDelete(item.id)}>Yes, delete</button><button type="button" onClick={() => setDeleteCandidateId("")}>Cancel</button></div> : <button className="delete-class-button" type="button" onClick={() => setDeleteCandidateId(item.id)}>Delete</button>}</div></article>)}</div></section>}
+      {!!classes.length && <section className="saved-classes"><div className="section-title inline"><div><p className="eyebrow">SAVED CLASSES</p><h2>{classes.length} {classes.length === 1 ? "class" : "classes"} ready</h2></div></div><div className="saved-class-grid">{classes.map((item) => <article className={editingId === item.id ? "editing" : ""} key={item.id}><span>GRADES {item.grades.join(" · ")}</span><h3>{item.name}</h3><p>{item.subjects.join(" · ")} · {item.quarter}</p><small>{item.meetingDays} · {item.startTime} · {item.learners.length} named learners</small><div className="class-card-actions"><button className="edit-class-button" type="button" onClick={() => editClass(item)}>✎ Edit class</button><button className="delete-class-button" type="button" onClick={() => setDeleteCandidateId(item.id)}>Delete</button></div>{deleteCandidateId === item.id && <div className="delete-confirm" role="alert"><div><b>Delete {item.name}?</b><span>This also removes its saved lesson plans and attendance records.</span></div><div><button type="button" onClick={() => setDeleteCandidateId("")}>Keep class</button><button type="button" onClick={() => onDelete(item.id)}>Delete class</button></div></div>}</article>)}</div></section>}
       <form className="class-setup-card" onSubmit={submitClass}>
         <div className="class-setup-heading"><span>{editingId ? "✓" : "1"}</span><div><h2>{editingId ? `Edit ${name}` : classes.length ? "Add another class" : "Tell us about your first class"}</h2><p>{editingId ? "Changes to subjects and learner names will appear throughout the prototype." : "You can change lesson-specific details later without changing the saved class."}</p></div>{editingId && <button className="text-button cancel-edit" type="button" onClick={resetForm}>Cancel editing</button>}</div>
         <div className="form-grid class-form-grid">
