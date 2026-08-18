@@ -61,6 +61,8 @@ export default function Home() {
   const [classes, setClasses] = useState<TeachingClass[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
+  const [savedResourceIds, setSavedResourceIds] = useState<number[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, Record<string, string>>>({});
   const [editingPlanId, setEditingPlanId] = useState("");
   const [classDataReady, setClassDataReady] = useState(false);
 
@@ -69,12 +71,16 @@ export default function Home() {
       const storedClasses = window.localStorage.getItem("kalinga-classes");
       const storedActiveClass = window.localStorage.getItem("kalinga-active-class");
       const storedPlans = window.localStorage.getItem("kalinga-plans");
+      const storedResources = window.localStorage.getItem("kalinga-saved-resources");
+      const storedAttendance = window.localStorage.getItem("kalinga-attendance");
       if (storedClasses) {
         const parsed = JSON.parse(storedClasses) as TeachingClass[];
         setClasses(parsed);
         setActiveClassId(storedActiveClass || parsed[0]?.id || "");
       }
       if (storedPlans) setSavedPlans(JSON.parse(storedPlans) as SavedPlan[]);
+      if (storedResources) setSavedResourceIds(JSON.parse(storedResources) as number[]);
+      if (storedAttendance) setAttendanceRecords(JSON.parse(storedAttendance) as Record<string, Record<string, string>>);
     } catch {
       // A clean zero state is safer than blocking the prototype on damaged local data.
     } finally {
@@ -87,7 +93,9 @@ export default function Home() {
     window.localStorage.setItem("kalinga-classes", JSON.stringify(classes));
     window.localStorage.setItem("kalinga-active-class", activeClassId);
     window.localStorage.setItem("kalinga-plans", JSON.stringify(savedPlans));
-  }, [classes, activeClassId, savedPlans, classDataReady]);
+    window.localStorage.setItem("kalinga-saved-resources", JSON.stringify(savedResourceIds));
+    window.localStorage.setItem("kalinga-attendance", JSON.stringify(attendanceRecords));
+  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, classDataReady]);
 
   const activeClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
@@ -125,6 +133,14 @@ export default function Home() {
     setSavedPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)]);
     setEditingPlanId(plan.id);
     setNotice(`${plan.title} was saved under ${classes.find((item) => item.id === plan.classId)?.name || "your class"}.`);
+  }
+
+  function toggleSavedResource(resourceId: number) {
+    setSavedResourceIds((current) => current.includes(resourceId) ? current.filter((id) => id !== resourceId) : [...current, resourceId]);
+  }
+
+  function saveAttendance(recordKey: string, statuses: Record<string, string>) {
+    setAttendanceRecords((current) => ({ ...current, [recordKey]: statuses }));
   }
 
   if (!hasEntered) {
@@ -253,10 +269,10 @@ export default function Home() {
                 <span className="verified">✓ Verified resource</span><h3>Fractions using local objects</h3><p>Activity sheet · Grades 3–5 · Mathematics</p>
                 <div className="tags"><span>Multigrade</span><span>No printer</span><span>Manobo</span></div>
               </div>
-              <div className="resource-meta"><span>★ 4.8</span><small>132 teachers saved this</small><button type="button">Save offline</button></div>
+              <div className="resource-meta"><span>★ 4.8</span><small>132 teachers saved this</small><button type="button" onClick={() => toggleSavedResource(1)}>{savedResourceIds.includes(1) ? "✓ Saved on device" : "Save to device"}</button></div>
             </article>
           </section>
-          </> : view === "classes" ? <ClassesView classes={classes} onSave={saveClass} onLoadSample={loadSampleClass} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView /> : view === "attendance" ? <AttendanceView /> : <CommunityView />}
+          </> : view === "classes" ? <ClassesView classes={classes} onSave={saveClass} onLoadSample={loadSampleClass} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
         </div>
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -574,32 +590,59 @@ const resources = [
   { id: 4, icon: "123", title: "Number drills with bottle caps", type: "Activity cards", grades: "Grades 1–3", subject: "Mathematics", tags: ["No printer", "Limited materials"], rating: "4.9", saves: 164, verified: true },
 ];
 
-function LibraryView() {
+function LibraryView({ classes, activeClassId, savedResourceIds, onToggleSaved, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; savedResourceIds: number[]; onToggleSaved: (id: number) => void; onSetUpClass: () => void }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All resources");
-  const [saved, setSaved] = useState<number[]>([1]);
-  const visible = resources.filter((resource) => `${resource.title} ${resource.subject} ${resource.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase()) && (filter === "All resources" || resource.subject === filter));
+  const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
+  const selectedClass = classes.find((item) => item.id === selectedClassId);
+  const visible = resources.filter((resource) => `${resource.title} ${resource.subject} ${resource.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase()) && (filter === "All resources" || filter === "Saved on device" ? filter !== "Saved on device" || savedResourceIds.includes(resource.id) : resource.subject === filter));
 
   return <div className="view-page">
     <PageIntro eyebrow="SHARED LIBRARY" title="Resources made by teachers" description="Find materials that fit your grades, competencies, and classroom context." action={<button className="primary-button" type="button">↑ Share a resource</button>} />
-    <section className="library-tools"><label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by lesson, competency, keyword, or author" /></label><div className="filter-row">{["All resources", "Mathematics", "Science", "English"].map((item) => <button className={filter === item ? "active" : ""} type="button" onClick={() => setFilter(item)} key={item}>{item}</button>)}</div><button className="filter-button" type="button">☷ More filters <span>3</span></button></section>
-    <div className="library-summary"><p><strong>{visible.length} recommended resources</strong><span>Matched to Grades 3–5 · Agusan del Sur · low connectivity</span></p><select aria-label="Sort resources"><option>Most relevant</option><option>Highest rated</option><option>Most saved</option></select></div>
+    <section className="library-context"><div><p className="eyebrow">RECOMMENDATIONS FOR</p>{selectedClass ? <label><select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select><span>Grades {selectedClass.grades.join(", ")} · {selectedClass.subject} · {selectedClass.quarter}</span></label> : <div className="library-no-class"><span>Add a class to receive relevant recommendations.</span><button type="button" onClick={onSetUpClass}>Set up class →</button></div>}</div><p><b>{savedResourceIds.length}</b><span>saved on this device</span></p></section>
+    <aside className="prototype-disclosure"><span>i</span><p><b>Prototype offline behavior</b> Your saved selection persists on this device. The production app would also cache the actual files so they open without a connection.</p></aside>
+    <section className="library-tools"><label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by lesson, competency, keyword, or author" /></label><div className="filter-row">{["All resources", "Saved on device", "Mathematics", "Science", "English"].map((item) => <button className={filter === item ? "active" : ""} type="button" onClick={() => setFilter(item)} key={item}>{item}</button>)}</div><button className="filter-button" type="button">☷ More filters <span>3</span></button></section>
+    <div className="library-summary"><p><strong>{visible.length} {filter === "Saved on device" ? "saved" : "recommended"} resources</strong><span>{selectedClass ? `Matched to Grades ${selectedClass.grades.join(", ")} · ${selectedClass.subject} · Agusan del Sur` : "Browse the shared teacher repository"}</span></p><select aria-label="Sort resources"><option>Most relevant</option><option>Highest rated</option><option>Most saved</option></select></div>
     <section className="resource-grid">
-      {visible.map((resource) => <article className="library-card" key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.type}</span></div><div className="library-body"><div className="library-badges">{resource.verified && <span className="verified">✓ Verified</span>}<span>Shared by Teacher Lina</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.subject}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="library-stats"><span>★ {resource.rating}</span><span>{resource.saves} saves</span><span>Updated 2 days ago</span></div><div className="library-actions"><button className="secondary-button" type="button">Preview</button><button className={saved.includes(resource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => setSaved((items) => items.includes(resource.id) ? items.filter((id) => id !== resource.id) : [...items, resource.id])}>{saved.includes(resource.id) ? "✓ Saved offline" : "Save offline"}</button></div></div></article>)}
+      {visible.map((resource) => <article className="library-card" key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.type}</span></div><div className="library-body"><div className="library-badges">{resource.verified && <span className="verified">✓ Verified</span>}<span>Shared by Teacher Lina</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.subject}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="library-stats"><span>★ {resource.rating}</span><span>{resource.saves} saves</span><span>Updated 2 days ago</span></div><div className="library-actions"><button className="secondary-button" type="button">Preview</button><button className={savedResourceIds.includes(resource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => onToggleSaved(resource.id)}>{savedResourceIds.includes(resource.id) ? "✓ Saved on device" : "Save to device"}</button></div></div></article>)}
     </section>
     {!visible.length && <div className="empty-state"><b>No matching resources yet</b><p>Try a broader keyword or clear one of your filters.</p></div>}
   </div>;
 }
 
-const learners = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy"];
+const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino"];
 
-function AttendanceView() {
-  const [grade, setGrade] = useState(3);
-  const [statuses, setStatuses] = useState<Record<string, string>>(() => Object.fromEntries(learners.map((name) => [name, "Present"])));
+function learnersForClass(item: TeachingClass, grade: number) {
+  const count = Math.max(1, Math.ceil(item.learnerCount / item.grades.length));
+  return Array.from({ length: count }, (_, index) => learnerNames[index] || `Learner ${String(index + 1).padStart(2, "0")} · Grade ${grade}`);
+}
+
+function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; attendanceRecords: Record<string, Record<string, string>>; onSave: (key: string, statuses: Record<string, string>) => void; onSetUpClass: () => void }) {
+  const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
+  const selectedClass = classes.find((item) => item.id === selectedClassId);
+  const [grade, setGrade] = useState(selectedClass?.grades[0] || 1);
+  const learners = selectedClass ? learnersForClass(selectedClass, grade) : [];
+  const recordKey = `${selectedClassId}-grade-${grade}`;
+  const [statuses, setStatuses] = useState<Record<string, string>>(() => attendanceRecords[recordKey] || Object.fromEntries(learners.map((name) => [name, "Present"])));
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setStatuses(attendanceRecords[recordKey] || Object.fromEntries(learners.map((name) => [name, "Present"])));
+    setSaved(Boolean(attendanceRecords[recordKey]));
+  }, [recordKey]);
+
+  function chooseClass(classId: string) {
+    const item = classes.find((entry) => entry.id === classId);
+    setSelectedClassId(classId);
+    setGrade(item?.grades[0] || 1);
+  }
+
+  if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><p className="eyebrow">RECORD ATTENDANCE</p><h1>Add a class first</h1><p>Attendance uses the classes and grade groups you manage, so there is nothing to record until a class is set up.</p><div><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
+
   const counts = learners.reduce<Record<string, number>>((total, name) => ({ ...total, [statuses[name]]: (total[statuses[name]] || 0) + 1 }), {});
-  return <div className="view-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title="Today’s attendance" description="Monday, August 17 · Dinagat Elementary School" action={<button className="primary-button" type="button" onClick={() => setSaved(true)}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
-    <div className="attendance-grid"><section className="attendance-main"><div className="attendance-toolbar"><div className="grade-tabs">{[3, 4, 5].map((item) => <button className={grade === item ? "active" : ""} type="button" onClick={() => setGrade(item)} key={item}>Grade {item}<small>{6 + item} learners</small></button>)}</div><button className="text-button" type="button">Mark all present</button></div><div className="student-list"><div className="student-head"><span>Learner</span><span>Status</span></div>{learners.map((name, index) => <div className="student-row" key={name}><div><span className="student-avatar">{name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><p><strong>{name}</strong><small>LRN •••• {2041 + index}</small></p></div><div className="status-options">{["Present", "Absent", "Late", "Leave"].map((status) => <button className={statuses[name] === status ? `active ${status.toLowerCase()}` : ""} type="button" onClick={() => setStatuses((current) => ({ ...current, [name]: status }))} key={status}>{status}</button>)}</div></div>)}</div></section><aside className="attendance-summary"><p className="eyebrow">GRADE {grade} SUMMARY</p><h3>{learners.length} learners</h3><div className="summary-ring"><strong>{Math.round(((counts.Present || 0) / learners.length) * 100)}%</strong><span>present</span></div>{["Present", "Absent", "Late", "Leave"].map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Safe while offline</b><small>Changes sync when a connection returns.</small></p></div></aside></div>
+  return <div className="view-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title="Today’s attendance" description={`Monday, August 17 · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={() => { onSave(recordKey, statuses); setSaved(true); }}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
+    <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><span>{selectedClass.meetingDays} · starts {selectedClass.startTime}</span></section>
+    <div className="attendance-grid"><section className="attendance-main"><div className="attendance-toolbar"><div className="grade-tabs">{selectedClass.grades.map((item) => <button className={grade === item ? "active" : ""} type="button" onClick={() => setGrade(item)} key={item}>Grade {item}<small>{learnersForClass(selectedClass, item).length} learners</small></button>)}</div><button className="text-button" type="button" onClick={() => { setStatuses(Object.fromEntries(learners.map((name) => [name, "Present"]))); setSaved(false); }}>Mark all present</button></div><div className="student-list"><div className="student-head"><span>Learner</span><span>Status</span></div>{learners.map((name, index) => <div className="student-row" key={name}><div><span className="student-avatar">{name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><p><strong>{name}</strong><small>LRN •••• {2041 + index}</small></p></div><div className="status-options">{["Present", "Absent", "Late", "Leave"].map((status) => <button className={statuses[name] === status ? `active ${status.toLowerCase()}` : ""} type="button" onClick={() => { setStatuses((current) => ({ ...current, [name]: status })); setSaved(false); }} key={status}>{status}</button>)}</div></div>)}</div></section><aside className="attendance-summary"><p className="eyebrow">GRADE {grade} SUMMARY</p><h3>{learners.length} learners</h3><div className="summary-ring"><strong>{Math.round(((counts.Present || 0) / learners.length) * 100)}%</strong><span>present</span></div>{["Present", "Absent", "Late", "Leave"].map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Saved locally first</b><small>Records persist on this device and can sync when a connection returns.</small></p></div></aside></div>
   </div>;
 }
 
