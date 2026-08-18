@@ -214,7 +214,7 @@ function StackedKalingaLogo() {
 
 function KalingaFooterArtwork() {
   return (
-    <svg className="login-artwork" viewBox="0 0 900 215" preserveAspectRatio="none" aria-hidden="true">
+    <svg className="login-artwork" viewBox="0 0 1440 215" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
       <defs>
         <pattern id="woven-band" width="180" height="96" patternUnits="userSpaceOnUse">
           <rect width="180" height="96" fill="#050505" />
@@ -231,16 +231,21 @@ function KalingaFooterArtwork() {
           <path d="M0 16v40M0 29l-24 18M0 29l24 18M0 56l-20 28M0 56l20 28" fill="none" stroke="#ec5822" strokeWidth="8" strokeLinecap="round" />
         </g>
       </defs>
-      <rect x="0" y="119" width="900" height="96" fill="url(#woven-band)" />
-      <path d="M0 125Q75 73 150 125T300 125T450 125T600 125T750 125T900 125" fill="none" stroke="#050505" strokeWidth="17" />
+      <rect x="0" y="119" width="1440" height="96" fill="url(#woven-band)" />
+      <path d="M0 125Q75 73 150 125T300 125T450 125T600 125T750 125T900 125T1050 125T1200 125T1350 125T1500 125" fill="none" stroke="#050505" strokeWidth="17" />
       <use href="#kalinga-bloom" x="45" y="67" />
       <use href="#kalinga-bloom" x="138" y="62" />
       <use href="#kalinga-bloom" x="231" y="66" />
       <use href="#kalinga-bloom" x="324" y="60" />
       <use href="#kalinga-bloom" x="417" y="66" />
       <use href="#kalinga-bloom" x="510" y="61" />
-      <use href="#person" x="700" y="27" />
-      <use href="#person" x="785" y="27" />
+      <use href="#kalinga-bloom" x="603" y="67" />
+      <use href="#kalinga-bloom" x="696" y="62" />
+      <use href="#kalinga-bloom" x="789" y="66" />
+      <use href="#kalinga-bloom" x="882" y="60" />
+      <use href="#kalinga-bloom" x="975" y="66" />
+      <use href="#person" x="1185" y="27" />
+      <use href="#person" x="1270" y="27" />
     </svg>
   );
 }
