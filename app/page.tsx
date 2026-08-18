@@ -208,7 +208,7 @@ export default function Home() {
     <main className="app-shell">
       <aside className="sidebar" aria-label="Main navigation">
         <button className="brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}>
-          <Image src="/ChatGPT Image Aug 18, 2026, 09_33_48 AM.png" width={1536} height={1024} alt="Kalinga" priority />
+          <Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority />
         </button>
 
         <nav className="nav-list">
@@ -236,7 +236,7 @@ export default function Home() {
 
       <section className="workspace">
         <header className="topbar">
-          <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/ChatGPT Image Aug 18, 2026, 09_33_48 AM.png" width={1536} height={1024} alt="Kalinga" priority /></button>
+          <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority /></button>
           <label className="search">
             <span aria-hidden="true">⌕</span>
             <input aria-label="Search lessons and resources" placeholder="Search lessons, competencies, or resources" />
@@ -380,7 +380,7 @@ function LoginScreen({ onContinue }: { onContinue: () => void }) {
 function StackedKalingaLogo() {
   return (
     <div className="stacked-logo" aria-label="Kalinga">
-      <Image src="/ChatGPT Image Aug 18, 2026, 09_33_48 AM.png" width={1536} height={1024} alt="" priority />
+      <Image src="/kalinga-logo.png" width={2172} height={724} alt="" priority />
     </div>
   );
 }
