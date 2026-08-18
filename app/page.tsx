@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 const schedule = [
   { time: "8:00", title: "Shared warm-up", detail: "Fractions around us", tone: "shared" },
@@ -23,10 +24,9 @@ export default function Home() {
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Main navigation">
-        <div className="brand" aria-label="Kalinga home">
-          <span className="brand-mark" aria-hidden="true"><i /><i /><i /><b>∞</b></span>
-          <span>kalinga</span>
-        </div>
+        <button className="brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}>
+          <Image src="/kalinga-logo.png" width={180} height={60} alt="Kalinga" priority />
+        </button>
 
         <nav className="nav-list">
           <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" onClick={() => setView("home")}><span className="nav-icon">⌂</span> Home</button>
@@ -49,7 +49,7 @@ export default function Home() {
 
       <section className="workspace">
         <header className="topbar">
-          <div className="mobile-brand">kalinga</div>
+          <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={116} height={39} alt="Kalinga" priority /></button>
           <label className="search">
             <span aria-hidden="true">⌕</span>
             <input aria-label="Search lessons and resources" placeholder="Search lessons, competencies, or resources" />
@@ -66,7 +66,7 @@ export default function Home() {
           <section className="welcome-row">
             <div>
               <p className="eyebrow">MONDAY · AUGUST 17</p>
-              <h1>Magandang araw, Teacher Ana!</h1>
+              <h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>Teacher Ana!</em></h1>
               <p className="lead">Your three grade groups are ready for today.</p>
             </div>
             <button className="primary-button" type="button" onClick={beginPlan}><span>＋</span> Plan a multigrade lesson</button>
