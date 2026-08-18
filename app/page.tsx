@@ -16,10 +16,18 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [view, setView] = useState<View>("home");
   const [hasEntered, setHasEntered] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   function beginPlan() {
     setView("plan");
     setNotice("");
+  }
+
+  function signOut() {
+    setAccountOpen(false);
+    setView("home");
+    setNotice("");
+    setHasEntered(false);
   }
 
   if (!hasEntered) {
@@ -45,11 +53,14 @@ export default function Home() {
           <div><strong>Offline-ready</strong><small>12 resources saved</small></div>
         </div>
 
-        <button className="profile" type="button">
-          <span className="avatar">TA</span>
-          <span><strong>Teacher Ana</strong><small>Dinagat Elementary</small></span>
-          <span aria-hidden="true">···</span>
-        </button>
+        <div className="account-anchor desktop-account">
+          {accountOpen && <AccountMenu onSignOut={signOut} />}
+          <button className="profile" type="button" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
+            <span className="avatar">TA</span>
+            <span><strong>Teacher Ana</strong><small>Dinagat Elementary</small></span>
+            <span aria-hidden="true">···</span>
+          </button>
+        </div>
       </aside>
 
       <section className="workspace">
@@ -63,6 +74,10 @@ export default function Home() {
             <span className="connection"><i /> Offline-ready</span>
             <button className="language" type="button">ENG / FIL</button>
             <button className="notification" type="button" aria-label="Notifications">●</button>
+            <div className="account-anchor mobile-account">
+              <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>TA</button>
+              {accountOpen && <AccountMenu onSignOut={signOut} />}
+            </div>
           </div>
         </header>
 
@@ -162,9 +177,7 @@ function LoginScreen({ onContinue }: { onContinue: () => void }) {
   return (
     <main className="login-screen">
       <section className="login-panel" aria-labelledby="login-title">
-        <div className="login-brand">
-          <Image src="/kalinga-logo.png" width={245} height={82} alt="Kalinga" priority />
-        </div>
+        <StackedKalingaLogo />
         <div className="login-copy">
           <p className="eyebrow">TEACHERS’ ASSISTANT</p>
           <h1 id="login-title">Welcome back, Teacher</h1>
@@ -183,8 +196,66 @@ function LoginScreen({ onContinue }: { onContinue: () => void }) {
         <p className="demo-note"><span>i</span><b>Demo access</b> No authorization is connected yet. Either option safely opens the sample app.</p>
         <p className="login-language">English <i /> Filipino</p>
       </section>
-      <div className="login-pattern" aria-hidden="true"><span /><span /><span /><span /><span /></div>
+      <KalingaFooterArtwork />
     </main>
+  );
+}
+
+function StackedKalingaLogo() {
+  return (
+    <div className="stacked-logo" aria-label="Kalinga">
+      <span className="stacked-logo-symbol" aria-hidden="true">
+        <Image src="/kalinga-logo.png" width={600} height={200} alt="" priority />
+      </span>
+      <span className="stacked-logo-word" aria-hidden="true">kalinga</span>
+    </div>
+  );
+}
+
+function KalingaFooterArtwork() {
+  return (
+    <svg className="login-artwork" viewBox="0 0 900 215" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <pattern id="woven-band" width="180" height="96" patternUnits="userSpaceOnUse">
+          <rect width="180" height="96" fill="#050505" />
+          <path d="M-28 83 45 10l73 73M62 83l73-73 73 73" fill="none" stroke="#f7efe2" strokeWidth="22" />
+        </pattern>
+        <g id="kalinga-bloom">
+          <circle cx="0" cy="0" r="6" fill="#ec5822" />
+          <circle cx="-13" cy="3" r="4" fill="#ec5822" />
+          <circle cx="13" cy="3" r="4" fill="#ec5822" />
+          <path d="M-17 17Q0 1 17 17M-16 17l16 14 16-14M-16 17 0 8l16 9M0 31v25" fill="none" stroke="#050505" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+        <g id="person">
+          <circle cx="0" cy="0" r="13" fill="#ec5822" />
+          <path d="M0 16v40M0 29l-24 18M0 29l24 18M0 56l-20 28M0 56l20 28" fill="none" stroke="#ec5822" strokeWidth="8" strokeLinecap="round" />
+        </g>
+      </defs>
+      <rect x="0" y="119" width="900" height="96" fill="url(#woven-band)" />
+      <path d="M0 125Q75 73 150 125T300 125T450 125T600 125T750 125T900 125" fill="none" stroke="#050505" strokeWidth="17" />
+      <use href="#kalinga-bloom" x="45" y="67" />
+      <use href="#kalinga-bloom" x="138" y="62" />
+      <use href="#kalinga-bloom" x="231" y="66" />
+      <use href="#kalinga-bloom" x="324" y="60" />
+      <use href="#kalinga-bloom" x="417" y="66" />
+      <use href="#kalinga-bloom" x="510" y="61" />
+      <use href="#person" x="700" y="27" />
+      <use href="#person" x="785" y="27" />
+    </svg>
+  );
+}
+
+function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <div className="account-menu" role="menu" aria-label="Account options">
+      <div className="account-menu-heading"><span className="avatar">TA</span><span><strong>Teacher Ana</strong><small>teacher.ana@kalinga.ph</small></span></div>
+      <div className="account-menu-options">
+        <button type="button" role="menuitem" disabled><span>◎</span> Account settings<small>Coming soon</small></button>
+        <button type="button" role="menuitem" disabled><span>↓</span> Offline downloads<small>Coming soon</small></button>
+        <button type="button" role="menuitem" disabled><span>?</span> Help &amp; support<small>Coming soon</small></button>
+      </div>
+      <button className="signout-button" type="button" role="menuitem" onClick={onSignOut}><span>↪</span> Sign out</button>
+    </div>
   );
 }
 
