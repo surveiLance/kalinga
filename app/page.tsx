@@ -15,10 +15,15 @@ type View = "home" | "plan" | "library" | "attendance" | "community";
 export default function Home() {
   const [notice, setNotice] = useState("");
   const [view, setView] = useState<View>("home");
+  const [hasEntered, setHasEntered] = useState(false);
 
   function beginPlan() {
     setView("plan");
     setNotice("");
+  }
+
+  if (!hasEntered) {
+    return <LoginScreen onContinue={() => setHasEntered(true)} />;
   }
 
   return (
@@ -140,6 +145,45 @@ export default function Home() {
           <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Home</button><button className={view === "plan" ? "active" : ""} type="button" onClick={beginPlan}><span>＋</span>Create</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Library</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Community</button>
         </nav>
       </section>
+    </main>
+  );
+}
+
+function LoginScreen({ onContinue }: { onContinue: () => void }) {
+  const [email, setEmail] = useState("teacher.ana@kalinga.ph");
+  const [password, setPassword] = useState("kalinga-demo");
+  const [showPassword, setShowPassword] = useState(false);
+
+  function submitLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onContinue();
+  }
+
+  return (
+    <main className="login-screen">
+      <section className="login-panel" aria-labelledby="login-title">
+        <div className="login-brand">
+          <Image src="/kalinga-logo.png" width={245} height={82} alt="Kalinga" priority />
+        </div>
+        <div className="login-copy">
+          <p className="eyebrow">TEACHERS’ ASSISTANT</p>
+          <h1 id="login-title">Welcome back, Teacher</h1>
+          <p>Sign in to access your lessons, saved resources, and classroom records.</p>
+        </div>
+
+        <form className="login-form" onSubmit={submitLogin}>
+          <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teacher@school.edu.ph" required /></label>
+          <label>Password<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? "Hide" : "Show"}</button></span></label>
+          <div className="login-options"><label><input type="checkbox" defaultChecked /> Keep me signed in</label><button type="button">Forgot password?</button></div>
+          <button className="login-primary" type="submit">Sign in to Kalinga</button>
+        </form>
+
+        <div className="login-divider"><span>or</span></div>
+        <button className="prototype-button" type="button" onClick={onContinue}>Continue to prototype <span>→</span></button>
+        <p className="demo-note"><span>i</span><b>Demo access</b> No authorization is connected yet. Either option safely opens the sample app.</p>
+        <p className="login-language">English <i /> Filipino</p>
+      </section>
+      <div className="login-pattern" aria-hidden="true"><span /><span /><span /><span /><span /></div>
     </main>
   );
 }
