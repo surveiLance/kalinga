@@ -577,7 +577,13 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
     setScheduleExpanded(false);
   }
 
-  function editClass(item: TeachingClass) {
+  function openNewClassForm() {
+    resetForm();
+    setFormOpen(true);
+    window.requestAnimationFrame(() => document.querySelector(".class-setup-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function editClass(item: TeachingClass, section: "details" | "schedule" | "learners" = "details") {
     setEditingId(item.id);
     setDeleteCandidateId("");
     setName(item.name);
@@ -586,9 +592,10 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
     setQuarter(item.quarter);
     setMeetings(item.meetings.map((meeting) => ({ ...meeting })));
     setLearners(item.learners.map((learner) => ({ ...learner })));
-    setScheduleExpanded(true);
+    setScheduleExpanded(section === "schedule");
     setFormOpen(true);
-    window.requestAnimationFrame(() => document.querySelector(".class-setup-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    const target = section === "learners" ? ".roster-builder" : section === "schedule" ? ".class-meeting-builder" : ".class-setup-card";
+    window.requestAnimationFrame(() => document.querySelector(target)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
   function updateGrades(next: GradeLevel[]) {
@@ -634,8 +641,8 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
 
   return (
     <div className="view-page classes-page">
-      {!!classes.length && <PageIntro eyebrow="CLASSES & LEARNERS" title="Choose a class" description="Open a class to take attendance, plan a lesson, change its schedule, or manage learners." action={<button className="primary-button" type="button" onClick={() => { resetForm(); setFormOpen(true); }}>＋ Add a class</button>} />}
-      {!!classes.length && <AllClassesSchedule classes={classes} onOpenClass={(classId) => { onSelectClass(classId); window.requestAnimationFrame(() => document.querySelector(".class-hub")?.scrollIntoView({ behavior: "smooth", block: "start" })); }} onEditClass={editClass} />}
+      {!!classes.length && <PageIntro eyebrow="CLASSES & LEARNERS" title="Choose a class" description="Open a class to take attendance, plan a lesson, change its schedule, or manage learners." />}
+      {!!classes.length && <AllClassesSchedule classes={classes} onOpenClass={(classId) => { onSelectClass(classId); window.requestAnimationFrame(() => document.querySelector(".class-hub")?.scrollIntoView({ behavior: "smooth", block: "start" })); }} onEditClass={(item) => editClass(item, "schedule")} />}
       {!!classes.length && selectedClass && <section className="class-hub">
         <nav className="class-switcher" aria-label="Saved classes">
           <p className="eyebrow">YOUR CLASSES</p>
@@ -644,13 +651,13 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
         <div className="class-workspace">
           <header className="class-workspace-head">
             <div><p className="eyebrow">{selectedClass.quarter} · {selectedClass.meetings.length} SAVED CLASS BLOCKS</p><h2>{selectedClass.name}</h2><p>{gradeList(selectedClass.grades)} · {selectedClass.subjects.join(" · ")} · {selectedClass.learners.length} learners</p></div>
-            <div><button className="secondary-button" type="button" onClick={() => editClass(selectedClass)}>✎ Edit class</button><button className="danger-outline-button" type="button" onClick={() => setDeleteCandidateId(selectedClass.id)}>Delete class</button><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button></div>
+            <div className="class-header-actions"><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button><details className="class-more-menu"><summary aria-label={`More options for ${selectedClass.name}`}>•••</summary><div role="menu"><button type="button" role="menuitem" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); editClass(selectedClass, "details"); }}><span>✎</span><span><b>Edit class details</b><small>Change grades, subjects, or quarter</small></span></button><button className="delete-menu-item" type="button" role="menuitem" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); setDeleteCandidateId(selectedClass.id); }}><span>×</span><span><b>Delete class</b><small>Remove this class and its records</small></span></button></div></details></div>
           </header>
           {deleteCandidateId === selectedClass.id && <div className="delete-confirm prominent-delete" role="alert"><div><b>Delete {selectedClass.name} permanently?</b><span>This removes the class, its lesson plans, learner attendance, and saved timetable from this device.</span></div><div><button type="button" onClick={() => setDeleteCandidateId("")}>Keep class</button><button type="button" onClick={() => { onDelete(selectedClass.id); setDeleteCandidateId(""); }}>Yes, delete class</button></div></div>}
           <div className="class-action-strip">
             <button type="button" onClick={onAttendance}><span>✓</span><p><b>Take attendance</b><small>{attendanceCount ? `${attendanceCount} records saved` : `${selectedClass.learners.length} learners ready`}</small></p><b>→</b></button>
-            <button type="button" onClick={() => editClass(selectedClass)}><span>▦</span><p><b>Class meeting times</b><small>{selectedClass.meetings.map((meeting) => `${meeting.days} ${meeting.startTime}`).join(" · ")}</small></p><b>→</b></button>
-            <button type="button" onClick={() => editClass(selectedClass)}><span>◎</span><p><b>Manage learners</b><small>Add names or change grade levels</small></p><b>→</b></button>
+            <button type="button" onClick={() => editClass(selectedClass, "schedule")}><span>▦</span><p><b>Class meeting times</b><small>{selectedClass.meetings.map((meeting) => `${meeting.days} ${meeting.startTime}`).join(" · ")}</small></p><b>→</b></button>
+            <button type="button" onClick={() => editClass(selectedClass, "learners")}><span>◎</span><p><b>Manage learners</b><small>Add, remove, or change learner grade levels</small></p><b>→</b></button>
           </div>
           <div className="class-detail-grid">
             <article className="class-schedule-panel">
@@ -665,6 +672,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
           </div>
         </div>
       </section>}
+      {!!classes.length && !formOpen && <section className="add-class-bottom"><div><p className="eyebrow">NEW SCHOOL TERM OR TEACHING LOAD?</p><h2>Need another class?</h2><p>Add another class only when you begin managing a new group of learners.</p></div><button className="secondary-button" type="button" onClick={openNewClassForm}>＋ Add another class</button></section>}
       {(formOpen || !classes.length) && <form className={`class-setup-card class-form-drawer ${!classes.length ? "first-class-form" : ""}`} onSubmit={submitClass}>
         <div className="class-setup-heading"><span>{editingId ? "✓" : "1"}</span><div><p className="eyebrow">{editingId ? "EDIT SAVED CLASS" : "STEP 1 · CLASS DETAILS"}</p><h2>{editingId ? `Edit ${name}` : classes.length ? "Add a class" : "Set up your first class"}</h2><p>{editingId ? "Changes will appear everywhere this class is used." : "Start with the basics. Schedule and learner names can be added now or changed later."}</p></div>{editingId && <button className="text-button cancel-edit" type="button" onClick={() => { resetForm(); setFormOpen(false); }}>Cancel editing</button>}</div>
         <div className="form-grid class-form-grid">
