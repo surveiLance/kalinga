@@ -280,3 +280,69 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
   .library-context select, .attendance-class-picker select { width: 100%; min-width: 0; }
   .prototype-disclosure { align-items: flex-start; }
 }
+
+/* Motion system */
+@keyframes kalinga-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kalinga-slide-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes kalinga-pop {
+  from { opacity: 0; transform: translateY(7px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes kalinga-soft-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(92, 199, 178, .13); }
+  50% { box-shadow: 0 0 0 8px rgba(92, 199, 178, 0); }
+}
+
+@keyframes kalinga-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes kalinga-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.login-panel { animation: kalinga-rise .55s cubic-bezier(.22, 1, .36, 1) both; }
+.login-artwork { animation: kalinga-fade .7s .08s ease-out both; }
+.sidebar { animation: kalinga-slide-in .4s cubic-bezier(.22, 1, .36, 1) both; }
+.topbar { animation: kalinga-rise .35s cubic-bezier(.22, 1, .36, 1) both; }
+.home-welcome, .page-intro { animation: kalinga-rise .36s cubic-bezier(.22, 1, .36, 1) both; }
+.home-command-grid, .hero-grid, .all-schedule-card, .class-hub, .builder-card, .competency-layout, .plan-result, .library-tools, .library-summary, .attendance-class-picker, .attendance-grid, .community-tabs, .discussion-layout { animation: kalinga-rise .42s .06s cubic-bezier(.22, 1, .36, 1) both; }
+.account-menu, .delete-confirm, .notice { transform-origin: top right; animation: kalinga-pop .2s cubic-bezier(.22, 1, .36, 1) both; }
+.status-dot, .connection i { animation: kalinga-soft-pulse 2.4s ease-in-out infinite; }
+.progress-track span { transform-origin: left; animation: kalinga-fill .65s .18s cubic-bezier(.22, 1, .36, 1) both; }
+.summary-ring { animation: kalinga-pop .4s .12s cubic-bezier(.22, 1, .36, 1) both; }
+
+.primary-button, .secondary-button, .dark-button, .prototype-button, .login-primary, .nav-item, .mobile-nav button, .quick-card, .class-action-strip > button, .class-switcher > button, .schedule-row-actions button, .library-card, .library-actions button, .status-options button, .grade-tabs button, .filter-button, .text-button, .danger-outline-button {
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease, color .18s ease, opacity .18s ease;
+}
+
+.primary-button:hover, .secondary-button:hover, .dark-button:hover, .prototype-button:hover, .login-primary:hover { transform: translateY(-2px); }
+.quick-card:hover, .class-action-strip > button:hover, .class-switcher > button:hover, .schedule-row-actions button:hover, .library-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(37, 31, 24, .09); }
+.primary-button:active, .secondary-button:active, .dark-button:active, .prototype-button:active, .login-primary:active, .nav-item:active, .mobile-nav button:active, .quick-card:active, .class-action-strip > button:active, .schedule-row-actions button:active, .library-actions button:active, .status-options button:active, .grade-tabs button:active, .filter-button:active, .text-button:active, .danger-outline-button:active { transform: scale(.97); }
+.nav-item .nav-icon, .mobile-nav button span, .class-action-strip > button > b, .schedule-row-actions button { transition: transform .18s ease; }
+.nav-item:hover .nav-icon, .nav-item.active .nav-icon { transform: translateX(2px); }
+.mobile-nav button.active span { transform: translateY(-2px); }
+.class-action-strip > button:hover > b { transform: translateX(3px); }
+.student-row, .all-schedule-list article, .meeting-row, .reply-item { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
+.student-row:hover, .all-schedule-list article:hover, .meeting-row:hover, .reply-item:hover { transform: translateX(2px); }
+.status-options button.active, .grade-tabs button.active, .schedule-day-tabs button.active { transform: scale(1.03); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
