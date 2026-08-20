@@ -37,9 +37,9 @@ h1, h2 { font-family: var(--font-display); font-weight: 700; }
 .login-copy > p:last-child { max-width: 350px; margin: 0 auto; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .login-form { margin-top: 26px; display: grid; gap: 15px; }
 .login-form > label { display: grid; gap: 8px; color: var(--ink); font-size: 11px; font-weight: 750; }
-.login-form input[type="email"], .password-field { width: 100%; height: 51px; border: 1px solid #d7cfc3; border-radius: 14px; background: #fff; box-shadow: 0 5px 18px rgba(43, 35, 27, .035); }
-.login-form input[type="email"], .password-field input { padding: 0 15px; color: var(--ink); font-size: 12px; outline: 0; }
-.login-form input[type="email"]:focus, .password-field:focus-within { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(236, 88, 34, .12); }
+.login-form input[type="text"], .login-form input[type="email"], .password-field { width: 100%; height: 51px; border: 1px solid #d7cfc3; border-radius: 14px; background: #fff; box-shadow: 0 5px 18px rgba(43, 35, 27, .035); }
+.login-form input[type="text"], .login-form input[type="email"], .password-field input { padding: 0 15px; color: var(--ink); font-size: 12px; outline: 0; }
+.login-form input[type="text"]:focus, .login-form input[type="email"]:focus, .password-field:focus-within { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(236, 88, 34, .12); }
 .password-field { display: flex; align-items: center; overflow: hidden; }
 .password-field input { min-width: 0; flex: 1; height: 100%; border: 0; background: transparent; }
 .password-field input:focus { outline: 0; }

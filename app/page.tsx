@@ -89,6 +89,17 @@ function gradeList(grades: GradeLevel[]) {
   return grades.map(gradeLabel).join(", ");
 }
 
+function teacherLabel(name: string) {
+  const cleaned = name.trim();
+  return cleaned ? `Teacher ${cleaned}` : "Teacher";
+}
+
+function teacherInitials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "T";
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase()).join("");
+}
+
 function sortGradeLevels(grades: GradeLevel[]) {
   return [...grades].sort((a, b) => {
     const aIndex = commonGradeLevels.indexOf(a);
@@ -195,6 +206,8 @@ export default function Home() {
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, Record<string, string>>>({});
   const [editingPlanId, setEditingPlanId] = useState("");
   const [classDataReady, setClassDataReady] = useState(false);
+  const [teacherName, setTeacherName] = useState("Ana");
+  const [teacherEmail, setTeacherEmail] = useState("teacher.ana@kalinga.ph");
 
   useEffect(() => {
     try {
@@ -203,6 +216,8 @@ export default function Home() {
       const storedPlans = window.localStorage.getItem("kalinga-plans");
       const storedResources = window.localStorage.getItem("kalinga-saved-resources");
       const storedAttendance = window.localStorage.getItem("kalinga-attendance");
+      const storedTeacherName = window.localStorage.getItem("kalinga-teacher-name");
+      const storedTeacherEmail = window.localStorage.getItem("kalinga-teacher-email");
       if (storedClasses) {
         const parsed = (JSON.parse(storedClasses) as LegacyTeachingClass[]).map(normalizeClass);
         // Hydrate device-only prototype data after the client mounts.
@@ -213,6 +228,8 @@ export default function Home() {
       if (storedPlans) setSavedPlans((JSON.parse(storedPlans) as LegacySavedPlan[]).map(normalizeSavedPlan));
       if (storedResources) setSavedResourceIds(JSON.parse(storedResources) as number[]);
       if (storedAttendance) setAttendanceRecords(JSON.parse(storedAttendance) as Record<string, Record<string, string>>);
+      if (storedTeacherName) setTeacherName(storedTeacherName);
+      if (storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
     } catch {
       // A clean zero state is safer than blocking the prototype on damaged local data.
     } finally {
@@ -227,7 +244,9 @@ export default function Home() {
     window.localStorage.setItem("kalinga-plans", JSON.stringify(savedPlans));
     window.localStorage.setItem("kalinga-saved-resources", JSON.stringify(savedResourceIds));
     window.localStorage.setItem("kalinga-attendance", JSON.stringify(attendanceRecords));
-  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, classDataReady]);
+    window.localStorage.setItem("kalinga-teacher-name", teacherName);
+    window.localStorage.setItem("kalinga-teacher-email", teacherEmail);
+  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, teacherName, teacherEmail, classDataReady]);
 
   const activeClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
@@ -290,7 +309,7 @@ export default function Home() {
   }
 
   if (!hasEntered) {
-    return <LoginScreen onContinue={() => setHasEntered(true)} />;
+    return <LoginScreen name={teacherName} email={teacherEmail} onNameChange={setTeacherName} onEmailChange={setTeacherEmail} onContinue={() => setHasEntered(true)} />;
   }
 
   return (
@@ -314,10 +333,10 @@ export default function Home() {
         </div>
 
         <div className="account-anchor desktop-account">
-          {accountOpen && <AccountMenu onSignOut={signOut} />}
+          {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
           <button className="profile" type="button" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
-            <span className="avatar">TA</span>
-            <span><strong>Teacher Ana</strong><small>Dinagat Elementary</small></span>
+            <span className="avatar">{teacherInitials(teacherName)}</span>
+            <span><strong>{teacherLabel(teacherName)}</strong><small>Dinagat Elementary</small></span>
             <span aria-hidden="true">···</span>
           </button>
         </div>
@@ -335,8 +354,8 @@ export default function Home() {
             <button className="language" type="button">ENG / FIL</button>
             <button className="notification" type="button" aria-label="Notifications">●</button>
             <div className="account-anchor mobile-account">
-              <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>TA</button>
-              {accountOpen && <AccountMenu onSignOut={signOut} />}
+              <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
+              {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
             </div>
           </div>
         </header>
@@ -344,7 +363,7 @@ export default function Home() {
         <div className="content">
           {view === "home" && !activeClass ? <ClassZeroState onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} /> : view === "home" && activeClass ? <>
             <section className="welcome-row home-welcome">
-              <div><p className="eyebrow">MONDAY · AUGUST 17</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>Teacher Ana!</em></h1><p className="lead">Here is what needs your attention today. Full class details stay in My Classes.</p></div>
+              <div><p className="eyebrow">MONDAY · AUGUST 17</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>{teacherLabel(teacherName)}!</em></h1><p className="lead">Here is what needs your attention today. Full class details stay in My Classes.</p></div>
               <div className="welcome-actions"><label>Today’s class<select value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div>
             </section>
             {notice && <p className="notice" role="status">{notice}</p>}
@@ -377,8 +396,7 @@ export default function Home() {
   );
 }
 
-function LoginScreen({ onContinue }: { onContinue: () => void }) {
-  const [email, setEmail] = useState("teacher.ana@kalinga.ph");
+function LoginScreen({ name, email, onNameChange, onEmailChange, onContinue }: { name: string; email: string; onNameChange: (name: string) => void; onEmailChange: (email: string) => void; onContinue: () => void }) {
   const [password, setPassword] = useState("kalinga-demo");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -398,7 +416,8 @@ function LoginScreen({ onContinue }: { onContinue: () => void }) {
         </div>
 
         <form className="login-form" onSubmit={submitLogin}>
-          <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teacher@school.edu.ph" required /></label>
+          <label>Teacher name<input type="text" value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Your name" required /></label>
+          <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="teacher@school.edu.ph" required /></label>
           <label>Password<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? "Hide" : "Show"}</button></span></label>
           <div className="login-options"><label><input type="checkbox" defaultChecked /> Keep me signed in</label><button type="button">Forgot password?</button></div>
           <button className="login-primary" type="submit">Sign in to Kalinga</button>
@@ -460,10 +479,10 @@ function KalingaFooterArtwork() {
   );
 }
 
-function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
+function AccountMenu({ name, email, onSignOut }: { name: string; email: string; onSignOut: () => void }) {
   return (
     <div className="account-menu" role="menu" aria-label="Account options">
-      <div className="account-menu-heading"><span className="avatar">TA</span><span><strong>Teacher Ana</strong><small>teacher.ana@kalinga.ph</small></span></div>
+      <div className="account-menu-heading"><span className="avatar">{teacherInitials(name)}</span><span><strong>{teacherLabel(name)}</strong><small>{email}</small></span></div>
       <div className="account-menu-options">
         <button type="button" role="menuitem" disabled><span>◎</span> Account settings<small>Coming soon</small></button>
         <button type="button" role="menuitem" disabled><span>↓</span> Offline downloads<small>Coming soon</small></button>
