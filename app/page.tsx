@@ -100,6 +100,21 @@ function teacherInitials(name: string) {
   return words.slice(0, 2).map((word) => word[0]?.toUpperCase()).join("");
 }
 
+function dateInputValue(date = new Date()) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+function displayDate(value: string) {
+  return new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`));
+}
+
+function moveDate(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return dateInputValue(date);
+}
+
 function sortGradeLevels(grades: GradeLevel[]) {
   return [...grades].sort((a, b) => {
     const aIndex = commonGradeLevels.indexOf(a);
@@ -249,10 +264,11 @@ export default function Home() {
   }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, teacherName, teacherEmail, classDataReady]);
 
   const activeClass = classes.find((item) => item.id === activeClassId) || classes[0];
+  const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
   const latestPlan = activePlans[0];
   const activeAttendance = activeClass
-    ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${activeClass.id}-grade-`)).flatMap(([, records]) => Object.values(records))
+    ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${activeClass.id}-${today}-grade-`) || key.startsWith(`${activeClass.id}-grade-`)).flatMap(([, records]) => Object.values(records))
     : [];
 
   function beginPlan(planId?: string) {
@@ -359,7 +375,7 @@ export default function Home() {
         <div className="content">
           {view === "home" && !activeClass ? <ClassZeroState onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} /> : view === "home" && activeClass ? <>
             <section className="welcome-row home-welcome">
-              <div><p className="eyebrow">MONDAY · AUGUST 17</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>{teacherLabel(teacherName)}!</em></h1><p className="lead">Here is what needs your attention today. Full class details stay in My Classes.</p></div>
+              <div><p className="eyebrow">{displayDate(today).toUpperCase()}</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>{teacherLabel(teacherName)}!</em></h1><p className="lead">Here is what needs your attention today. Full class details stay in My Classes.</p></div>
               <div className="welcome-actions"><label>Today’s class<select value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div>
             </section>
             {notice && <p className="notice" role="status">{notice}</p>}
@@ -897,34 +913,41 @@ function learnerCountLabel(count: number) {
   return `${count} ${count === 1 ? "learner" : "learners"}`;
 }
 
-function attendanceForClass(item: TeachingClass, attendanceRecords: Record<string, Record<string, string>>) {
+function attendanceForClass(item: TeachingClass, attendanceRecords: Record<string, Record<string, string>>, date: string) {
   return Object.fromEntries(item.learners.map((learner) => {
-    const stored = attendanceRecords[`${item.id}-grade-${learner.grade}`] || {};
+    const stored = attendanceRecords[`${item.id}-${date}-grade-${learner.grade}`] || attendanceRecords[`${item.id}-grade-${learner.grade}`] || {};
     return [learner.id, stored[learner.id] || stored[learner.name] || "Present"];
   }));
 }
 
 function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; attendanceRecords: Record<string, Record<string, string>>; onSave: (updates: Record<string, Record<string, string>>) => void; onSetUpClass: () => void }) {
   const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
+  const [selectedDate, setSelectedDate] = useState(dateInputValue());
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const [gradeFilter, setGradeFilter] = useState<GradeLevel | "all">("all");
   const allLearners = selectedClass ? selectedClass.learners : [];
   const learners = gradeFilter === "all" ? allLearners : allLearners.filter((learner) => learner.grade === gradeFilter);
-  const [statuses, setStatuses] = useState<Record<string, string>>(() => selectedClass ? attendanceForClass(selectedClass, attendanceRecords) : {});
+  const [statuses, setStatuses] = useState<Record<string, string>>(() => selectedClass ? attendanceForClass(selectedClass, attendanceRecords, selectedDate) : {});
   const [saved, setSaved] = useState(false);
 
   function chooseClass(classId: string) {
     const nextClass = classes.find((item) => item.id === classId);
     setSelectedClassId(classId);
     setGradeFilter("all");
-    setStatuses(nextClass ? attendanceForClass(nextClass, attendanceRecords) : {});
-    setSaved(Boolean(nextClass?.grades.some((grade) => attendanceRecords[`${nextClass.id}-grade-${grade}`])));
+    setStatuses(nextClass ? attendanceForClass(nextClass, attendanceRecords, selectedDate) : {});
+    setSaved(Boolean(nextClass?.grades.some((grade) => attendanceRecords[`${nextClass.id}-${selectedDate}-grade-${grade}`])));
+  }
+
+  function chooseDate(date: string) {
+    setSelectedDate(date);
+    setStatuses(selectedClass ? attendanceForClass(selectedClass, attendanceRecords, date) : {});
+    setSaved(Boolean(selectedClass?.grades.some((grade) => attendanceRecords[`${selectedClass.id}-${date}-grade-${grade}`])));
   }
 
   function saveVisibleAttendance() {
     if (!selectedClass) return;
     const updates = Object.fromEntries(selectedClass.grades.map((grade) => {
-      const key = `${selectedClass.id}-grade-${grade}`;
+      const key = `${selectedClass.id}-${selectedDate}-grade-${grade}`;
       const gradeLearners = learnersForClass(selectedClass, grade);
       return [key, Object.fromEntries(gradeLearners.map((learner) => [learner.id, statuses[learner.id] || "Present"]))];
     }));
@@ -935,8 +958,8 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, onSave, onS
   if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><p className="eyebrow">RECORD ATTENDANCE</p><h1>Add a class first</h1><p>Attendance uses the classes and grade groups you manage, so there is nothing to record until a class is set up.</p><div><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
   const counts = learners.reduce<Record<string, number>>((total, learner) => ({ ...total, [statuses[learner.id]]: (total[statuses[learner.id]] || 0) + 1 }), {});
-  return <div className="view-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title="Today’s attendance" description={`Monday, August 17 · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
-    <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><span>{selectedClass.meetings.map((meeting) => `${meeting.days} · ${meeting.startTime}`).join("  |  ")}</span></section>
+  return <div className="view-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
+    <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div className="attendance-date-picker"><button type="button" aria-label="Previous day" onClick={() => chooseDate(moveDate(selectedDate, -1))}>←</button><label>Date<input type="date" value={selectedDate} onChange={(event) => chooseDate(event.target.value)} /></label><button type="button" aria-label="Next day" onClick={() => chooseDate(moveDate(selectedDate, 1))}>→</button><button type="button" onClick={() => chooseDate(dateInputValue())}>Today</button></div><span>{selectedClass.meetings.map((meeting) => `${meeting.days} · ${meeting.startTime}`).join("  |  ")}</span></section>
     <div className="attendance-grid"><section className="attendance-main"><div className="attendance-toolbar"><div className="grade-tabs"><button className={gradeFilter === "all" ? "active" : ""} type="button" onClick={() => setGradeFilter("all")}>All students<small>{learnerCountLabel(allLearners.length)}</small></button>{selectedClass.grades.map((item) => { const count = learnersForClass(selectedClass, item).length; return <button className={gradeFilter === item ? "active" : ""} type="button" onClick={() => setGradeFilter(item)} key={item}>{gradeLabel(item)}<small>{learnerCountLabel(count)}</small></button>; })}</div><button className="text-button" type="button" onClick={() => { setStatuses((current) => ({ ...current, ...Object.fromEntries(learners.map((learner) => [learner.id, "Present"])) })); setSaved(false); }}>Mark {gradeFilter === "all" ? "all" : gradeLabel(gradeFilter)} present</button></div><div className="student-list"><div className="student-head"><span>Learner</span><span>Status</span></div>{learners.map((learner, index) => <div className="student-row" key={learner.id}><div><span className="student-avatar">{learner.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><p><strong>{learner.name}</strong><small>{gradeLabel(learner.grade)} · LRN •••• {2041 + index}</small></p></div><div className="status-options">{["Present", "Absent", "Late", "Leave"].map((status) => <button className={statuses[learner.id] === status ? `active ${status.toLowerCase()}` : ""} type="button" onClick={() => { setStatuses((current) => ({ ...current, [learner.id]: status })); setSaved(false); }} key={status}>{status}</button>)}</div></div>)}{!learners.length && <div className="attendance-empty"><span>◎</span><p><b>{gradeFilter === "all" ? "No learners added yet" : `No ${gradeLabel(gradeFilter)} learners yet`}</b><small>Add learner names to {selectedClass.name} and they will appear here automatically.</small></p><button className="secondary-button" type="button" onClick={onSetUpClass}>Edit class roster</button></div>}</div></section><aside className="attendance-summary"><p className="eyebrow">{gradeFilter === "all" ? "ALL STUDENTS" : gradeLabel(gradeFilter).toUpperCase()} SUMMARY</p><h3>{learnerCountLabel(learners.length)}</h3><div className="summary-ring"><strong>{learners.length ? Math.round(((counts.Present || 0) / learners.length) * 100) : 0}%</strong><span>present</span></div>{["Present", "Absent", "Late", "Leave"].map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Saved locally first</b><small>Records persist on this device and can sync when a connection returns.</small></p></div></aside></div>
   </div>;
 }
