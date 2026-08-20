@@ -345,10 +345,6 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority /></button>
-          <label className="search">
-            <span aria-hidden="true">⌕</span>
-            <input aria-label="Search lessons and resources" placeholder="Search lessons, competencies, or resources" />
-          </label>
           <div className="top-actions">
             <span className="connection"><i /> Offline-ready</span>
             <button className="language" type="button">ENG / FIL</button>
@@ -516,10 +512,13 @@ function ClassZeroState({ onSetUp, onLoadSample }: { onSetUp: () => void; onLoad
 }
 
 function AllClassesSchedule({ classes, onOpenClass, onEditClass }: { classes: TeachingClass[]; onOpenClass: (classId: string) => void; onEditClass: (item: TeachingClass) => void }) {
-  const [selectedDay, setSelectedDay] = useState("Monday");
+  const [selectedDay, setSelectedDay] = useState("Today");
+  const today = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const filterDay = selectedDay === "Today" ? today : selectedDay;
   const scheduleItems = classes.flatMap((item) => item.meetings.flatMap((meeting) => daysForPattern(meeting.days).map((day) => ({ key: `${item.id}-${meeting.id}-${day}`, classId: item.id, className: item.name, grades: item.grades, day, meeting, teachingClass: item }))));
+  const dayCounts = Object.fromEntries(weekDays.map((day) => [day, scheduleItems.filter((item) => item.day === day).length]));
   const visibleItems = scheduleItems
-    .filter((item) => selectedDay === "All days" || item.day === selectedDay)
+    .filter((item) => filterDay === "All days" || item.day === filterDay)
     .sort((a, b) => (weekDays.indexOf(a.day) - weekDays.indexOf(b.day)) || (toMinutes(a.meeting.startTime) - toMinutes(b.meeting.startTime)));
 
   function hasConflict(item: (typeof scheduleItems)[number]) {
@@ -528,7 +527,9 @@ function AllClassesSchedule({ classes, onOpenClass, onEditClass }: { classes: Te
     return scheduleItems.some((other) => other.key !== item.key && other.day === item.day && start < toMinutes(other.meeting.startTime) + other.meeting.durationMinutes && end > toMinutes(other.meeting.startTime));
   }
 
-  return <section className="all-schedule-card"><header><div><p className="eyebrow">ALL-CLASSES SCHEDULE</p><h2>Your week at a glance</h2><p>Every saved meeting time appears here. Possible overlaps are flagged before they become a problem.</p></div><span>{scheduleItems.length} weekly class blocks</span></header><div className="schedule-day-tabs">{["All days", ...weekDays].map((day) => <button className={selectedDay === day ? "active" : ""} type="button" onClick={() => setSelectedDay(day)} key={day}>{day === "All days" ? day : day.slice(0, 3)}</button>)}</div>{visibleItems.length ? <div className="all-schedule-list">{visibleItems.map((item) => { const conflict = hasConflict(item); return <article className={conflict ? "has-conflict" : ""} key={item.key}><time><b>{item.meeting.startTime}</b><span>{formatTime(toMinutes(item.meeting.startTime) + item.meeting.durationMinutes)}</span></time><div><span>{selectedDay === "All days" ? item.day : item.meeting.label}</span><h3>{item.className}</h3><p>{selectedDay === "All days" ? item.meeting.label : gradeList(item.grades)} · {item.meeting.durationMinutes} minutes</p></div>{conflict && <strong>⚠ Possible overlap</strong>}<div className="schedule-row-actions"><button type="button" onClick={() => onOpenClass(item.classId)}>Open class</button><button type="button" onClick={() => onEditClass(item.teachingClass)}>Edit times</button></div></article>; })}</div> : <div className="all-schedule-empty"><span>○</span><p><b>No class blocks on {selectedDay}</b><small>Add another meeting time to any class when the schedule changes.</small></p></div>}</section>;
+  const dayOptions = ["Today", ...weekDays, "All days"];
+
+  return <section className="all-schedule-card"><header><div><p className="eyebrow">ALL-CLASSES SCHEDULE</p><h2>{filterDay === "All days" ? "Your week at a glance" : `${filterDay}’s schedule`}</h2><p>Choose a day to see only what you teach. Possible overlaps are flagged before they become a problem.</p></div><span>{visibleItems.length} {filterDay === "All days" ? "weekly" : "selected"} class {visibleItems.length === 1 ? "block" : "blocks"}</span></header><div className="schedule-day-tabs" aria-label="Choose a schedule day">{dayOptions.map((day) => { const representedDay = day === "Today" ? today : day; const count = day === "All days" ? scheduleItems.length : dayCounts[representedDay] || 0; return <button className={selectedDay === day ? "active" : ""} type="button" onClick={() => setSelectedDay(day)} key={day}><span>{day === "Today" ? "Today" : day === "All days" ? "All" : day.slice(0, 3)}</span><small>{day === "Today" ? representedDay.slice(0, 3) : `${count} ${count === 1 ? "class" : "classes"}`}</small></button>; })}</div>{visibleItems.length ? <div className="all-schedule-list">{visibleItems.map((item) => { const conflict = hasConflict(item); return <article className={conflict ? "has-conflict" : ""} key={item.key}><time><b>{item.meeting.startTime}</b><span>{formatTime(toMinutes(item.meeting.startTime) + item.meeting.durationMinutes)}</span></time><div><span>{filterDay === "All days" ? item.day : item.meeting.label}</span><h3>{item.className}</h3><p>{filterDay === "All days" ? item.meeting.label : gradeList(item.grades)} · {item.meeting.durationMinutes} minutes</p></div>{conflict && <strong>⚠ Possible overlap</strong>}<div className="schedule-row-actions"><button type="button" onClick={() => onOpenClass(item.classId)}>Open class</button><button type="button" onClick={() => onEditClass(item.teachingClass)}>Edit times</button></div></article>; })}</div> : <div className="all-schedule-empty"><span>○</span><p><b>No class blocks on {filterDay}</b><small>Add another meeting time to any class when the schedule changes.</small></p></div>}</section>;
 }
 
 function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, onSelectClass, onSave, onDelete, onLoadSample, onPlan, onAttendance }: { classes: TeachingClass[]; activeClassId: string; savedPlans: SavedPlan[]; attendanceRecords: Record<string, Record<string, string>>; onSelectClass: (classId: string) => void; onSave: (item: Omit<TeachingClass, "id">, classId?: string) => void; onDelete: (classId: string) => void; onLoadSample: () => void; onPlan: (planId?: string) => void; onAttendance: () => void }) {
