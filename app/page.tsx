@@ -787,7 +787,7 @@ function createSchedule(grades: GradeLevel[], startTime = "8:00 AM", duration: s
 
 function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void }) {
   const generatedPlanId = useId();
-  const [step, setStep] = useState<1 | 2 | 3>(initialPlan ? 3 : 1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialPlan ? 4 : 1);
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const [grades, setGrades] = useState(initialPlan?.grades || selectedClass?.grades || []);
@@ -862,34 +862,53 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   }
 
   return (
-    <div className="view-page">
+    <div className="view-page plan-page">
       <PageIntro
         eyebrow="CREATE · MULTIGRADE LESSON"
-        title={step === 1 ? "Tell us about your class" : step === 2 ? "Choose each grade’s competency" : "Your coordinated lesson"}
-        description={step === 1 ? "Kalinga uses your classroom context to prepare a useful starting point." : step === 2 ? "You remain in control—edit, replace, or leave any suggestion blank." : "One class flow, with a clear learning path for every grade."}
+        title={step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : step === 3 ? "Choose each grade’s competency" : "Your coordinated lesson"}
+        description={step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : step === 3 ? "You remain in control—edit, replace, or leave any competency blank." : "One class flow, with a clear learning path for every grade."}
         action={<button className="secondary-button" type="button" onClick={onBack}>← Back home</button>}
       />
 
-      <div className="stepper" aria-label={`Step ${step} of 3`}>
-        {["Class context", "Competencies", "Review plan"].map((label, index) => <div key={label} className={step >= index + 1 ? "done" : ""}><span>{step > index + 1 ? "✓" : index + 1}</span><b>{label}</b></div>)}
+      <div className="stepper" aria-label={`Step ${step} of 4`}>
+        {["Class & lesson", "Lesson details", "Competencies", "Review plan"].map((label, index) => <div key={label} className={step === index + 1 ? "current" : step > index + 1 ? "complete" : ""}><span>{step > index + 1 ? "✓" : index + 1}</span><strong>{label}</strong></div>)}
       </div>
 
       {step === 1 && (
         <section className="builder-card">
           <div className="builder-main">
+            <div className="planner-portion-heading">
+              <p className="eyebrow">PART 1 OF 4 · CLASS & LESSON</p>
+              <h2>What are you preparing?</h2>
+              <p>Choose a saved class, give the lesson an optional title, and confirm who will learn together.</p>
+            </div>
             <div className="form-grid planner-class-row">
               <label>Plan for saved class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-              <label>Lesson title<input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="What is this lesson about?" /></label>
+              <label>Lesson title <small>Optional</small><input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="You can name this later" /></label>
             </div>
             <div className="field-group">
               <p className="group-label">Which grade levels or learner groups are learning together?<small>Use the levels saved with this class, or add another group for this lesson.</small></p>
               <GradeLevelPicker value={grades} onChange={updateGrades} />
             </div>
-            <div className="form-grid">
-              <label>Lesson subject<input list="class-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type any subject" /><datalist id="class-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist><small>Competencies stay blank until you enter this lesson’s actual topic.</small></label>
+          </div>
+          <aside className="builder-help"><span>1</span><h3>Begin with what is already saved</h3><p>Kalinga carries your class, grades, and learner groups into planning so you do not have to type them again.</p><div><b>{selectedClass?.name || "No class"}</b><small>{grades.length} learner {grades.length === 1 ? "group" : "groups"} selected</small></div></aside>
+          <footer className="builder-footer"><span>Only this portion is shown. You can come back before building the plan.</span><button className="primary-button" type="button" disabled={!selectedClassId || !grades.length} onClick={() => setStep(2)}>Continue to lesson details →</button></footer>
+        </section>
+      )}
+
+      {step === 2 && (
+        <section className="builder-card">
+          <div className="builder-main">
+            <div className="planner-portion-heading">
+              <p className="eyebrow">PART 2 OF 4 · LESSON DETAILS</p>
+              <h2>How will this lesson run?</h2>
+              <p>Enter the exact subject and teaching window. These details shape the editable schedule later.</p>
+            </div>
+            <div className="form-grid planner-details-grid">
+              <label>Lesson subject<input list="class-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type any subject" /><datalist id="class-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist><small>Use any subject name. Competencies remain blank until you enter them.</small></label>
               <label>Language<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>English & Filipino</option><option>English</option><option>Filipino</option><option>Mother Tongue</option><option>Other / Mixed</option></select></label>
               <label>Quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
-              <label className="duration-field">Total class time<div className="duration-input"><input aria-label="Total class time in minutes" type="number" min="5" max="600" step="5" inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value)} /><span>minutes</span></div><small>Enter the exact full class time. This is shared by all groups—not time per grade.</small></label>
+              <label className="duration-field">Total class time<div className="duration-input"><input aria-label="Total class time in minutes" type="number" min="5" max="600" step="5" inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value)} /><span>minutes</span></div><small>This is the full time shared by all groups—not time per grade.</small></label>
             </div>
             <div className="lesson-timing-box"><div><p className="timing-label">When does this lesson start?</p><h3>{startTime} · {durationMinutes(duration)} minutes</h3><p>Kalinga will divide this window into an all-class opening and one teacher-focus block per group. You can change every block afterward.</p></div><TimePicker value={startTime} onChange={setStartTime} /></div>
             <div className="field-group">
@@ -897,12 +916,12 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
               <div className="context-pills"><button className="selected" type="button">Multigrade</button><button className="selected" type="button">Low connectivity</button><button type="button">No printing</button><button type="button">Indigenous context</button><button type="button">Limited materials</button></div>
             </div>
           </div>
-          <aside className="builder-help"><span>✦</span><h3>Teacher-first assistance</h3><p>Kalinga can organize what you enter, but it will not invent a competency when no matching DepEd or AI source is available.</p><div><b>{grades.length}</b><small>learner groups selected</small></div><div><b>{startTime}</b><small>lesson starts · {durationMinutes(duration)} minutes total</small></div></aside>
-          <footer className="builder-footer"><span>Draft saves automatically on this device.</span><button className="primary-button" type="button" disabled={!grades.length} onClick={() => setStep(2)}>Choose competencies →</button></footer>
+          <aside className="builder-help"><span>2</span><h3>One teaching window</h3><p>This is not a separate duration for every grade. Kalinga will organize one class period around your different learner groups.</p><div><b>{startTime}</b><small>starts · {durationMinutes(duration)} minutes total</small></div><div><b>{subject || "No subject yet"}</b><small>{quarter} · {language}</small></div></aside>
+          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => setStep(1)}>← Class & lesson</button><button className="primary-button" type="button" disabled={!subject.trim()} onClick={() => setStep(3)}>Continue to competencies →</button></footer>
         </section>
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <section className="competency-layout">
           <div className="competency-list">
             <aside className="competency-source-note"><span>i</span><p><b>No automatic competency was inserted</b><small>{subject || "This subject"} · {quarter}. Enter the DepEd competency you are actually teaching. When verified curriculum data or AI is unavailable offline, these fields intentionally remain blank.</small></p></aside>
@@ -915,13 +934,13 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
             ))}
           </div>
           <aside className="overlap-panel neutral-overlap"><p className="eyebrow">OPTIONAL ASSISTANCE</p><h3>Shared opportunities appear only when supported</h3><p>With connectivity, a future AI service can compare the competencies you entered and suggest a shared opening activity. Offline, Kalinga does not guess.</p><div className="offline-ai-state"><span>○</span><p><b>No suggestion loaded</b><small>Your grade-level fields remain independent and editable.</small></p></div></aside>
-          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => setStep(1)}>← Class context</button><button className="primary-button" type="button" onClick={() => { setSlots(createSchedule(grades, startTime, duration)); setStep(3); }}>Build editable schedule →</button></footer>
+          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => setStep(2)}>← Lesson details</button><button className="primary-button" type="button" onClick={() => { setSlots(createSchedule(grades, startTime, duration)); setStep(4); }}>Build editable schedule →</button></footer>
         </section>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <section className="plan-result">
-          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => setStep(2)}>Edit competencies</button><button className="primary-button" type="button" onClick={saveCurrentPlan}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
+          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => setStep(3)}>Edit competencies</button><button className="primary-button" type="button" onClick={saveCurrentPlan}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
           <div className="plan-title"><div><p className="eyebrow">{quarter} · MULTIGRADE LESSON PLAN</p><input className="plan-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); setSaved(false); }} /><p>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} · {durationMinutes(duration)} minutes total · {language}</p></div><button className="icon-button" type="button" aria-label="More lesson actions">···</button></div>
           <div className="schedule-window-summary"><span>◎</span><p><b>Your teaching window</b><small>The rows below divide {durationMinutes(duration)} minutes beginning at {startTime}. Moving any row shifts that row and every later block by the same amount.</small></p></div>
           <div className="rotation-table">
