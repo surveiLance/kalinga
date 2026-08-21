@@ -70,7 +70,6 @@ type LegacySavedPlan = Omit<SavedPlan, "grades"> & { grades: Array<GradeLevel | 
 const commonSubjects = ["Mathematics", "Science", "English", "Filipino", "Araling Panlipunan", "MAPEH", "Edukasyon sa Pagpapakatao", "TLE"];
 const commonGradeLevels: GradeLevel[] = ["Kindergarten", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const meetingDayOptions = ["Monday to Friday", "Monday, Wednesday, Friday", "Tuesday and Thursday", ...weekDays, "Custom schedule"];
 const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino", "Mariel C. Torres", "Noel B. Pangan", "Olivia R. Cabahug", "Paolo S. Evasco", "Queenie M. Dayao", "Ramon L. Flores"];
 
 function normalizeGradeLevel(grade: GradeLevel | number): GradeLevel {
@@ -143,6 +142,11 @@ function daysForPattern(pattern: string) {
   if (pattern === "Tuesday and Thursday") return ["Tuesday", "Thursday"];
   const namedDays = weekDays.filter((day) => pattern.toLowerCase().includes(day.toLowerCase()));
   return namedDays.length ? namedDays : ["Custom schedule"];
+}
+
+function formatMeetingDays(days: string[]) {
+  const weekdays = weekDays.slice(0, 5);
+  return weekdays.every((day, index) => days[index] === day) && days.length === weekdays.length ? "Monday to Friday" : days.join(", ");
 }
 
 function normalizeClass(item: LegacyTeachingClass): TeachingClass {
@@ -559,11 +563,13 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   const [quarter, setQuarter] = useState("Quarter 1");
   const [meetings, setMeetings] = useState<ClassMeeting[]>([{ id: "meeting-draft-1", days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "" }]);
   const [learners, setLearners] = useState<ClassLearner[]>([]);
-  const [scheduleExpanded, setScheduleExpanded] = useState(false);
+  const [classStep, setClassStep] = useState<1 | 2 | 3>(1);
   const selectedClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const selectedPlans = savedPlans.filter((plan) => plan.classId === selectedClass?.id);
   const currentPlan = selectedPlans[0];
   const attendanceCount = selectedClass ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${selectedClass.id}-`)).flatMap(([, records]) => Object.values(records)).length : 0;
+  const detailsComplete = Boolean(name.trim() && grades.length && subjects.length);
+  const namedLearnerCount = learners.filter((learner) => learner.name.trim()).length;
 
   function resetForm() {
     setEditingId("");
@@ -574,7 +580,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
     setQuarter("Quarter 1");
     setMeetings([{ id: `meeting-${Date.now()}-1`, days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "" }]);
     setLearners([]);
-    setScheduleExpanded(false);
+    setClassStep(1);
   }
 
   function openNewClassForm() {
@@ -592,10 +598,14 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
     setQuarter(item.quarter);
     setMeetings(item.meetings.map((meeting) => ({ ...meeting })));
     setLearners(item.learners.map((learner) => ({ ...learner })));
-    setScheduleExpanded(section === "schedule");
+    setClassStep(section === "schedule" ? 2 : section === "learners" ? 3 : 1);
     setFormOpen(true);
-    const target = section === "learners" ? ".roster-builder" : section === "schedule" ? ".class-meeting-builder" : ".class-setup-card";
-    window.requestAnimationFrame(() => document.querySelector(target)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    window.requestAnimationFrame(() => document.querySelector(".class-setup-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function goToClassStep(step: 1 | 2 | 3) {
+    setClassStep(step);
+    window.requestAnimationFrame(() => document.querySelector(".class-setup-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
   function updateGrades(next: GradeLevel[]) {
@@ -632,7 +642,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
 
   function submitClass(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim() || !grades.length || !subjects.length) return;
+    if (classStep !== 3 || !detailsComplete) return;
     const safeMeetings = meetings.length ? meetings.map((meeting) => ({ ...meeting, durationMinutes: Math.max(5, Number(meeting.durationMinutes) || 60), label: meeting.label.trim() || "Regular class" })) : [{ id: `meeting-${Date.now()}-1`, days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "Regular class" }];
     onSave({ name: name.trim(), grades, subjects, quarter, meetingDays: safeMeetings[0].days, startTime: safeMeetings[0].startTime, meetings: safeMeetings, learners: learners.filter((learner) => learner.name.trim()).map((learner) => ({ ...learner, name: learner.name.trim() })) }, editingId || undefined);
     resetForm();
@@ -674,17 +684,45 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
       </section>}
       {!!classes.length && !formOpen && <section className="add-class-bottom"><div><p className="eyebrow">NEW SCHOOL TERM OR TEACHING LOAD?</p><h2>Need another class?</h2><p>Add another class only when you begin managing a new group of learners.</p></div><button className="secondary-button" type="button" onClick={openNewClassForm}>＋ Add another class</button></section>}
       {(formOpen || !classes.length) && <form className={`class-setup-card class-form-drawer ${!classes.length ? "first-class-form" : ""}`} onSubmit={submitClass}>
-        <div className="class-setup-heading"><span>{editingId ? "✓" : "1"}</span><div><p className="eyebrow">{editingId ? "EDIT SAVED CLASS" : "STEP 1 · CLASS DETAILS"}</p><h2>{editingId ? `Edit ${name}` : classes.length ? "Add a class" : "Set up your first class"}</h2><p>{editingId ? "Changes will appear everywhere this class is used." : "Start with the basics. Schedule and learner names can be added now or changed later."}</p></div>{editingId && <button className="text-button cancel-edit" type="button" onClick={() => { resetForm(); setFormOpen(false); }}>Cancel editing</button>}</div>
-        <div className="form-grid class-form-grid">
-          <label>Class or section name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Morning Multigrade Class" required /></label>
-          <label>Current quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
+        <nav className="class-wizard-progress" aria-label="Class setup progress">
+          {[{ number: 1, title: "Class details", detail: "Grades and subjects" }, { number: 2, title: "Schedule", detail: "Days and times" }, { number: 3, title: "Learners", detail: "Optional" }].map((step) => <div className={`${classStep === step.number ? "current" : ""} ${classStep > step.number ? "complete" : ""}`} aria-current={classStep === step.number ? "step" : undefined} key={step.number}><span>{classStep > step.number ? "✓" : step.number}</span><p><b>{step.title}</b><small>{step.detail}</small></p></div>)}
+        </nav>
+        <div className="class-setup-heading">
+          <span>{classStep}</span>
+          <div>
+            <p className="eyebrow">STEP {classStep} OF 3{editingId ? " · EDITING SAVED CLASS" : ""}</p>
+            <h2>{classStep === 1 ? editingId ? `Edit ${name}` : classes.length ? "Add a class" : "Set up your first class" : classStep === 2 ? "Set the class schedule" : "Add learners (optional)"}</h2>
+            <p>{classStep === 1 ? "Add the essentials once. Kalinga reuses them across planning and attendance." : classStep === 2 ? "Confirm when this class meets. Keep the ready-made schedule if it already fits." : "Add learner names for attendance now, or skip this and return later."}</p>
+          </div>
+          {!!classes.length && <button className="text-button cancel-edit" type="button" onClick={() => { resetForm(); setFormOpen(false); }}>{editingId ? "Cancel editing" : "Close"}</button>}
         </div>
-        <div className="field-group"><p className="group-label">Which grade levels or learner groups are together?<small>Choose Kindergarten through Grade 12, or add the exact level your school uses.</small></p><GradeLevelPicker value={grades} onChange={updateGrades} /></div>
-        <div className="field-group subject-setup"><p className="group-label">What subjects do you teach this class?<small>Select every subject that applies, or add the exact subject name you use.</small></p><div className="subject-options">{commonSubjects.map((subject) => <button className={subjects.includes(subject) ? "selected" : ""} type="button" onClick={() => toggleSubject(subject)} key={subject}>{subjects.includes(subject) ? "✓ " : "+ "}{subject}</button>)}</div><div className="custom-subject"><input value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomSubject(); } }} placeholder="Another subject (e.g. Mother Tongue)" /><button className="secondary-button" type="button" onClick={addCustomSubject}>Add subject</button></div>{!!subjects.length && <div className="selected-subjects">{subjects.map((subject) => <button type="button" onClick={() => toggleSubject(subject)} key={subject}>{subject} ×</button>)}</div>}</div>
-        <div className="field-group class-meeting-builder"><div className="meeting-builder-heading"><div><p className="eyebrow">STEP 2 · CLASS SCHEDULE</p><p className="group-label">When does this class meet?<small>{meetings.length === 1 ? `${meetings[0].days} at ${meetings[0].startTime} for ${meetings[0].durationMinutes} minutes.` : `${meetings.length} class times saved.`} You can change this later.</small></p></div><button className="secondary-button" type="button" onClick={() => setScheduleExpanded((expanded) => !expanded)}>{scheduleExpanded ? "Hide schedule details" : "Change schedule"}</button></div>{scheduleExpanded && <><div className="meeting-rows">{meetings.map((meeting, index) => <article className="meeting-row" key={meeting.id}><span>{index + 1}</span><label>Class time label <small>(optional)</small><input value={meeting.label} onChange={(event) => updateMeeting(meeting.id, { label: event.target.value })} placeholder="Leave blank for Regular class" /></label><label>Which days?<input list="meeting-day-options" value={meeting.days} onChange={(event) => updateMeeting(meeting.id, { days: event.target.value })} placeholder="e.g. Monday to Friday" /></label><div className="meeting-time-field"><b>Starts at</b><TimePicker value={meeting.startTime} onChange={(value) => updateMeeting(meeting.id, { startTime: value })} /></div><label>How long?<div className="duration-input"><input aria-label={`Meeting ${index + 1} duration in minutes`} type="number" min="5" max="600" step="5" value={meeting.durationMinutes} onChange={(event) => updateMeeting(meeting.id, { durationMinutes: Number(event.target.value) })} /><span>minutes</span></div></label><button className="remove-meeting" type="button" disabled={meetings.length === 1} onClick={() => setMeetings((current) => current.filter((item) => item.id !== meeting.id))}>Remove</button></article>)}</div><button className="add-meeting-inline" type="button" onClick={addMeeting}>＋ Add another class time</button></>}<datalist id="meeting-day-options">{meetingDayOptions.map((option) => <option value={option} key={option} />)}</datalist></div>
-        <div className="field-group roster-builder"><div className="roster-heading"><div><p className="eyebrow">STEP 3 · LEARNERS (OPTIONAL)</p><p className="group-label">Who are the learners in this class?<small>Add names now for attendance, or save the class and add them later.</small></p></div><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>You can skip learner names for now</b><small>Select a grade level first, or save this class and return later.</small></p></div> : <div className="roster-rows">{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", event.target.value)}>{grades.map((grade) => <option value={grade} key={grade}>{gradeLabel(grade)}</option>)}</select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
-        <footer className="builder-footer"><span>{!grades.length ? "Select at least one grade level." : !subjects.length ? "Select or add at least one subject." : `${grades.length} grade groups · ${subjects.length} subjects · ${learners.filter((learner) => learner.name.trim()).length} named learners`}</span><button className="primary-button" type="submit" disabled={!name.trim() || !grades.length || !subjects.length}>{editingId ? "Save class changes" : "Save class and continue →"}</button></footer>
-        {classes.length && <button className="close-class-form" type="button" onClick={() => { resetForm(); setFormOpen(false); }}>Close without saving</button>}
+
+        {classStep === 1 && <section className="class-wizard-step" aria-label="Class details">
+          <div className="form-grid class-form-grid">
+            <label>Class or section name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Morning Multigrade Class" required /></label>
+            <label>Current quarter<select value={quarter} onChange={(event) => setQuarter(event.target.value)}><option>Quarter 1</option><option>Quarter 2</option><option>Quarter 3</option><option>Quarter 4</option></select></label>
+          </div>
+          <div className="field-group"><p className="group-label">Which grade levels or learner groups are together?<small>Choose Kindergarten through Grade 12, or add the exact level your school uses.</small></p><GradeLevelPicker value={grades} onChange={updateGrades} /></div>
+          <div className="field-group subject-setup"><p className="group-label">What subjects do you teach this class?<small>Select every subject that applies, or add the exact subject name you use.</small></p><div className="subject-options">{commonSubjects.map((subject) => <button className={subjects.includes(subject) ? "selected" : ""} type="button" onClick={() => toggleSubject(subject)} key={subject}>{subjects.includes(subject) ? "✓ " : "+ "}{subject}</button>)}</div><div className="custom-subject"><input value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomSubject(); } }} placeholder="Another subject (e.g. Mother Tongue)" /><button className="secondary-button" type="button" onClick={addCustomSubject}>Add subject</button></div>{!!subjects.length && <div className="selected-subjects">{subjects.map((subject) => <button type="button" onClick={() => toggleSubject(subject)} key={subject}>{subject} ×</button>)}</div>}</div>
+        </section>}
+
+        {classStep === 2 && <section className="class-wizard-step" aria-label="Class schedule">
+          <div className="field-group class-meeting-builder"><div className="meeting-builder-heading"><div><p className="group-label">When does this class meet?<small>{meetings.length === 1 ? `${meetings[0].days} at ${meetings[0].startTime} for ${meetings[0].durationMinutes} minutes.` : `${meetings.length} class times ready.`}</small></p></div></div><div className="meeting-rows">{meetings.map((meeting, index) => <article className="meeting-row" key={meeting.id}><span>{index + 1}</span><label>Class time label <small>(optional)</small><input value={meeting.label} onChange={(event) => updateMeeting(meeting.id, { label: event.target.value })} placeholder="Leave blank for Regular class" /></label><div className="meeting-days-field"><b>Which days?</b><MeetingDayPicker value={meeting.days} onChange={(days) => updateMeeting(meeting.id, { days })} /></div><div className="meeting-time-field"><b>Starts at</b><TimePicker value={meeting.startTime} onChange={(value) => updateMeeting(meeting.id, { startTime: value })} /></div><label>How long?<div className="duration-input"><input aria-label={`Meeting ${index + 1} duration in minutes`} type="number" min="5" max="600" step="5" value={meeting.durationMinutes} onChange={(event) => updateMeeting(meeting.id, { durationMinutes: Number(event.target.value) })} /><span>minutes</span></div></label><button className="remove-meeting" type="button" disabled={meetings.length === 1} onClick={() => setMeetings((current) => current.filter((item) => item.id !== meeting.id))}>Remove</button></article>)}</div><button className="add-meeting-inline" type="button" onClick={addMeeting}>＋ Add another class time</button></div>
+        </section>}
+
+        {classStep === 3 && <section className="class-wizard-step" aria-label="Learners">
+          <div className="field-group roster-builder"><div className="roster-heading"><div><p className="group-label">Who are the learners in this class?<small>Add names now for attendance, or save the class and add them later.</small></p></div><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>You can skip learner names for now</b><small>Save the class now and add names from Manage learners whenever you are ready.</small></p></div> : <div className="roster-rows">{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", event.target.value)}>{grades.map((grade) => <option value={grade} key={grade}>{gradeLabel(grade)}</option>)}</select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
+        </section>}
+
+        <footer className="class-wizard-actions">
+          <span>{classStep === 1 ? !name.trim() ? "Enter a class or section name to continue." : !grades.length ? "Choose at least one grade level." : !subjects.length ? "Choose or add at least one subject." : "Class details are ready." : classStep === 2 ? `${meetings.length} ${meetings.length === 1 ? "class time" : "class times"} ready. You can change these later.` : namedLearnerCount ? `${namedLearnerCount} named ${namedLearnerCount === 1 ? "learner" : "learners"} ready for attendance.` : "Learner names are optional—you can add them later."}</span>
+          <div className="class-wizard-buttons">
+            {classStep > 1 && <button className="secondary-button" type="button" onClick={() => goToClassStep((classStep - 1) as 1 | 2)}>← Back</button>}
+            {classStep === 1 && <button className="primary-button" type="button" disabled={!detailsComplete} onClick={() => goToClassStep(2)}>Continue to schedule →</button>}
+            {classStep === 2 && <button className="primary-button" type="button" onClick={() => goToClassStep(3)}>Continue to learners →</button>}
+            {classStep === 3 && <button className="primary-button" type="submit">{editingId ? "Save class changes" : namedLearnerCount ? "Save class →" : "Save without learners →"}</button>}
+          </div>
+        </footer>
       </form>}
       {!classes.length && <button className="sample-data-button" type="button" onClick={onLoadSample}>Not ready to enter data? Load one sample class</button>}
     </div>
@@ -712,6 +750,15 @@ function formatTime(totalMinutes: number) {
 function durationMinutes(duration: string | number) {
   const parsed = typeof duration === "number" ? duration : Number.parseInt(duration, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 80;
+}
+
+function MeetingDayPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const selectedDays = daysForPattern(value).filter((day) => weekDays.includes(day));
+  function toggleDay(day: string) {
+    const nextDays = selectedDays.includes(day) ? selectedDays.filter((item) => item !== day) : weekDays.filter((item) => selectedDays.includes(item) || item === day);
+    if (nextDays.length) onChange(formatMeetingDays(nextDays));
+  }
+  return <details className="meeting-day-picker"><summary>{selectedDays.map((day) => day.slice(0, 3)).join(", ") || "Choose days"}</summary><div role="group" aria-label="Choose class days">{weekDays.map((day) => <button className={selectedDays.includes(day) ? "selected" : ""} type="button" aria-pressed={selectedDays.includes(day)} onClick={() => toggleDay(day)} key={day}><span>{selectedDays.includes(day) ? "✓" : ""}</span>{day}</button>)}</div></details>;
 }
 
 function TimePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
