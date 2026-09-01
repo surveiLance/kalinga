@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import Image from "next/image";
+import { askConnectedGabay, isSupabaseConfigured } from "@/lib/gabay-ai";
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
 
@@ -493,7 +494,7 @@ export default function Home() {
           <button className="gabay-character-button" type="button" aria-label="Open Gabay" onClick={() => setGabayOpen(true)}><GabayMascot size="companion" motion={gabayMotion} speaking={!gabayQuiet && dismissedGabayNudge !== gabayNudgeKey} /></button>
           <button className={`gabay-launcher ${gabayQuiet ? "is-quiet" : ""}`} type="button" aria-label={`Ask Gabay${gabayQuiet ? "; quiet mode is on" : ""}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => setGabayOpen(true)}><span><b>Ask Gabay</b><small>{gabayQuiet ? "Quiet mode is on" : "May maitutulong ako"}</small></span></button>
         </div>
-        <GabayGuide open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} attendanceCount={activeAttendance.length} quiet={gabayQuiet} motion={gabayMotion} onQuietChange={setGabayQuiet} onMotionChange={setGabayMotion} onClose={() => setGabayOpen(false)} onNavigate={(target) => { setView(target); setGabayOpen(false); }} onPlan={() => { beginPlan(); setGabayOpen(false); }} />
+        <GabayGuide key={view} open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} attendanceCount={activeAttendance.length} quiet={gabayQuiet} motion={gabayMotion} onQuietChange={setGabayQuiet} onMotionChange={setGabayMotion} onClose={() => setGabayOpen(false)} onNavigate={(target) => { setView(target); setGabayOpen(false); }} onPlan={() => { beginPlan(); setGabayOpen(false); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Ask</button>
@@ -670,11 +671,9 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<GabayChatMessage[]>([]);
+  const [isReplying, setIsReplying] = useState(false);
+  const [connectedReplyUsed, setConnectedReplyUsed] = useState(false);
   const chatInputId = useId();
-
-  useEffect(() => {
-    setChatMessages([]);
-  }, [view]);
 
   if (!open) return null;
 
@@ -733,13 +732,30 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
     return `${context.next} This is a prototype response based on the page you are viewing; a connected, source-grounded AI will handle open-ended questions later.`;
   }
 
-  function sendChat(event: React.FormEvent<HTMLFormElement>) {
+  async function sendChat(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = chatInput.trim();
-    if (!message) return;
+    if (!message || isReplying) return;
     const stamp = Date.now();
-    setChatMessages((current) => [...current, { id: `teacher-${stamp}`, role: "teacher", text: message }, { id: `gabay-${stamp}`, role: "gabay", text: prototypeReply(message) }]);
+    setChatMessages((current) => [...current, { id: `teacher-${stamp}`, role: "teacher", text: message }]);
     setChatInput("");
+    setIsReplying(true);
+
+    const result = await askConnectedGabay(message, {
+      view,
+      gradeLevels: activeClass?.grades ?? [],
+      subject: latestPlan?.subject || activeClass?.subjects[0],
+      lessonTopic: latestPlan?.title,
+      offline: typeof navigator !== "undefined" && !navigator.onLine,
+    });
+
+    setConnectedReplyUsed(result.connected);
+    setChatMessages((current) => [...current, {
+      id: `gabay-${stamp}`,
+      role: "gabay",
+      text: result.connected ? result.reply : prototypeReply(message),
+    }]);
+    setIsReplying(false);
   }
 
   function askQuick(label: string, reply: string) {
@@ -769,11 +785,11 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
     <header><GabayMascot size="large" motion={motion} speaking /><div><p>{context.eyebrow}</p><h2 id="gabay-title">Chat with Gabay</h2><small>Kasama mo sa page na ito</small></div><div className="gabay-header-actions"><button type="button" aria-label="Gabay options" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((current) => !current)}>···</button><button type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button>{settingsOpen && <div className="gabay-settings" role="group" aria-label="Gabay preferences"><p>GABAY SETTINGS</p><button type="button" aria-pressed={quiet} onClick={() => onQuietChange(!quiet)}><span><b>{quiet ? "Let Gabay speak" : "Shush Gabay"}</b><small>{quiet ? "Show helpful page comments" : "Stop comments; chat stays available"}</small></span><i>{quiet ? "Off" : "On"}</i></button><button type="button" aria-pressed={!motion} onClick={() => onMotionChange(!motion)}><span><b>{motion ? "Pause animations" : "Play animations"}</b><small>Keep all guidance available</small></span><i>{motion ? "On" : "Off"}</i></button></div>}</div></header>
     <div className="gabay-chat-body">
-      <div className="gabay-chat-thread" aria-live="polite"><div className="gabay"><GabayMascot size="small" motion={motion} speaking /><p><b>{context.title}</b>{context.next}</p></div>{chatMessages.map((message) => <div className={message.role} key={message.id}>{message.role === "gabay" && <GabayMascot size="small" motion={motion} />}<p>{message.text}</p></div>)}</div>
+      <div className="gabay-chat-thread" aria-live="polite"><div className="gabay"><GabayMascot size="small" motion={motion} speaking /><p><b>{context.title}</b>{context.next}</p></div>{chatMessages.map((message) => <div className={message.role} key={message.id}>{message.role === "gabay" && <GabayMascot size="small" motion={motion} />}<p>{message.text}</p></div>)}{isReplying && <div className="gabay"><GabayMascot size="small" motion={motion} speaking /><p>Sandali—tinitingnan ko ang page context mo…</p></div>}</div>
       <div className="gabay-questions" aria-label="Quick questions"><button type="button" onClick={() => askQuick("Anong uunahin?", context.next)}>Anong uunahin?</button><button type="button" onClick={() => askQuick("Paano ito gamitin?", context.screen)}>Paano ito gamitin?</button><button type="button" onClick={() => askQuick("Offline ba ito?", context.offline)}>Offline ba ito?</button></div>
       <div className="gabay-action-row" aria-label="Page actions">{actions[view].slice(0, 3).map((action) => <button type="button" key={action.id} onClick={() => runAction(action.id)}><span>{action.label}</span><small>{action.hint}</small></button>)}</div>
     </div>
-    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="Magtanong in Filipino, English, or Taglish" /><button type="submit" disabled={!chatInput.trim()} aria-label="Send question to Gabay">↑</button><small>Local prototype guidance muna · secure connected AI comes next</small></form>
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="Magtanong in Filipino, English, or Taglish" /><button type="submit" disabled={!chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button><small>{connectedReplyUsed ? "Connected AI reply · no learner records were sent" : isSupabaseConfigured ? "Local guidance stays available · connected AI starts after secure sign-in" : "Local guidance active · add Supabase environment values to connect AI"}</small></form>
   </aside>;
 }
 
