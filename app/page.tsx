@@ -612,16 +612,16 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
 function GabayMascot({ size = "medium", motion = true, speaking = false }: { size?: "small" | "medium" | "large" | "hero" | "companion"; motion?: boolean; speaking?: boolean }) {
   return <span className={`gabay-mascot gabay-mascot-${size} ${motion ? "" : "motion-paused"} ${speaking ? "is-speaking" : ""}`} aria-hidden="true">
     <svg viewBox="0 0 96 96" role="img">
-      <g className="gabay-rays"><path d="M48 5v8M22 14l6 7M74 14l-6 7" /></g>
-      <circle className="gabay-halo" cx="48" cy="31" r="21" />
-      <path className="gabay-arm gabay-arm-left" d="M27 54c-8 2-12 7-14 13" />
-      <path className="gabay-arm gabay-arm-right" d="M69 54c9-1 13-7 15-13" />
-      <rect className="gabay-body" x="21" y="35" width="54" height="43" rx="21" />
-      <ellipse className="gabay-face" cx="48" cy="53" rx="19" ry="16" />
-      <g className="gabay-eyes"><circle cx="41" cy="51" r="2.4" /><circle cx="55" cy="51" r="2.4" /></g>
-      <path className="gabay-smile" d="M41 59c4 4 10 4 14 0" />
-      <g className="gabay-weave"><path d="M27 70l10-8 11 8 11-8 10 8" /><path d="M27 70l10 8 11-8 11 8 10-8" /></g>
-      <circle className="gabay-spark" cx="76" cy="23" r="5" />
+      <g className="gabay-rays"><path d="M48 5v7M32 10l3 6M64 10l-3 6" /></g>
+      <circle className="gabay-halo" cx="48" cy="31" r="20" />
+      <path className="gabay-arm gabay-arm-left" d="M28 57c-8 2-12 8-13 14" />
+      <path className="gabay-arm gabay-arm-right" d="M68 57c9-1 13-7 15-13" />
+      <path className="gabay-body" d="M22 55c0-17 11-28 26-28s26 11 26 28v18c0 8-7 14-15 14H37c-8 0-15-6-15-14z" />
+      <ellipse className="gabay-face" cx="48" cy="51" rx="19" ry="17" />
+      <g className="gabay-eyes"><circle cx="41" cy="49" r="2.4" /><circle cx="55" cy="49" r="2.4" /></g>
+      <path className="gabay-smile" d="M41 57c4 4 10 4 14 0" />
+      <path className="gabay-cape" d="M31 69c5 4 11 6 17 6s12-2 17-6v9c-5 4-11 6-17 6s-12-2-17-6z" />
+      <circle className="gabay-spark" cx="75" cy="25" r="4" />
     </svg>
   </span>;
 }
@@ -667,14 +667,13 @@ function GabayTodayCard({ classCount, activeClass, hasPlan, attendanceSaved, mot
 type GabayChatMessage = { id: string; role: "teacher" | "gabay"; text: string };
 
 function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendanceCount, quiet, motion, onQuietChange, onMotionChange, onClose, onNavigate, onPlan }: { open: boolean; view: View; teacherName: string; activeClass?: TeachingClass; latestPlan?: SavedPlan; attendanceCount: number; quiet: boolean; motion: boolean; onQuietChange: (quiet: boolean) => void; onMotionChange: (motion: boolean) => void; onClose: () => void; onNavigate: (view: View) => void; onPlan: () => void }) {
-  const [question, setQuestion] = useState<"next" | "screen" | "offline">("next");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<GabayChatMessage[]>([]);
   const chatInputId = useId();
 
   useEffect(() => {
-    setQuestion("next");
+    setChatMessages([]);
   }, [view]);
 
   if (!open) return null;
@@ -724,7 +723,6 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
     },
   };
   const context = contexts[view];
-  const response = context[question];
 
   function prototypeReply(message: string) {
     const normalized = message.toLowerCase();
@@ -742,6 +740,11 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
     const stamp = Date.now();
     setChatMessages((current) => [...current, { id: `teacher-${stamp}`, role: "teacher", text: message }, { id: `gabay-${stamp}`, role: "gabay", text: prototypeReply(message) }]);
     setChatInput("");
+  }
+
+  function askQuick(label: string, reply: string) {
+    const stamp = Date.now();
+    setChatMessages((current) => [...current, { id: `teacher-${stamp}`, role: "teacher", text: label }, { id: `gabay-${stamp}`, role: "gabay", text: reply }]);
   }
 
   function runAction(action: "plan" | "attendance" | "classes" | "library" | "home") {
@@ -763,15 +766,15 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
     community: [{ id: "library", label: "Find shared resources", hint: "Browse teacher materials" }, { id: "plan", label: "Apply it to a lesson", hint: "Open the ILAW builder" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
   };
 
-  return <><button className="gabay-backdrop" type="button" aria-label="Close Gabay" onClick={closeGuide} /><aside className="gabay-panel" role="dialog" aria-modal="true" aria-labelledby="gabay-title">
-    <header><GabayMascot size="large" motion={motion} speaking /><div><p>{context.eyebrow}</p><h2 id="gabay-title">Gabay</h2><small>Page-aware teacher guide · Prototype</small></div><div className="gabay-header-actions"><button type="button" aria-label="Gabay options" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((current) => !current)}>···</button><button type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button>{settingsOpen && <div className="gabay-settings" role="group" aria-label="Gabay preferences"><p>GABAY SETTINGS</p><button type="button" aria-pressed={quiet} onClick={() => onQuietChange(!quiet)}><span><b>{quiet ? "Let Gabay speak" : "Shush Gabay"}</b><small>{quiet ? "Show helpful page comments" : "Stop comments; chat stays available"}</small></span><i>{quiet ? "Off" : "On"}</i></button><button type="button" aria-pressed={!motion} onClick={() => onMotionChange(!motion)}><span><b>{motion ? "Pause animations" : "Play animations"}</b><small>Keep all guidance available</small></span><i>{motion ? "On" : "Off"}</i></button></div>}</div></header>
-    <div className="gabay-conversation"><div className="gabay-message"><GabayMascot size="small" motion={motion} speaking /><div><b>{context.title}</b><p>{response}</p></div></div>
-      <div className="gabay-questions" aria-label="Quick questions"><button className={question === "next" ? "active" : ""} type="button" onClick={() => setQuestion("next")}>Anong uunahin?</button><button className={question === "screen" ? "active" : ""} type="button" onClick={() => setQuestion("screen")}>Paano ito gamitin?</button><button className={question === "offline" ? "active" : ""} type="button" onClick={() => setQuestion("offline")}>Offline ba ito?</button></div>
-      <section className="gabay-chat" aria-labelledby="gabay-chat-title"><div><p id="gabay-chat-title">CHAT WITH GABAY · MAGTANONG</p><small>Understands the page you are viewing</small></div>{chatMessages.length > 0 && <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message) => <div className={message.role} key={message.id}>{message.role === "gabay" && <GabayMascot size="small" motion={motion} />}<p>{message.text}</p></div>)}</div>}<form onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="Ask in Filipino, English, or Taglish" /><button type="submit" disabled={!chatInput.trim()} aria-label="Send question to Gabay">↑</button></form><small className="gabay-chat-note">Prototype chat uses local page guidance. Connected AI comes next.</small></section>
-      <section className="gabay-actions"><p>GO SOMEWHERE · BUKSAN</p>{actions[view].map((action) => <button type="button" key={action.id} onClick={() => runAction(action.id)}><span><b>{action.label}</b><small>{action.hint}</small></span><b>→</b></button>)}</section>
+  return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
+    <header><GabayMascot size="large" motion={motion} speaking /><div><p>{context.eyebrow}</p><h2 id="gabay-title">Chat with Gabay</h2><small>Kasama mo sa page na ito</small></div><div className="gabay-header-actions"><button type="button" aria-label="Gabay options" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((current) => !current)}>···</button><button type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button>{settingsOpen && <div className="gabay-settings" role="group" aria-label="Gabay preferences"><p>GABAY SETTINGS</p><button type="button" aria-pressed={quiet} onClick={() => onQuietChange(!quiet)}><span><b>{quiet ? "Let Gabay speak" : "Shush Gabay"}</b><small>{quiet ? "Show helpful page comments" : "Stop comments; chat stays available"}</small></span><i>{quiet ? "Off" : "On"}</i></button><button type="button" aria-pressed={!motion} onClick={() => onMotionChange(!motion)}><span><b>{motion ? "Pause animations" : "Play animations"}</b><small>Keep all guidance available</small></span><i>{motion ? "On" : "Off"}</i></button></div>}</div></header>
+    <div className="gabay-chat-body">
+      <div className="gabay-chat-thread" aria-live="polite"><div className="gabay"><GabayMascot size="small" motion={motion} speaking /><p><b>{context.title}</b>{context.next}</p></div>{chatMessages.map((message) => <div className={message.role} key={message.id}>{message.role === "gabay" && <GabayMascot size="small" motion={motion} />}<p>{message.text}</p></div>)}</div>
+      <div className="gabay-questions" aria-label="Quick questions"><button type="button" onClick={() => askQuick("Anong uunahin?", context.next)}>Anong uunahin?</button><button type="button" onClick={() => askQuick("Paano ito gamitin?", context.screen)}>Paano ito gamitin?</button><button type="button" onClick={() => askQuick("Offline ba ito?", context.offline)}>Offline ba ito?</button></div>
+      <div className="gabay-action-row" aria-label="Page actions">{actions[view].slice(0, 3).map((action) => <button type="button" key={action.id} onClick={() => runAction(action.id)}><span>{action.label}</span><small>{action.hint}</small></button>)}</div>
     </div>
-    <footer><span>i</span><p><b>Teacher remains in control.</b> Gabay gives contextual guidance today. Source-grounded AI drafting and open Taglish conversation come in the connected phase.</p></footer>
-  </aside></>;
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="Magtanong in Filipino, English, or Taglish" /><button type="submit" disabled={!chatInput.trim()} aria-label="Send question to Gabay">↑</button><small>Local prototype guidance muna · secure connected AI comes next</small></form>
+  </aside>;
 }
 
 function ClassZeroState({ teacherName, motion, onOpenGabay, onSetUp, onLoadSample }: { teacherName: string; motion: boolean; onOpenGabay: () => void; onSetUp: () => void; onLoadSample: () => void }) {
