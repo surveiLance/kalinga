@@ -259,6 +259,7 @@ export default function Home() {
   const [view, setView] = useState<View>("home");
   const [hasEntered, setHasEntered] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [gabayOpen, setGabayOpen] = useState(false);
   const [classes, setClasses] = useState<TeachingClass[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
@@ -312,6 +313,15 @@ export default function Home() {
     window.localStorage.setItem("kalinga-teacher-email", teacherEmail);
   }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, classDataReady]);
 
+  useEffect(() => {
+    if (!gabayOpen) return;
+    function closeWithEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setGabayOpen(false);
+    }
+    window.addEventListener("keydown", closeWithEscape);
+    return () => window.removeEventListener("keydown", closeWithEscape);
+  }, [gabayOpen]);
+
   const activeClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
@@ -319,6 +329,8 @@ export default function Home() {
   const activeAttendance = activeClass
     ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${activeClass.id}-${today}-grade-`) || key.startsWith(`${activeClass.id}-grade-`)).flatMap(([, records]) => Object.values(records))
     : [];
+  const currentWeekday = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const todayClassCount = classes.reduce((count, item) => count + item.meetings.filter((meeting) => daysForPattern(meeting.days).includes(currentWeekday)).length, 0);
 
   function beginPlan(planId?: string) {
     setEditingPlanId(typeof planId === "string" ? planId : "");
@@ -427,6 +439,7 @@ export default function Home() {
           {view === "home" && !activeClass ? <ClassZeroState onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} /> : view === "home" && activeClass ? <>
             <section className="welcome-row home-welcome">
               <div><p className="eyebrow">{displayDate(today).toUpperCase()}</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>{teacherLabel(teacherName)}!</em></h1><p className="lead">See what you teach today, then open the exact class tool you need.</p></div>
+              <GabayTodayCard classCount={todayClassCount} activeClass={activeClass} hasPlan={Boolean(latestPlan)} attendanceSaved={Boolean(activeAttendance.length)} onOpen={() => setGabayOpen(true)} />
             </section>
             {notice && <p className="notice" role="status">{notice}</p>}
             <AllClassesSchedule classes={classes} placement="home" onOpenClass={(classId) => { setActiveClassId(classId); setView("classes"); }} />
@@ -450,6 +463,9 @@ export default function Home() {
             </section>
           </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("classes")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
         </div>
+
+        <button className="gabay-launcher" type="button" aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => setGabayOpen(true)}><span>G</span><span><b>Ask Gabay</b><small>May maitutulong ako</small></span></button>
+        <GabayGuide open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} attendanceCount={activeAttendance.length} onClose={() => setGabayOpen(false)} onNavigate={(target) => { setView(target); setGabayOpen(false); }} onPlan={() => { beginPlan(); setGabayOpen(false); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Ask</button>
@@ -563,6 +579,106 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
       {action}
     </header>
   );
+}
+
+function GabayTodayCard({ classCount, activeClass, hasPlan, attendanceSaved, onOpen }: { classCount: number; activeClass: TeachingClass; hasPlan: boolean; attendanceSaved: boolean; onOpen: () => void }) {
+  const firstPriority = classCount
+    ? `${classCount} ${classCount === 1 ? "class" : "classes"} on today’s schedule`
+    : "No class is scheduled today";
+  const secondPriority = attendanceSaved
+    ? "Today’s attendance is already saved"
+    : classCount
+      ? `${activeClass.learners.length} ${activeClass.learners.length === 1 ? "learner is" : "learners are"} ready for attendance`
+      : `${activeClass.name} has ${activeClass.learners.length} ${activeClass.learners.length === 1 ? "learner" : "learners"} on its roster`;
+  const thirdPriority = hasPlan
+    ? "Your latest lesson plan is ready to review"
+    : "Your next lesson still needs a plan";
+
+  return <aside className="gabay-today-card" aria-label="Gabay’s suggested priorities for today">
+    <header><span className="gabay-mark">G</span><div><p>GABAY FOR TODAY</p><b>Ano ang uunahin natin?</b></div></header>
+    <ul><li><span>1</span>{firstPriority}</li><li><span>2</span>{secondPriority}</li><li><span>3</span>{thirdPriority}</li></ul>
+    <button type="button" onClick={onOpen}>Ask Gabay for help <span>→</span></button>
+  </aside>;
+}
+
+function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendanceCount, onClose, onNavigate, onPlan }: { open: boolean; view: View; teacherName: string; activeClass?: TeachingClass; latestPlan?: SavedPlan; attendanceCount: number; onClose: () => void; onNavigate: (view: View) => void; onPlan: () => void }) {
+  const [question, setQuestion] = useState<"next" | "screen" | "offline">("next");
+
+  useEffect(() => {
+    setQuestion("next");
+  }, [view]);
+
+  if (!open) return null;
+
+  const contexts: Record<View, { eyebrow: string; title: string; next: string; screen: string; offline: string }> = {
+    home: {
+      eyebrow: "TODAY · NGAYON",
+      title: `Magandang araw, ${teacherLabel(teacherName)}!`,
+      next: activeClass ? `${activeClass.name} is your active class. ${latestPlan ? "May saved lesson plan ka nang puwedeng i-review." : "Wala pang lesson plan, so magandang magsimula roon."} ${attendanceCount ? "Saved na rin ang attendance today." : "Attendance is ready when your class begins."}` : "Mag-set up muna tayo ng class para magamit ito sa planning at attendance.",
+      screen: "The Today screen gathers your schedule, active class, lesson readiness, and attendance in one place. Piliin lang ang task na kailangan mong gawin ngayon.",
+      offline: "Classes, drafts, and attendance are saved on this device first. Connected AI suggestions will be clearly marked and will only run when available.",
+    },
+    classes: {
+      eyebrow: "CLASSES · MGA KLASE",
+      title: "Ayusin natin ang class information once.",
+      next: "Check the learner list and meeting times first. Kalinga will reuse them in attendance and every lesson plan para hindi paulit-ulit ang encoding.",
+      screen: "Choose a class to see its learners, schedules, attendance, and saved lessons. Edit class details only when something actually changes.",
+      offline: "Your roster and schedule remain available on this device. They can sync to teacher accounts when the backend is connected.",
+    },
+    plan: {
+      eyebrow: "ILAW LESSON · PAGPAPLANO",
+      title: "One section at a time lang.",
+      next: "Start with the saved class and teaching window, then open I, L, A, and W individually. You can leave optional fields blank and return later.",
+      screen: "Intentions, Learning Experience, Assessment, and Ways Forward follow the teachers’ ILAW structure. Each grade keeps its own competency, activity, and assessment.",
+      offline: "Gabay will never invent an official competency. Use a verified DepEd source, paste the teacher’s source, or enter it yourself. Drafting remains editable offline.",
+    },
+    library: {
+      eyebrow: "RESOURCES · MGA KAGAMITAN",
+      title: "Find something that fits your real classroom.",
+      next: "Filter by grade, subject, and classroom context. Save useful materials on the device before going somewhere with low connectivity.",
+      screen: "This is the shared teacher library. Resources should show their author, source, grade fit, language, and offline availability before you use them.",
+      offline: "Only resources marked saved on device should be promised offline. Community search and new downloads will need a connection.",
+    },
+    attendance: {
+      eyebrow: "ATTENDANCE · TALAAN",
+      title: "Mark the class, then add context only when needed.",
+      next: "Confirm the class and date, mark each learner, add a short note for excused cases, then save attendance on the device.",
+      screen: "Attendance stays date-specific. Late learners still attended, while absent, excused, and leave remain separate records for a clearer summary.",
+      offline: "Attendance is stored locally first and can sync later. The app should always show whether a record is only on this device or already synced.",
+    },
+    community: {
+      eyebrow: "TEACHER COMMUNITY · KAPWA GURO",
+      title: "Ask teachers who understand the context.",
+      next: "Share a focused question with the grade levels, subject, and classroom condition. That helps other teachers give a useful answer faster.",
+      screen: "Community discussions connect questions, adaptations, and resources. Gabay can later summarize replies, but teachers remain the source of lived classroom knowledge.",
+      offline: "Saved discussions can be read offline later, but posting and receiving replies will require a connection.",
+    },
+  };
+  const context = contexts[view];
+  const response = context[question];
+
+  function runAction(action: "plan" | "attendance" | "classes" | "library" | "home") {
+    if (action === "plan") onPlan();
+    else onNavigate(action);
+  }
+
+  const actions: Record<View, Array<{ id: "plan" | "attendance" | "classes" | "library" | "home"; label: string; hint: string }>> = {
+    home: [{ id: "plan", label: "Plan a lesson", hint: "Gumawa ng ILAW plan" }, { id: "attendance", label: "Take attendance", hint: "Buksan ang talaan" }, { id: "classes", label: "Open my classes", hint: "Learners at schedule" }],
+    classes: [{ id: "plan", label: "Plan from this class", hint: "Reuse saved class details" }, { id: "attendance", label: "Take attendance", hint: "Use the saved roster" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
+    plan: [{ id: "classes", label: "Check class details", hint: "Roster and schedule" }, { id: "library", label: "Find a resource", hint: "Teacher-made materials" }, { id: "home", label: "Back to Today", hint: "Save and continue later" }],
+    library: [{ id: "plan", label: "Use in a lesson", hint: "Return to planning" }, { id: "classes", label: "Check class context", hint: "Grades and learners" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
+    attendance: [{ id: "classes", label: "Manage learners", hint: "Update the saved roster" }, { id: "plan", label: "Plan the next lesson", hint: "Open the ILAW builder" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
+    community: [{ id: "library", label: "Find shared resources", hint: "Browse teacher materials" }, { id: "plan", label: "Apply it to a lesson", hint: "Open the ILAW builder" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
+  };
+
+  return <><button className="gabay-backdrop" type="button" aria-label="Close Gabay" onClick={onClose} /><aside className="gabay-panel" role="dialog" aria-modal="true" aria-labelledby="gabay-title">
+    <header><span className="gabay-mark">G</span><div><p>{context.eyebrow}</p><h2 id="gabay-title">Gabay</h2><small>Kalinga’s teacher guide · Prototype guidance</small></div><button type="button" aria-label="Close Gabay" onClick={onClose}>×</button></header>
+    <div className="gabay-conversation"><div className="gabay-message"><span>G</span><div><b>{context.title}</b><p>{response}</p></div></div>
+      <div className="gabay-questions" aria-label="Quick questions"><button className={question === "next" ? "active" : ""} type="button" onClick={() => setQuestion("next")}>Anong uunahin?</button><button className={question === "screen" ? "active" : ""} type="button" onClick={() => setQuestion("screen")}>Paano ito gamitin?</button><button className={question === "offline" ? "active" : ""} type="button" onClick={() => setQuestion("offline")}>Offline ba ito?</button></div>
+      <section className="gabay-actions"><p>GO SOMEWHERE · BUKSAN</p>{actions[view].map((action) => <button type="button" key={action.id} onClick={() => runAction(action.id)}><span><b>{action.label}</b><small>{action.hint}</small></span><b>→</b></button>)}</section>
+    </div>
+    <footer><span>i</span><p><b>Teacher remains in control.</b> Gabay gives contextual guidance today. Source-grounded AI drafting and open Taglish conversation come in the connected phase.</p></footer>
+  </aside></>;
 }
 
 function ClassZeroState({ onSetUp, onLoadSample }: { onSetUp: () => void; onLoadSample: () => void }) {
