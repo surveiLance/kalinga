@@ -835,7 +835,7 @@ function createSchedule(grades: GradeLevel[], startTime = "8:00 AM", duration: s
 
 function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void }) {
   const generatedPlanId = useId();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialPlan ? 4 : 1);
+  const [step, setStep] = useState<1 | 2 | 3>(initialPlan ? 3 : 1);
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const [grades, setGrades] = useState(initialPlan?.grades || selectedClass?.grades || []);
@@ -862,16 +862,16 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [saved, setSaved] = useState(false);
   const planRosterCounts = learnerSexCounts(selectedClass?.learners || []);
 
-  function canOpenPlanStep(nextStep: 1 | 2 | 3 | 4) {
+  function canOpenPlanStep(nextStep: 1 | 2 | 3) {
     if (nextStep === 1) return true;
     if (!selectedClassId || !grades.length) return false;
     if (nextStep === 2) return true;
     return Boolean(subject.trim());
   }
 
-  function goToPlanStep(nextStep: 1 | 2 | 3 | 4) {
+  function goToPlanStep(nextStep: 1 | 2 | 3) {
     if (!canOpenPlanStep(nextStep)) return;
-    if (nextStep === 4 && !slots.length) setSlots(createSchedule(grades, startTime, duration));
+    if (nextStep === 3 && !slots.length) setSlots(createSchedule(grades, startTime, duration));
     setStep(nextStep);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
@@ -947,20 +947,20 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     <div className="view-page plan-page">
       <PageIntro
         eyebrow="CREATE · MULTIGRADE LESSON"
-        title={step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : step === 3 ? "Set your learning intentions" : "Complete your ILAW lesson"}
-        description={step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : step === 3 ? "Open one grade at a time and enter only what you already know." : "Work on one ILAW section at a time, then save whenever the plan is ready."}
+        title={step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : "Complete your ILAW lesson"}
+        description={step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : "Open one ILAW section at a time, then save whenever the plan is ready."}
         action={<button className="secondary-button" type="button" onClick={onBack}>← Back home</button>}
       />
 
-      <div className="stepper" aria-label={`Step ${step} of 4`}>
-        {(["Class & lesson", "Lesson details", "Intentions", "ILAW plan"] as const).map((label, index) => { const targetStep = (index + 1) as 1 | 2 | 3 | 4; return <button type="button" key={label} disabled={!canOpenPlanStep(targetStep)} onClick={() => goToPlanStep(targetStep)} aria-current={step === targetStep ? "step" : undefined} className={step === targetStep ? "current" : step > targetStep ? "complete" : ""}><span>{step > targetStep ? "✓" : targetStep}</span><strong>{label}</strong></button>; })}
+      <div className="stepper" aria-label={`Step ${step} of 3`}>
+        {(["Class & lesson", "Lesson details", "ILAW plan"] as const).map((label, index) => { const targetStep = (index + 1) as 1 | 2 | 3; return <button type="button" key={label} disabled={!canOpenPlanStep(targetStep)} onClick={() => goToPlanStep(targetStep)} aria-current={step === targetStep ? "step" : undefined} className={step === targetStep ? "current" : step > targetStep ? "complete" : ""}><span>{step > targetStep ? "✓" : targetStep}</span><strong>{label}</strong></button>; })}
       </div>
 
       {step === 1 && (
         <section className="builder-card">
           <div className="builder-main">
             <div className="planner-portion-heading">
-              <p className="eyebrow">PART 1 OF 4 · CLASS & LESSON</p>
+              <p className="eyebrow">PART 1 OF 3 · CLASS & LESSON</p>
               <h2>What are you preparing?</h2>
               <p>Choose a saved class, give the lesson an optional title, and confirm who will learn together.</p>
             </div>
@@ -982,7 +982,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
         <section className="builder-card">
           <div className="builder-main">
             <div className="planner-portion-heading">
-              <p className="eyebrow">PART 2 OF 4 · LESSON DETAILS</p>
+              <p className="eyebrow">PART 2 OF 3 · LESSON DETAILS</p>
               <h2>How will this lesson run?</h2>
               <p>Enter the exact subject and teaching window. These details shape the editable schedule later.</p>
             </div>
@@ -999,33 +999,24 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
             </div>
           </div>
           <aside className="builder-help"><span>2</span><h3>One teaching window</h3><p>This is not a separate duration for every grade. Kalinga will organize one class period around your different learner groups.</p><div><b>{startTime}</b><small>starts · {durationMinutes(duration)} minutes total</small></div><div><b>{subject || "No subject yet"}</b><small>{quarter} · {language}</small></div></aside>
-          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => goToPlanStep(1)}>← Class & lesson</button><button className="primary-button" type="button" disabled={!subject.trim()} onClick={() => goToPlanStep(3)}>Continue to intentions →</button></footer>
+          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => goToPlanStep(1)}>← Class & lesson</button><button className="primary-button" type="button" disabled={!subject.trim()} onClick={() => { setSlots(createSchedule(grades, startTime, duration)); goToPlanStep(3); }}>Continue to ILAW plan →</button></footer>
         </section>
       )}
 
       {step === 3 && (
-        <section className="competency-layout">
-          <div className="competency-list">
-            <div className="ilaw-section-heading"><p className="eyebrow">I · INTENTIONS</p><h2>What should each group learn?</h2><p>These fields stay blank until you or a verified curriculum source fills them.</p></div>
-            <p className="competency-guidance">Nothing is generated without a verified source. Leave a field blank and return later if needed.</p>
-            <details className="ilaw-optional-disclosure"><summary><span>Shared theme and multigrade approach</span><small>Optional lesson setup</small></summary><div className="ilaw-intention-grid"><label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label><label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label></div></details>
-            {grades.map((grade) => (
-              <details className={`competency-card competency-disclosure grade-${grade}`} key={grade}>
-                <summary><span><b>{gradeLabel(grade)}</b><small>{subject || "Subject not entered"} · {quarter}</small></span><span>{competencies[grade] || objectives[grade] ? "Started" : "Not started"}</span></summary>
-                <div className="competency-fields"><label>Learning competency<textarea value={competencies[grade] || ""} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label><p className="competency-helper">Saved offline and editable at any time.</p></div>
-              </details>
-            ))}
-          </div>
-          <aside className="overlap-panel neutral-overlap"><p className="eyebrow">CLASS CONTEXT</p><h3>{selectedClass?.learners.length || 0} enrolled learners</h3><p>{grades.map((grade) => `${gradeLabel(grade)}: ${selectedClass?.learners.filter((learner) => learner.grade === grade).length || 0}`).join(" · ")}</p><p>{planRosterCounts.female} female · {planRosterCounts.male} male{planRosterCounts.unspecified ? ` · ${planRosterCounts.unspecified} not specified` : ""}</p><small>This is the saved roster—not today’s attendance. Attendance stays date-specific.</small><div className="offline-ai-state"><span>○</span><p><b>Teacher remains in control</b><small>Connected suggestions may help later, but they never replace the competencies entered here.</small></p></div></aside>
-          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => goToPlanStep(2)}>← Lesson details</button><button className="primary-button" type="button" onClick={() => { setSlots(createSchedule(grades, startTime, duration)); goToPlanStep(4); }}>Continue to ILAW plan →</button></footer>
-        </section>
-      )}
-
-      {step === 4 && (
         <section className="plan-result">
-          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => goToPlanStep(3)}>Edit intentions</button><button className="primary-button" type="button" onClick={saveCurrentPlan}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
+          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => goToPlanStep(2)}>← Lesson details</button><button className="primary-button" type="button" onClick={saveCurrentPlan}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
           <div className="plan-title"><div><p className="eyebrow">{quarter} · MULTIGRADE LESSON PLAN</p><input className="plan-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); setSaved(false); }} /><p>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} · {durationMinutes(duration)} minutes total · {language}</p></div><button className="icon-button" type="button" aria-label="More lesson actions">···</button></div>
           <div className="ilaw-plan-summary"><div><span>Class</span><b>{selectedClass?.name}</b></div><div><span>Grade levels</span><b>{gradeList(grades)}</b></div><div><span>Enrolled learners</span><b>{selectedClass?.learners.length || 0} total · {planRosterCounts.female}F · {planRosterCounts.male}M{planRosterCounts.unspecified ? ` · ${planRosterCounts.unspecified} not set` : ""}</b></div><div><span>Multigrade model</span><b>{multigradeModel}</b></div>{sharedTheme && <div className="wide"><span>Shared theme</span><b>{sharedTheme}</b></div>}</div>
+
+          <details className="ilaw-disclosure intentions-section">
+            <summary><span className="ilaw-letter">I</span><span><small>INTENTIONS</small><b>Set what each group should learn</b><em>{grades.length} grade {grades.length === 1 ? "group" : "groups"} · open one at a time</em></span></summary>
+            <div className="ilaw-disclosure-body intentions-body">
+              <p className="competency-guidance">Nothing is generated without a verified source. Enter only what you know, or leave a field blank and return later.</p>
+              <details className="ilaw-optional-disclosure"><summary><span>Shared theme and multigrade approach</span><small>Optional lesson setup</small></summary><div className="ilaw-intention-grid"><label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label><label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label></div></details>
+              <div className="intention-grade-list">{grades.map((grade) => <details className={`competency-card competency-disclosure grade-${grade}`} key={grade}><summary><span><b>{gradeLabel(grade)}</b><small>{subject || "Subject not entered"} · {quarter}</small></span><span>{competencies[grade] || objectives[grade] ? "Started" : "Not started"}</span></summary><div className="competency-fields"><label>Learning competency<textarea value={competencies[grade] || ""} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label><p className="competency-helper">Saved offline and editable at any time.</p></div></details>)}</div>
+            </div>
+          </details>
 
           <details className="ilaw-disclosure learning-experience-disclosure">
             <summary><span className="ilaw-letter">L</span><span><small>LEARNING EXPERIENCE</small><b>Build the teaching flow</b><em>{slots.length} editable blocks · {durationMinutes(duration)} minutes</em></span></summary>
