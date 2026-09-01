@@ -7,10 +7,13 @@ type View = "home" | "classes" | "plan" | "library" | "attendance" | "community"
 
 type GradeLevel = string;
 
+type LearnerSex = "Female" | "Male" | "Not specified";
+
 type ClassLearner = {
   id: string;
   name: string;
   grade: GradeLevel;
+  sex: LearnerSex;
 };
 
 type ClassMeeting = {
@@ -37,7 +40,7 @@ type LegacyTeachingClass = Omit<Partial<TeachingClass>, "grades" | "learners" | 
   id: string;
   name: string;
   grades?: Array<GradeLevel | number>;
-  learners?: Array<Omit<ClassLearner, "grade"> & { grade: GradeLevel | number }>;
+  learners?: Array<Omit<ClassLearner, "grade" | "sex"> & { grade: GradeLevel | number; sex?: LearnerSex | string }>;
   meetings?: Array<Partial<ClassMeeting>>;
   subject?: string;
   learnerCount?: number;
@@ -100,6 +103,31 @@ function gradeList(grades: GradeLevel[]) {
   return grades.map(gradeLabel).join(", ");
 }
 
+function normalizeLearnerSex(value?: string): LearnerSex {
+  if (/^(female|f)$/i.test(value || "")) return "Female";
+  if (/^(male|m)$/i.test(value || "")) return "Male";
+  return "Not specified";
+}
+
+function learnerSexCounts(learners: ClassLearner[]) {
+  return learners.reduce((counts, learner) => {
+    if (learner.sex === "Female") counts.female += 1;
+    else if (learner.sex === "Male") counts.male += 1;
+    else counts.unspecified += 1;
+    return counts;
+  }, { female: 0, male: 0, unspecified: 0 });
+}
+
+function learnerRosterSummary(learners: ClassLearner[], compact = false) {
+  if (!learners.length) return compact ? "No learners yet" : "No sex data yet";
+  const counts = learnerSexCounts(learners);
+  const labels = compact
+    ? [`${counts.female}F`, `${counts.male}M`]
+    : [`${counts.female} female`, `${counts.male} male`];
+  if (counts.unspecified) labels.push(compact ? `${counts.unspecified} not set` : `${counts.unspecified} not specified`);
+  return labels.join(" · ");
+}
+
 function teacherLabel(name: string) {
   const cleaned = name.trim();
   return cleaned ? `Teacher ${cleaned}` : "Teacher";
@@ -141,6 +169,7 @@ function createSampleLearners(grades: GradeLevel[], count: number): ClassLearner
     id: `learner-${index + 1}`,
     name: learnerNames[index] || `Learner ${String(index + 1).padStart(2, "0")}`,
     grade: safeGrades[index % safeGrades.length],
+    sex: index % 2 ? "Male" : "Female",
   }));
 }
 
@@ -167,7 +196,7 @@ function normalizeClass(item: LegacyTeachingClass): TeachingClass {
     ? item.subjects.filter(Boolean)
     : [item.subject || "Mathematics"];
   const learners = Array.isArray(item.learners) && item.learners.length
-    ? item.learners.map((learner, index) => ({ id: learner.id || `${item.id}-learner-${index + 1}`, name: learner.name, grade: normalizeGradeLevel(learner.grade || grades[0]) }))
+    ? item.learners.map((learner, index) => ({ id: learner.id || `${item.id}-learner-${index + 1}`, name: learner.name, grade: normalizeGradeLevel(learner.grade || grades[0]), sex: normalizeLearnerSex(learner.sex) }))
     : createSampleLearners(grades, Math.max(0, item.learnerCount || 0)).map((learner) => ({ ...learner, id: `${item.id}-${learner.id}` }));
   const meetingDays = item.meetingDays || "Monday to Friday";
   const startTime = item.startTime || "8:00 AM";
@@ -584,6 +613,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   const selectedClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const selectedPlans = savedPlans.filter((plan) => plan.classId === selectedClass?.id);
   const currentPlan = selectedPlans[0];
+  const selectedRosterCounts = selectedClass ? learnerSexCounts(selectedClass.learners) : { female: 0, male: 0, unspecified: 0 };
   const attendanceCount = selectedClass ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${selectedClass.id}-`)).flatMap(([, records]) => Object.values(records)).length : 0;
   const detailsComplete = Boolean(name.trim() && grades.length && subjects.length);
   const namedLearnerCount = learners.filter((learner) => learner.name.trim()).length;
@@ -640,11 +670,15 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   }
 
   function addLearner() {
-    setLearners((current) => [...current, { id: `learner-${Date.now()}-${current.length}`, name: "", grade: grades[0] || "1" }]);
+    setLearners((current) => [...current, { id: `learner-${Date.now()}-${current.length}`, name: "", grade: grades[0] || "1", sex: "Not specified" }]);
   }
 
-  function updateLearner(id: string, field: "name" | "grade", value: string) {
-    setLearners((current) => current.map((learner) => learner.id === id ? { ...learner, [field]: value } : learner));
+  function updateLearner(id: string, field: "name" | "grade" | "sex", value: string) {
+    setLearners((current) => current.map((learner) => {
+      if (learner.id !== id) return learner;
+      if (field === "sex") return { ...learner, sex: normalizeLearnerSex(value) };
+      return { ...learner, [field]: value };
+    }));
   }
 
   function addMeeting() {
@@ -671,11 +705,11 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
       {!!classes.length && selectedClass && <section className="class-hub">
         <nav className="class-switcher" aria-label="Saved classes">
           <p className="eyebrow">YOUR CLASSES</p>
-          {classes.map((item) => <button className={item.id === selectedClass.id ? "active" : ""} type="button" key={item.id} onClick={() => onSelectClass(item.id)}><span><b>{item.name}</b><small>{gradeList(item.grades)} · {item.meetings.length} {item.meetings.length === 1 ? "meeting time" : "meeting times"}</small></span><span>→</span></button>)}
+          {classes.map((item) => <button className={item.id === selectedClass.id ? "active" : ""} type="button" key={item.id} onClick={() => onSelectClass(item.id)}><span><b>{item.name}</b><small>{gradeList(item.grades)} · {item.learners.length} learners</small><small>{learnerRosterSummary(item.learners, true)}</small></span><span>→</span></button>)}
         </nav>
         <div className="class-workspace">
           <header className="class-workspace-head">
-            <div><p className="eyebrow">{selectedClass.meetings.length} SAVED CLASS {selectedClass.meetings.length === 1 ? "BLOCK" : "BLOCKS"}</p><h2>{selectedClass.name}</h2><p>{gradeList(selectedClass.grades)} · {selectedClass.subjects.join(" · ")} · {selectedClass.learners.length} learners</p></div>
+            <div><p className="eyebrow">{selectedClass.meetings.length} SAVED CLASS {selectedClass.meetings.length === 1 ? "BLOCK" : "BLOCKS"}</p><h2>{selectedClass.name}</h2><p>{gradeList(selectedClass.grades)} · {selectedClass.subjects.join(" · ")}</p><p className="class-roster-line"><b>{selectedClass.learners.length} learners</b><span>{learnerRosterSummary(selectedClass.learners)}</span></p></div>
             <div className="class-header-actions"><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button><details className="class-more-menu"><summary aria-label={`More options for ${selectedClass.name}`}>•••</summary><div role="menu"><button type="button" role="menuitem" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); editClass(selectedClass, "details"); }}><span>✎</span><span><b>Edit class details</b><small>Change grades or subjects</small></span></button><button className="delete-menu-item" type="button" role="menuitem" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); setDeleteCandidateId(selectedClass.id); }}><span>×</span><span><b>Delete class</b><small>Remove this class and its records</small></span></button></div></details></div>
           </header>
           {deleteCandidateId === selectedClass.id && <div className="delete-confirm prominent-delete" role="alert"><div><b>Delete {selectedClass.name} permanently?</b><span>This removes the class, its lesson plans, learner attendance, and saved timetable from this device.</span></div><div><button type="button" onClick={() => setDeleteCandidateId("")}>Keep class</button><button type="button" onClick={() => { onDelete(selectedClass.id); setDeleteCandidateId(""); }}>Yes, delete class</button></div></div>}
@@ -692,7 +726,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
             <aside className="class-plans-panel">
               <div className="section-title inline"><div><p className="eyebrow">LESSON PLANS</p><h3>{selectedPlans.length} saved</h3></div></div>
               {selectedPlans.length ? <div className="class-plan-links">{selectedPlans.map((plan) => <button type="button" key={plan.id} onClick={() => onPlan(plan.id)}><span><b>{plan.title}</b><small>{plan.subject} · {plan.quarter}</small></span><span>→</span></button>)}</div> : <p className="class-plan-empty">Saved plans for this class will stay together here.</p>}
-              <div className="class-roster-summary"><span>{selectedClass.learners.length}</span><p><b>Named learners</b><small>Attendance is connected to this roster.</small></p><button type="button" onClick={onAttendance}>Open attendance →</button></div>
+              <div className="class-roster-summary"><span>{selectedClass.learners.length}</span><p><b>Named learners</b><small>{selectedRosterCounts.female} female · {selectedRosterCounts.male} male{selectedRosterCounts.unspecified ? ` · ${selectedRosterCounts.unspecified} not specified` : ""}</small></p><button type="button" onClick={onAttendance}>Open attendance →</button></div>
             </aside>
           </div>
         </div>
@@ -725,7 +759,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
         </section>}
 
         {classStep === 3 && <section className="class-wizard-step" aria-label="Learners">
-          <div className="field-group roster-builder"><div className="roster-heading"><div><p className="group-label">Who are the learners in this class?<small>Add names now for attendance, or save the class and add them later.</small></p></div><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>You can skip learner names for now</b><small>Save the class now and add names from Manage learners whenever you are ready.</small></p></div> : <div className="roster-rows">{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", event.target.value)}>{grades.map((grade) => <option value={grade} key={grade}>{gradeLabel(grade)}</option>)}</select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
+          <div className="field-group roster-builder"><div className="roster-heading"><div><p className="group-label">Who are the learners in this class?<small>Add names for attendance. Sex is optional and is used only for the class totals found in the ILAW material.</small></p></div><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>You can skip learner names for now</b><small>Save the class now and add names from Manage learners whenever you are ready.</small></p></div> : <div className="roster-rows"><div className="roster-column-labels" aria-hidden="true"><span></span><b>Learner name</b><b>Grade</b><b>Sex (optional)</b><span></span></div>{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", event.target.value)}>{grades.map((grade) => <option value={grade} key={grade}>{gradeLabel(grade)}</option>)}</select><select aria-label={`Learner ${index + 1} sex`} value={learner.sex} onChange={(event) => updateLearner(learner.id, "sex", event.target.value)}><option>Not specified</option><option>Female</option><option>Male</option></select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
         </section>}
 
         <footer className="class-wizard-actions">
@@ -826,6 +860,21 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [nextSessionNotes, setNextSessionNotes] = useState(initialPlan?.nextSessionNotes || "");
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [saved, setSaved] = useState(false);
+  const planRosterCounts = learnerSexCounts(selectedClass?.learners || []);
+
+  function canOpenPlanStep(nextStep: 1 | 2 | 3 | 4) {
+    if (nextStep === 1) return true;
+    if (!selectedClassId || !grades.length) return false;
+    if (nextStep === 2) return true;
+    return Boolean(subject.trim());
+  }
+
+  function goToPlanStep(nextStep: 1 | 2 | 3 | 4) {
+    if (!canOpenPlanStep(nextStep)) return;
+    if (nextStep === 4 && !slots.length) setSlots(createSchedule(grades, startTime, duration));
+    setStep(nextStep);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
 
   function updateGrades(next: GradeLevel[]) {
     setGrades(next);
@@ -899,12 +948,12 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
       <PageIntro
         eyebrow="CREATE · MULTIGRADE LESSON"
         title={step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : step === 3 ? "Set your learning intentions" : "Complete your ILAW lesson"}
-        description={step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : step === 3 ? "Add a shared theme, then keep every grade’s competency and objective distinct." : "Review the coordinated flow, assessment, and ways forward before saving."}
+        description={step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : step === 3 ? "Open one grade at a time and enter only what you already know." : "Work on one ILAW section at a time, then save whenever the plan is ready."}
         action={<button className="secondary-button" type="button" onClick={onBack}>← Back home</button>}
       />
 
       <div className="stepper" aria-label={`Step ${step} of 4`}>
-        {["Class & lesson", "Lesson details", "Intentions", "ILAW plan"].map((label, index) => <div key={label} className={step === index + 1 ? "current" : step > index + 1 ? "complete" : ""}><span>{step > index + 1 ? "✓" : index + 1}</span><strong>{label}</strong></div>)}
+        {(["Class & lesson", "Lesson details", "Intentions", "ILAW plan"] as const).map((label, index) => { const targetStep = (index + 1) as 1 | 2 | 3 | 4; return <button type="button" key={label} disabled={!canOpenPlanStep(targetStep)} onClick={() => goToPlanStep(targetStep)} aria-current={step === targetStep ? "step" : undefined} className={step === targetStep ? "current" : step > targetStep ? "complete" : ""}><span>{step > targetStep ? "✓" : targetStep}</span><strong>{label}</strong></button>; })}
       </div>
 
       {step === 1 && (
@@ -925,7 +974,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
             </div>
           </div>
           <aside className="builder-help"><span>1</span><h3>Begin with what is already saved</h3><p>Kalinga carries your class, grades, and learner groups into planning so you do not have to type them again.</p><div><b>{selectedClass?.name || "No class"}</b><small>{grades.length} learner {grades.length === 1 ? "group" : "groups"} selected</small></div></aside>
-          <footer className="builder-footer"><span>Only this portion is shown. You can come back before building the plan.</span><button className="primary-button" type="button" disabled={!selectedClassId || !grades.length} onClick={() => setStep(2)}>Continue to lesson details →</button></footer>
+          <footer className="builder-footer"><span>Only this portion is shown. You can come back before building the plan.</span><button className="primary-button" type="button" disabled={!selectedClassId || !grades.length} onClick={() => goToPlanStep(2)}>Continue to lesson details →</button></footer>
         </section>
       )}
 
@@ -950,7 +999,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
             </div>
           </div>
           <aside className="builder-help"><span>2</span><h3>One teaching window</h3><p>This is not a separate duration for every grade. Kalinga will organize one class period around your different learner groups.</p><div><b>{startTime}</b><small>starts · {durationMinutes(duration)} minutes total</small></div><div><b>{subject || "No subject yet"}</b><small>{quarter} · {language}</small></div></aside>
-          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => setStep(1)}>← Class & lesson</button><button className="primary-button" type="button" disabled={!subject.trim()} onClick={() => setStep(3)}>Continue to competencies →</button></footer>
+          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => goToPlanStep(1)}>← Class & lesson</button><button className="primary-button" type="button" disabled={!subject.trim()} onClick={() => goToPlanStep(3)}>Continue to intentions →</button></footer>
         </section>
       )}
 
@@ -958,39 +1007,44 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
         <section className="competency-layout">
           <div className="competency-list">
             <div className="ilaw-section-heading"><p className="eyebrow">I · INTENTIONS</p><h2>What should each group learn?</h2><p>These fields stay blank until you or a verified curriculum source fills them.</p></div>
-            <div className="ilaw-intention-grid">
-              <label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label>
-              <label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label>
-            </div>
-            <aside className="competency-source-note"><span>i</span><p><b>No automatic competency was inserted</b><small>{subject || "This subject"} · {quarter}. Enter only the competency you are actually teaching. Kalinga will not invent one when verified data or AI is unavailable.</small></p></aside>
+            <p className="competency-guidance">Nothing is generated without a verified source. Leave a field blank and return later if needed.</p>
+            <details className="ilaw-optional-disclosure"><summary><span>Shared theme and multigrade approach</span><small>Optional lesson setup</small></summary><div className="ilaw-intention-grid"><label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label><label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label></div></details>
             {grades.map((grade) => (
-              <article className={`competency-card grade-${grade}`} key={grade}>
-                <header><span>{gradeLabel(grade).toUpperCase()}</span><small>{subject || "Subject not entered"} · {quarter}</small></header>
-                <label>Learning competency<textarea value={competencies[grade] || ""} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency for this lesson`} /></label>
-                <label>Learning objective<textarea value={objectives[grade] || ""} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label>
-                <p className="competency-helper">Both fields are optional while drafting and remain editable offline.</p>
-              </article>
+              <details className={`competency-card competency-disclosure grade-${grade}`} key={grade}>
+                <summary><span><b>{gradeLabel(grade)}</b><small>{subject || "Subject not entered"} · {quarter}</small></span><span>{competencies[grade] || objectives[grade] ? "Started" : "Not started"}</span></summary>
+                <div className="competency-fields"><label>Learning competency<textarea value={competencies[grade] || ""} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label><p className="competency-helper">Saved offline and editable at any time.</p></div>
+              </details>
             ))}
           </div>
-          <aside className="overlap-panel neutral-overlap"><p className="eyebrow">CLASS CONTEXT</p><h3>{selectedClass?.learners.length || 0} enrolled learners</h3><p>{grades.map((grade) => `${gradeLabel(grade)}: ${selectedClass?.learners.filter((learner) => learner.grade === grade).length || 0}`).join(" · ")}</p><small>This is the saved roster—not today’s attendance. Attendance stays date-specific.</small><div className="offline-ai-state"><span>○</span><p><b>Teacher remains in control</b><small>A future connected assistant may suggest overlaps, but it must not replace the competencies entered here.</small></p></div></aside>
-          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => setStep(2)}>← Lesson details</button><button className="primary-button" type="button" onClick={() => { setSlots(createSchedule(grades, startTime, duration)); setStep(4); }}>Continue to learning experience →</button></footer>
+          <aside className="overlap-panel neutral-overlap"><p className="eyebrow">CLASS CONTEXT</p><h3>{selectedClass?.learners.length || 0} enrolled learners</h3><p>{grades.map((grade) => `${gradeLabel(grade)}: ${selectedClass?.learners.filter((learner) => learner.grade === grade).length || 0}`).join(" · ")}</p><p>{planRosterCounts.female} female · {planRosterCounts.male} male{planRosterCounts.unspecified ? ` · ${planRosterCounts.unspecified} not specified` : ""}</p><small>This is the saved roster—not today’s attendance. Attendance stays date-specific.</small><div className="offline-ai-state"><span>○</span><p><b>Teacher remains in control</b><small>Connected suggestions may help later, but they never replace the competencies entered here.</small></p></div></aside>
+          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => goToPlanStep(2)}>← Lesson details</button><button className="primary-button" type="button" onClick={() => { setSlots(createSchedule(grades, startTime, duration)); goToPlanStep(4); }}>Continue to ILAW plan →</button></footer>
         </section>
       )}
 
       {step === 4 && (
         <section className="plan-result">
-          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => setStep(3)}>Edit competencies</button><button className="primary-button" type="button" onClick={saveCurrentPlan}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
+          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => goToPlanStep(3)}>Edit intentions</button><button className="primary-button" type="button" onClick={saveCurrentPlan}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
           <div className="plan-title"><div><p className="eyebrow">{quarter} · MULTIGRADE LESSON PLAN</p><input className="plan-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); setSaved(false); }} /><p>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} · {durationMinutes(duration)} minutes total · {language}</p></div><button className="icon-button" type="button" aria-label="More lesson actions">···</button></div>
-          <div className="ilaw-plan-summary"><div><span>Class</span><b>{selectedClass?.name}</b></div><div><span>Grade levels</span><b>{gradeList(grades)}</b></div><div><span>Enrolled learners</span><b>{selectedClass?.learners.length || 0}</b></div><div><span>Multigrade model</span><b>{multigradeModel}</b></div>{sharedTheme && <div className="wide"><span>Shared theme</span><b>{sharedTheme}</b></div>}</div>
-          <section className="ilaw-edit-section"><header><span>L</span><div><p className="eyebrow">LEARNING EXPERIENCE</p><h2>Coordinate one teaching window</h2></div></header><div className="ilaw-two-column"><label>Learner context<textarea value={learnerContext} onChange={(event) => { setLearnerContext(event.target.value); setSaved(false); }} placeholder="What do these learners already know, experience, or need?" /></label><label>Materials and references<textarea value={materials} onChange={(event) => { setMaterials(event.target.value); setSaved(false); }} placeholder="Local objects, activity sheets, curriculum references…" /></label></div></section>
-          <div className="schedule-window-summary"><span>◎</span><p><b>Your teaching window</b><small>The rows below divide {durationMinutes(duration)} minutes beginning at {startTime}. Moving any row shifts that row and every later block by the same amount.</small></p></div>
-          <div className="rotation-table">
-            <div className="rotation-head" style={{ "--grade-count": grades.length } as React.CSSProperties}><span>Start time</span><span>Teacher focus</span>{grades.map((grade) => <span key={grade}>{gradeLabel(grade)}</span>)}</div>
-            {slots.map((slot) => <div className="rotation-row editable-row" style={{ "--grade-count": grades.length } as React.CSSProperties} key={slot.id}><div className="slot-time-editor"><TimePicker value={slot.time} onChange={(value) => updateSlotTime(slot.id, value)} /></div><input aria-label={`Teacher focus at ${slot.time}`} value={slot.teacherFocus} placeholder="Who has teacher support?" onChange={(event) => updateSlot(slot.id, "teacherFocus", event.target.value)} />{grades.map((grade) => <textarea aria-label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`${gradeLabel(grade)} activity`} onChange={(event) => updateGradeTask(slot.id, grade, event.target.value)} key={grade} />)}</div>)}
-          </div>
-          <div className="schedule-actions"><button className="secondary-button" type="button" onClick={addSlot}>＋ Add schedule block</button><span>Times stay linked: move one block and every block after it moves with it. Activities remain independently editable.</span></div>
-          <section className="ilaw-edit-section assessment-section"><header><span>A</span><div><p className="eyebrow">ASSESSMENT</p><h2>Check learning by grade</h2></div></header><div className="ilaw-grade-grid">{grades.map((grade) => <article key={grade}><h3>{gradeLabel(grade)}</h3><label>Formative check<textarea value={formativeAssessments[grade] || ""} onChange={(event) => { setFormativeAssessments((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="How will you check understanding during the lesson?" /></label><label>Exit task<textarea value={exitTasks[grade] || ""} onChange={(event) => { setExitTasks((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What will the learner do before the lesson ends?" /></label><label>Success criteria<textarea value={successCriteria[grade] || ""} onChange={(event) => { setSuccessCriteria((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What counts as successful learning?" /></label></article>)}</div></section>
-          <section className="ilaw-edit-section ways-forward-section"><header><span>W</span><div><p className="eyebrow">WAYS FORWARD</p><h2>Prepare the next response</h2></div></header><div className="ilaw-two-column"><label>Reflection questions<textarea value={reflection} onChange={(event) => { setReflection(event.target.value); setSaved(false); }} placeholder="What worked, and who still needs support?" /></label><label>Remediation<textarea value={remediation} onChange={(event) => { setRemediation(event.target.value); setSaved(false); }} placeholder="What support will learners receive?" /></label><label>Enrichment<textarea value={enrichment} onChange={(event) => { setEnrichment(event.target.value); setSaved(false); }} placeholder="What extension can ready learners do?" /></label><label>Notes for the next session<textarea value={nextSessionNotes} onChange={(event) => { setNextSessionNotes(event.target.value); setSaved(false); }} placeholder="What should continue or change next time?" /></label></div></section>
+          <div className="ilaw-plan-summary"><div><span>Class</span><b>{selectedClass?.name}</b></div><div><span>Grade levels</span><b>{gradeList(grades)}</b></div><div><span>Enrolled learners</span><b>{selectedClass?.learners.length || 0} total · {planRosterCounts.female}F · {planRosterCounts.male}M{planRosterCounts.unspecified ? ` · ${planRosterCounts.unspecified} not set` : ""}</b></div><div><span>Multigrade model</span><b>{multigradeModel}</b></div>{sharedTheme && <div className="wide"><span>Shared theme</span><b>{sharedTheme}</b></div>}</div>
+
+          <details className="ilaw-disclosure learning-experience-disclosure">
+            <summary><span className="ilaw-letter">L</span><span><small>LEARNING EXPERIENCE</small><b>Build the teaching flow</b><em>{slots.length} editable blocks · {durationMinutes(duration)} minutes</em></span></summary>
+            <div className="ilaw-disclosure-body">
+              <details className="ilaw-optional-disclosure"><summary><span>Learner context and materials</span><small>Optional details</small></summary><div className="ilaw-two-column"><label>Learner context<textarea value={learnerContext} onChange={(event) => { setLearnerContext(event.target.value); setSaved(false); }} placeholder="What do these learners already know, experience, or need?" /></label><label>Materials and references<textarea value={materials} onChange={(event) => { setMaterials(event.target.value); setSaved(false); }} placeholder="Local objects, activity sheets, curriculum references…" /></label></div></details>
+              <div className="schedule-window-summary"><span>◎</span><p><b>Your teaching window</b><small>The blocks begin at {startTime}. Change a time only when the suggested flow does not fit your class.</small></p></div>
+              <details className="schedule-editor-disclosure"><summary><span>Review or adjust the timetable</span><small>{slots.map((slot) => slot.time).join(" · ")}</small></summary><div className="rotation-table"><div className="rotation-head" style={{ "--grade-count": grades.length } as React.CSSProperties}><span>Start time</span><span>Teacher focus</span>{grades.map((grade) => <span key={grade}>{gradeLabel(grade)}</span>)}</div>{slots.map((slot) => <div className="rotation-row editable-row" style={{ "--grade-count": grades.length } as React.CSSProperties} key={slot.id}><div className="slot-time-editor"><TimePicker value={slot.time} onChange={(value) => updateSlotTime(slot.id, value)} /></div><input aria-label={`Teacher focus at ${slot.time}`} value={slot.teacherFocus} placeholder="Who has teacher support?" onChange={(event) => updateSlot(slot.id, "teacherFocus", event.target.value)} />{grades.map((grade) => <textarea aria-label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`${gradeLabel(grade)} activity`} onChange={(event) => updateGradeTask(slot.id, grade, event.target.value)} key={grade} />)}</div>)}</div><div className="schedule-actions"><button className="secondary-button" type="button" onClick={addSlot}>＋ Add schedule block</button><span>Changing one time shifts every later block. Activities remain independently editable.</span></div></details>
+            </div>
+          </details>
+
+          <details className="ilaw-disclosure assessment-section">
+            <summary><span className="ilaw-letter">A</span><span><small>ASSESSMENT</small><b>Check learning by grade</b><em>Open when you are ready to add checks</em></span></summary>
+            <div className="ilaw-disclosure-body"><div className="ilaw-grade-grid">{grades.map((grade) => <article key={grade}><h3>{gradeLabel(grade)}</h3><label>How will you check learning?<textarea value={formativeAssessments[grade] || ""} onChange={(event) => { setFormativeAssessments((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="A question, performance, observation, or short activity" /></label><details className="assessment-more"><summary>Add exit task or success criteria <span>Optional</span></summary><label>Exit task<textarea value={exitTasks[grade] || ""} onChange={(event) => { setExitTasks((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What will the learner do before the lesson ends?" /></label><label>Success criteria<textarea value={successCriteria[grade] || ""} onChange={(event) => { setSuccessCriteria((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What counts as successful learning?" /></label></details></article>)}</div></div>
+          </details>
+
+          <details className="ilaw-disclosure ways-forward-section">
+            <summary><span className="ilaw-letter">W</span><span><small>WAYS FORWARD</small><b>Complete after the lesson</b><em>Reflection, remediation, enrichment, and next steps</em></span></summary>
+            <div className="ilaw-disclosure-body"><p className="after-lesson-note">This section is intentionally optional during planning. Return after teaching while the lesson is still fresh.</p><div className="ilaw-two-column"><label>Reflection<textarea value={reflection} onChange={(event) => { setReflection(event.target.value); setSaved(false); }} placeholder="What worked, and who still needs support?" /></label><label>Remediation<textarea value={remediation} onChange={(event) => { setRemediation(event.target.value); setSaved(false); }} placeholder="What support will learners receive?" /></label><label>Enrichment<textarea value={enrichment} onChange={(event) => { setEnrichment(event.target.value); setSaved(false); }} placeholder="What extension can ready learners do?" /></label><label>Notes for the next session<textarea value={nextSessionNotes} onChange={(event) => { setNextSessionNotes(event.target.value); setSaved(false); }} placeholder="What should continue or change next time?" /></label></div></div>
+          </details>
           <div className="plan-notes"><article><span>✦</span><div><b>You control the timetable</b><p>The generated blocks are only a starting point based on the lesson window you entered.</p></div></article><button className="text-button" type="button" onClick={() => setSlots(createSchedule(grades, startTime, duration))}>Reset from {startTime}</button></div>
         </section>
       )}
