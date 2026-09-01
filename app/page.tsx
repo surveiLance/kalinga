@@ -3,8 +3,11 @@
 import { useEffect, useId, useState } from "react";
 import Image from "next/image";
 import { askConnectedGabay, isSupabaseConfigured } from "@/lib/gabay-ai";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
+type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
+type AuthActionResult = { ok: boolean; message?: string };
 
 type GradeLevel = string;
 
@@ -258,7 +261,7 @@ function GradeLevelPicker({ value, onChange }: { value: GradeLevel[]; onChange: 
 export default function Home() {
   const [notice, setNotice] = useState("");
   const [view, setView] = useState<View>("home");
-  const [hasEntered, setHasEntered] = useState(false);
+  const [entryMode, setEntryMode] = useState<EntryMode>(isSupabaseConfigured ? "loading" : "signed-out");
   const [accountOpen, setAccountOpen] = useState(false);
   const [gabayOpen, setGabayOpen] = useState(false);
   const [gabayQuiet, setGabayQuiet] = useState(false);
@@ -274,7 +277,41 @@ export default function Home() {
   const [editingPlanId, setEditingPlanId] = useState("");
   const [classDataReady, setClassDataReady] = useState(false);
   const [teacherName, setTeacherName] = useState("Ana");
-  const [teacherEmail, setTeacherEmail] = useState("teacher.ana@kalinga.ph");
+  const [teacherEmail, setTeacherEmail] = useState("");
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let active = true;
+
+    function applyTeacherAccount(user: { email?: string; user_metadata?: Record<string, unknown> }) {
+      const displayName = typeof user.user_metadata?.display_name === "string"
+        ? user.user_metadata.display_name
+        : typeof user.user_metadata?.full_name === "string"
+          ? user.user_metadata.full_name
+          : user.email?.split("@")[0] || "Teacher";
+      setTeacherName(displayName);
+      setTeacherEmail(user.email || "");
+      setEntryMode("authenticated");
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (data.session?.user) applyTeacherAccount(data.session.user);
+      else setEntryMode((current) => current === "prototype" ? current : "signed-out");
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      if (session?.user) applyTeacherAccount(session.user);
+      else setEntryMode((current) => current === "prototype" ? current : "signed-out");
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -350,11 +387,36 @@ export default function Home() {
     setNotice("");
   }
 
-  function signOut() {
+  async function signOut() {
     setAccountOpen(false);
     setView("home");
     setNotice("");
-    setHasEntered(false);
+    if (entryMode === "authenticated") {
+      await getSupabaseBrowserClient()?.auth.signOut();
+    }
+    setEntryMode("signed-out");
+  }
+
+  async function signInTeacher(email: string, password: string): Promise<AuthActionResult> {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return { ok: false, message: "Supabase is not configured on this device yet." };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, message: error.message };
+    if (!data.user) return { ok: false, message: "We could not open this teacher account." };
+    return { ok: true };
+  }
+
+  async function createTeacherAccount(name: string, email: string, password: string): Promise<AuthActionResult> {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return { ok: false, message: "Supabase is not configured on this device yet." };
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: name.trim() } },
+    });
+    if (error) return { ok: false, message: error.message };
+    if (!data.session) return { ok: true, message: "Check your email to confirm the account, then return here to sign in." };
+    return { ok: true };
   }
 
   function saveClass(newClass: Omit<TeachingClass, "id">, classId?: string) {
@@ -412,8 +474,12 @@ export default function Home() {
     if (openGuide) setGabayOpen(true);
   }
 
-  if (!hasEntered) {
-    return <LoginScreen name={teacherName} email={teacherEmail} onNameChange={setTeacherName} onEmailChange={setTeacherEmail} onContinue={() => setHasEntered(true)} />;
+  if (entryMode === "loading") {
+    return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening your teaching space…</p></section><KalingaFooterArtwork /></main>;
+  }
+
+  if (entryMode === "signed-out") {
+    return <LoginScreen name={teacherName} email={teacherEmail} onNameChange={setTeacherName} onEmailChange={setTeacherEmail} onSignIn={signInTeacher} onCreateAccount={createTeacherAccount} onContinue={() => setEntryMode("prototype")} />;
   }
 
   return (
@@ -504,13 +570,31 @@ export default function Home() {
   );
 }
 
-function LoginScreen({ name, email, onNameChange, onEmailChange, onContinue }: { name: string; email: string; onNameChange: (name: string) => void; onEmailChange: (email: string) => void; onContinue: () => void }) {
-  const [password, setPassword] = useState("kalinga-demo");
+function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCreateAccount, onContinue }: { name: string; email: string; onNameChange: (name: string) => void; onEmailChange: (email: string) => void; onSignIn: (email: string, password: string) => Promise<AuthActionResult>; onCreateAccount: (name: string, email: string, password: string) => Promise<AuthActionResult>; onContinue: () => void }) {
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [formMode, setFormMode] = useState<"sign-in" | "create">("sign-in");
+  const [submitting, setSubmitting] = useState(false);
+  const [formMessage, setFormMessage] = useState("");
+  const [formError, setFormError] = useState("");
 
-  function submitLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function submitLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onContinue();
+    setSubmitting(true);
+    setFormError("");
+    setFormMessage("");
+    const result = formMode === "sign-in"
+      ? await onSignIn(email.trim(), password)
+      : await onCreateAccount(name.trim(), email.trim(), password);
+    setSubmitting(false);
+    if (!result.ok) setFormError(result.message || "Something went wrong. Please try again.");
+    else if (result.message) setFormMessage(result.message);
+  }
+
+  function switchMode(mode: "sign-in" | "create") {
+    setFormMode(mode);
+    setFormError("");
+    setFormMessage("");
   }
 
   return (
@@ -519,21 +603,24 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onContinue }: {
         <StackedKalingaLogo />
         <div className="login-copy">
           <p className="eyebrow">TEACHERS’ ASSISTANT</p>
-          <h1 id="login-title">Welcome back, Teacher</h1>
-          <p>Sign in to access your lessons, saved resources, and classroom records.</p>
+          <h1 id="login-title">{formMode === "sign-in" ? "Welcome back, Teacher" : "Create your teacher account"}</h1>
+          <p>{formMode === "sign-in" ? "Sign in to securely access your teaching space and Gabay." : "Set up one account for your classes, plans, and attendance."}</p>
         </div>
 
+        <div className="auth-mode-switch" role="tablist" aria-label="Account access"><button className={formMode === "sign-in" ? "active" : ""} type="button" role="tab" aria-selected={formMode === "sign-in"} onClick={() => switchMode("sign-in")}>Sign in</button><button className={formMode === "create" ? "active" : ""} type="button" role="tab" aria-selected={formMode === "create"} onClick={() => switchMode("create")}>Create account</button></div>
         <form className="login-form" onSubmit={submitLogin}>
-          <label>Teacher name<input type="text" value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Your name" required /></label>
+          {formMode === "create" && <label>Teacher name<input type="text" value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Your name" autoComplete="name" required /></label>}
           <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="teacher@school.edu.ph" required /></label>
-          <label>Password<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? "Hide" : "Show"}</button></span></label>
-          <div className="login-options"><label><input type="checkbox" defaultChecked /> Keep me signed in</label><button type="button">Forgot password?</button></div>
-          <button className="login-primary" type="submit">Sign in to Kalinga</button>
+          <label>Password<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} autoComplete={formMode === "sign-in" ? "current-password" : "new-password"} required /><button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? "Hide" : "Show"}</button></span></label>
+          <div className="login-options"><span>{formMode === "sign-in" ? "Your session stays securely signed in on this device." : "Use at least 6 characters."}</span></div>
+          {formError && <p className="auth-feedback error" role="alert">{formError}</p>}
+          {formMessage && <p className="auth-feedback success" role="status">{formMessage}</p>}
+          <button className="login-primary" type="submit" disabled={submitting}>{submitting ? "Please wait…" : formMode === "sign-in" ? "Sign in to Kalinga" : "Create teacher account"}</button>
         </form>
 
         <div className="login-divider"><span>or</span></div>
         <button className="prototype-button" type="button" onClick={onContinue}>Continue to prototype <span>→</span></button>
-        <p className="demo-note"><span>i</span><b>Demo access</b> No authorization is connected yet. Either option safely opens the sample app.</p>
+        <p className="demo-note"><span>i</span><b>Demo access</b> Prototype mode stays on this device. Sign in to securely use connected Gabay.</p>
         <p className="login-language">English <i /> Filipino</p>
       </section>
       <KalingaFooterArtwork />
