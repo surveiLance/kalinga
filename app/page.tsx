@@ -262,7 +262,8 @@ export default function Home() {
   const [gabayOpen, setGabayOpen] = useState(false);
   const [gabayQuiet, setGabayQuiet] = useState(false);
   const [gabayMotion, setGabayMotion] = useState(true);
-  const [dismissedGabayNudge, setDismissedGabayNudge] = useState<View | null>(null);
+  const [gabayEventMessage, setGabayEventMessage] = useState("");
+  const [dismissedGabayNudge, setDismissedGabayNudge] = useState("");
   const [classes, setClasses] = useState<TeachingClass[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
@@ -340,6 +341,7 @@ export default function Home() {
     : [];
   const currentWeekday = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
   const todayClassCount = classes.reduce((count, item) => count + item.meetings.filter((meeting) => daysForPattern(meeting.days).includes(currentWeekday)).length, 0);
+  const gabayNudgeKey = `${view}:${gabayEventMessage || "page"}`;
 
   function beginPlan(planId?: string) {
     setEditingPlanId(typeof planId === "string" ? planId : "");
@@ -360,6 +362,7 @@ export default function Home() {
     setActiveClassId(item.id);
     setView("classes");
     setNotice(`${item.name} ${classId ? "was updated" : "is ready"} across planning, attendance, and resources.`);
+    setGabayEventMessage(classId ? `Updated na ang ${item.name}. Ginagamit na rin ang changes sa planning at attendance.` : `Handa na ang ${item.name}! Saved na ang roster at schedule para hindi mo na ulit i-encode.`);
   }
 
   function deleteClass(classId: string) {
@@ -372,6 +375,7 @@ export default function Home() {
     setActiveClassId((current) => current === classId ? remainingClasses[0]?.id || "" : current);
     setEditingPlanId((current) => savedPlans.some((plan) => plan.id === current && plan.classId === classId) ? "" : current);
     setNotice(`${removedClass?.name || "Class"} and its connected plans and attendance records were deleted.`);
+    setGabayEventMessage(`Tinanggal na ang ${removedClass?.name || "class"} at ang connected local records nito.`);
   }
 
   function loadSampleClass() {
@@ -379,21 +383,32 @@ export default function Home() {
     setActiveClassId(sampleClass.id);
     setView("classes");
     setNotice("Sample school data loaded. You can edit or add classes anytime.");
+    setGabayEventMessage("Sample class loaded. Puwede mo itong galawin para makita ang buong workflow.");
   }
 
   function savePlan(plan: SavedPlan) {
     setSavedPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)]);
     setEditingPlanId(plan.id);
     setNotice(`${plan.title} was saved under ${classes.find((item) => item.id === plan.classId)?.name || "your class"}.`);
+    setGabayEventMessage(`Saved ang “${plan.title}.” Nasa class workspace na ito at puwedeng balikan offline.`);
   }
 
   function toggleSavedResource(resourceId: number) {
+    const willSave = !savedResourceIds.includes(resourceId);
     setSavedResourceIds((current) => current.includes(resourceId) ? current.filter((id) => id !== resourceId) : [...current, resourceId]);
+    setGabayEventMessage(willSave ? "Resource saved on this device. Available na ito for your offline preparation." : "Removed na ang resource sa offline saves mo.");
   }
 
   function saveAttendance(updates: Record<string, Record<string, string>>, noteUpdates: Record<string, Record<string, string>>) {
     setAttendanceRecords((current) => ({ ...current, ...updates }));
     setAttendanceNotes((current) => ({ ...current, ...noteUpdates }));
+    setGabayEventMessage("Attendance saved locally. Maaari mo pa itong i-edit before it syncs later.");
+  }
+
+  function finishGabayNudge(openGuide = false) {
+    setDismissedGabayNudge(gabayEventMessage ? `${view}:page` : gabayNudgeKey);
+    setGabayEventMessage("");
+    if (openGuide) setGabayOpen(true);
   }
 
   if (!hasEntered) {
@@ -445,7 +460,7 @@ export default function Home() {
         </header>
 
         <div className="content">
-          {view === "home" && !activeClass ? <ClassZeroState onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} /> : view === "home" && activeClass ? <>
+          {view === "home" && !activeClass ? <ClassZeroState teacherName={teacherName} motion={gabayMotion} onOpenGabay={() => setGabayOpen(true)} onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} /> : view === "home" && activeClass ? <>
             <section className="welcome-row home-welcome">
               <div><p className="eyebrow">{displayDate(today).toUpperCase()}</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>{teacherLabel(teacherName)}!</em></h1><p className="lead">See what you teach today, then open the exact class tool you need.</p></div>
               <GabayTodayCard classCount={todayClassCount} activeClass={activeClass} hasPlan={Boolean(latestPlan)} attendanceSaved={Boolean(activeAttendance.length)} motion={gabayMotion} onOpen={() => setGabayOpen(true)} />
@@ -473,8 +488,11 @@ export default function Home() {
           </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("classes")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
         </div>
 
-        {!gabayQuiet && !gabayOpen && dismissedGabayNudge !== view && <GabayNudge view={view} motion={gabayMotion} onOpen={() => setGabayOpen(true)} onDismiss={() => setDismissedGabayNudge(view)} />}
-        <button className={`gabay-launcher ${gabayQuiet ? "is-quiet" : ""}`} type="button" aria-label={`Ask Gabay${gabayQuiet ? "; quiet mode is on" : ""}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => setGabayOpen(true)}><GabayMascot size="launcher" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayQuiet ? "Quiet mode is on" : "May maitutulong ako"}</small></span></button>
+        <div className={`gabay-floating-companion ${view === "home" ? "on-home" : ""}`}>
+          {!gabayQuiet && !gabayOpen && dismissedGabayNudge !== gabayNudgeKey && <GabayNudge message={gabayEventMessage || gabayNudges[view]} isEvent={Boolean(gabayEventMessage)} onOpen={() => finishGabayNudge(true)} onDismiss={() => finishGabayNudge()} />}
+          <button className="gabay-character-button" type="button" aria-label="Open Gabay" onClick={() => setGabayOpen(true)}><GabayMascot size="companion" motion={gabayMotion} speaking={!gabayQuiet && dismissedGabayNudge !== gabayNudgeKey} /></button>
+          <button className={`gabay-launcher ${gabayQuiet ? "is-quiet" : ""}`} type="button" aria-label={`Ask Gabay${gabayQuiet ? "; quiet mode is on" : ""}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => setGabayOpen(true)}><span><b>Ask Gabay</b><small>{gabayQuiet ? "Quiet mode is on" : "May maitutulong ako"}</small></span></button>
+        </div>
         <GabayGuide open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} attendanceCount={activeAttendance.length} quiet={gabayQuiet} motion={gabayMotion} onQuietChange={setGabayQuiet} onMotionChange={setGabayMotion} onClose={() => setGabayOpen(false)} onNavigate={(target) => { setView(target); setGabayOpen(false); }} onPlan={() => { beginPlan(); setGabayOpen(false); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -591,7 +609,7 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
   );
 }
 
-function GabayMascot({ size = "medium", motion = true, speaking = false }: { size?: "small" | "medium" | "launcher" | "large"; motion?: boolean; speaking?: boolean }) {
+function GabayMascot({ size = "medium", motion = true, speaking = false }: { size?: "small" | "medium" | "large" | "hero" | "companion"; motion?: boolean; speaking?: boolean }) {
   return <span className={`gabay-mascot gabay-mascot-${size} ${motion ? "" : "motion-paused"} ${speaking ? "is-speaking" : ""}`} aria-hidden="true">
     <svg viewBox="0 0 96 96" role="img">
       <g className="gabay-rays"><path d="M48 5v8M22 14l6 7M74 14l-6 7" /></g>
@@ -617,9 +635,9 @@ const gabayNudges: Record<View, string> = {
   community: "Ilagay ang grade at classroom context para mas malinaw ang tanong.",
 };
 
-function GabayNudge({ view, motion, onOpen, onDismiss }: { view: View; motion: boolean; onOpen: () => void; onDismiss: () => void }) {
+function GabayNudge({ message, isEvent, onOpen, onDismiss }: { message: string; isEvent: boolean; onOpen: () => void; onDismiss: () => void }) {
   return <aside className="gabay-nudge" role="status" aria-live="polite">
-    <button className="gabay-nudge-main" type="button" onClick={onOpen}><GabayMascot size="small" motion={motion} speaking /><span><b>Gabay says</b>{gabayNudges[view]}</span></button>
+    <button className="gabay-nudge-main" type="button" onClick={onOpen}><span><b>{isEvent ? "Gabay noticed" : "Gabay says"}</b>{message}</span></button>
     <button className="gabay-nudge-close" type="button" aria-label="Dismiss Gabay’s suggestion" onClick={onDismiss}>×</button>
   </aside>;
 }
@@ -637,10 +655,12 @@ function GabayTodayCard({ classCount, activeClass, hasPlan, attendanceSaved, mot
     ? "Your latest lesson plan is ready to review"
     : "Your next lesson still needs a plan";
 
-  return <aside className="gabay-today-card" aria-label="Gabay’s suggested priorities for today">
-    <header><GabayMascot size="medium" motion={motion} speaking /><div><p>GABAY FOR TODAY</p><b>Ano ang uunahin natin?</b></div></header>
-    <ul><li><span>1</span>{firstPriority}</li><li><span>2</span>{secondPriority}</li><li><span>3</span>{thirdPriority}</li></ul>
-    <button type="button" onClick={onOpen}>Ask Gabay for help <span>→</span></button>
+  return <aside className="gabay-today-guide" aria-label="Gabay’s suggested priorities for today">
+    <button className="gabay-hero-character" type="button" aria-label="Ask Gabay about today" onClick={onOpen}><GabayMascot size="hero" motion={motion} speaking /></button>
+    <div className="gabay-today-card"><header><div><p>GABAY FOR TODAY</p><b>Ano ang uunahin natin?</b></div></header>
+      <ul><li><span>1</span>{firstPriority}</li><li><span>2</span>{secondPriority}</li><li><span>3</span>{thirdPriority}</li></ul>
+      <button type="button" onClick={onOpen}>Ask Gabay for help <span>→</span></button>
+    </div>
   </aside>;
 }
 
@@ -754,16 +774,16 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
   </aside></>;
 }
 
-function ClassZeroState({ onSetUp, onLoadSample }: { onSetUp: () => void; onLoadSample: () => void }) {
+function ClassZeroState({ teacherName, motion, onOpenGabay, onSetUp, onLoadSample }: { teacherName: string; motion: boolean; onOpenGabay: () => void; onSetUp: () => void; onLoadSample: () => void }) {
   return (
-    <section className="class-zero-state">
-      <span className="zero-icon">▦</span>
-      <p className="eyebrow">START WITH YOUR REAL CLASSROOM</p>
-      <h1>No classes set up yet</h1>
-      <p>Add each class once. Kalinga will reuse its grade levels, schedule, subjects, and learner count everywhere—so you do not have to enter the same details again.</p>
-      <div><button className="primary-button" type="button" onClick={onSetUp}>＋ Set up my first class</button><button className="secondary-button" type="button" onClick={onLoadSample}>Preview with sample data</button></div>
-      <small>Your classes are saved on this device for the prototype.</small>
-    </section>
+    <div className="zero-home-state">
+      <section className="zero-welcome"><div><p className="eyebrow">WELCOME TO YOUR TEACHING SPACE</p><h1>Magandang araw,<br /><em>{teacherLabel(teacherName)}!</em></h1><p>Start with one class. Kalinga will carry its details into planning and attendance for you.</p></div><aside className="zero-gabay"><button type="button" aria-label="Ask Gabay how to begin" onClick={onOpenGabay}><GabayMascot size="hero" motion={motion} speaking /></button><div><p>GABAY SAYS</p><b>Three short steps lang.</b><span>Add the class, its meeting time, then learner names when you are ready.</span></div></aside></section>
+      <section className="class-zero-state">
+        <span className="zero-icon">▦</span>
+        <div><p className="eyebrow">START WITH YOUR REAL CLASSROOM</p><h2>No classes set up yet</h2><p>Add each class once. We will reuse its grades, schedule, subjects, and learners everywhere.</p></div>
+        <div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUp}>＋ Set up my first class</button><button className="secondary-button" type="button" onClick={onLoadSample}>Preview with sample data</button><small>Saved on this device for the prototype.</small></div>
+      </section>
+    </div>
   );
 }
 
