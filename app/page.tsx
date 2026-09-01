@@ -264,10 +264,8 @@ export default function Home() {
   const [entryMode, setEntryMode] = useState<EntryMode>(isSupabaseConfigured ? "loading" : "signed-out");
   const [accountOpen, setAccountOpen] = useState(false);
   const [gabayOpen, setGabayOpen] = useState(false);
-  const [gabayQuiet, setGabayQuiet] = useState(false);
   const [gabayMotion, setGabayMotion] = useState(true);
   const [gabayEventMessage, setGabayEventMessage] = useState("");
-  const [dismissedGabayNudge, setDismissedGabayNudge] = useState("");
   const [classes, setClasses] = useState<TeachingClass[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
@@ -323,7 +321,6 @@ export default function Home() {
       const storedAttendanceNotes = window.localStorage.getItem("kalinga-attendance-notes");
       const storedTeacherName = window.localStorage.getItem("kalinga-teacher-name");
       const storedTeacherEmail = window.localStorage.getItem("kalinga-teacher-email");
-      const storedGabayQuiet = window.localStorage.getItem("kalinga-gabay-quiet");
       const storedGabayMotion = window.localStorage.getItem("kalinga-gabay-motion");
       if (storedClasses) {
         const parsed = (JSON.parse(storedClasses) as LegacyTeachingClass[]).map(normalizeClass);
@@ -338,7 +335,6 @@ export default function Home() {
       if (storedAttendanceNotes) setAttendanceNotes(JSON.parse(storedAttendanceNotes) as Record<string, Record<string, string>>);
       if (storedTeacherName) setTeacherName(storedTeacherName);
       if (storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
-      if (storedGabayQuiet) setGabayQuiet(storedGabayQuiet === "true");
       if (storedGabayMotion) setGabayMotion(storedGabayMotion !== "false");
     } catch {
       // A clean zero state is safer than blocking the prototype on damaged local data.
@@ -357,9 +353,8 @@ export default function Home() {
     window.localStorage.setItem("kalinga-attendance-notes", JSON.stringify(attendanceNotes));
     window.localStorage.setItem("kalinga-teacher-name", teacherName);
     window.localStorage.setItem("kalinga-teacher-email", teacherEmail);
-    window.localStorage.setItem("kalinga-gabay-quiet", String(gabayQuiet));
     window.localStorage.setItem("kalinga-gabay-motion", String(gabayMotion));
-  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, gabayQuiet, gabayMotion, classDataReady]);
+  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, gabayMotion, classDataReady]);
 
   useEffect(() => {
     if (!gabayOpen) return;
@@ -379,7 +374,6 @@ export default function Home() {
     : [];
   const currentWeekday = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
   const todayClassCount = classes.reduce((count, item) => count + item.meetings.filter((meeting) => daysForPattern(meeting.days).includes(currentWeekday)).length, 0);
-  const gabayNudgeKey = `${view}:${gabayEventMessage || "page"}`;
 
   function beginPlan(planId?: string) {
     setEditingPlanId(typeof planId === "string" ? planId : "");
@@ -468,12 +462,6 @@ export default function Home() {
     setGabayEventMessage("Attendance saved locally. Maaari mo pa itong i-edit before it syncs later.");
   }
 
-  function finishGabayNudge(openGuide = false) {
-    setDismissedGabayNudge(gabayEventMessage ? `${view}:page` : gabayNudgeKey);
-    setGabayEventMessage("");
-    if (openGuide) setGabayOpen(true);
-  }
-
   if (entryMode === "loading") {
     return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening your teaching space…</p></section><KalingaFooterArtwork /></main>;
   }
@@ -518,6 +506,7 @@ export default function Home() {
           <div className="top-actions">
             <span className="connection"><i /> Offline-ready</span>
             <button className="language" type="button">ENG / FIL</button>
+            <button className={`gabay-topbar-button ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label="Open Gabay" aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Gabay</b><small>{entryMode === "authenticated" ? "AI guide" : "Local guide"}</small></span></button>
             <button className="notification" type="button" aria-label="Notifications">●</button>
             <div className="account-anchor mobile-account">
               <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
@@ -552,15 +541,10 @@ export default function Home() {
                 <button type="button" onClick={() => setView("library")}><span>▤</span><p><b>Find a resource</b><small>Search the teacher library</small></p><b>→</b></button>
               </aside>
             </section>
-          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("classes")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
+          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
         </div>
 
-        <div className={`gabay-floating-companion ${view === "home" ? "on-home" : ""}`}>
-          {!gabayQuiet && !gabayOpen && dismissedGabayNudge !== gabayNudgeKey && <GabayNudge message={gabayEventMessage || gabayNudges[view]} isEvent={Boolean(gabayEventMessage)} onOpen={() => finishGabayNudge(true)} onDismiss={() => finishGabayNudge()} />}
-          <button className="gabay-character-button" type="button" aria-label="Open Gabay" onClick={() => setGabayOpen(true)}><GabayMascot size="companion" motion={gabayMotion} speaking={!gabayQuiet && dismissedGabayNudge !== gabayNudgeKey} /></button>
-          <button className={`gabay-launcher ${gabayQuiet ? "is-quiet" : ""}`} type="button" aria-label={`Ask Gabay${gabayQuiet ? "; quiet mode is on" : ""}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => setGabayOpen(true)}><span><b>Ask Gabay</b><small>{gabayQuiet ? "Quiet mode is on" : "May maitutulong ako"}</small></span></button>
-        </div>
-        <GabayGuide key={view} open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} attendanceCount={activeAttendance.length} quiet={gabayQuiet} motion={gabayMotion} onQuietChange={setGabayQuiet} onMotionChange={setGabayMotion} onClose={() => setGabayOpen(false)} onNavigate={(target) => { setView(target); setGabayOpen(false); }} onPlan={() => { beginPlan(); setGabayOpen(false); }} />
+        <GabayGuide key={view} open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} attendanceCount={activeAttendance.length} motion={gabayMotion} authenticated={entryMode === "authenticated"} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Ask</button>
@@ -714,22 +698,6 @@ function GabayMascot({ size = "medium", motion = true, speaking = false }: { siz
   </span>;
 }
 
-const gabayNudges: Record<View, string> = {
-  home: "Magandang araw! Pili tayo ng isang task na uunahin.",
-  classes: "Once lang ang class setup—reuse natin ang roster at schedule.",
-  plan: "One ILAW section at a time. Hindi ko iimbentuhin ang competency.",
-  library: "Sabihin ang grade, subject, at context para mas akma ang resource.",
-  attendance: "Check muna ang class at date bago mag-save ng attendance.",
-  community: "Ilagay ang grade at classroom context para mas malinaw ang tanong.",
-};
-
-function GabayNudge({ message, isEvent, onOpen, onDismiss }: { message: string; isEvent: boolean; onOpen: () => void; onDismiss: () => void }) {
-  return <aside className="gabay-nudge" role="status" aria-live="polite">
-    <button className="gabay-nudge-main" type="button" onClick={onOpen}><span><b>{isEvent ? "Gabay noticed" : "Gabay says"}</b>{message}</span></button>
-    <button className="gabay-nudge-close" type="button" aria-label="Dismiss Gabay’s suggestion" onClick={onDismiss}>×</button>
-  </aside>;
-}
-
 function GabayTodayCard({ classCount, activeClass, hasPlan, attendanceSaved, motion, onOpen }: { classCount: number; activeClass: TeachingClass; hasPlan: boolean; attendanceSaved: boolean; motion: boolean; onOpen: () => void }) {
   const firstPriority = classCount
     ? `${classCount} ${classCount === 1 ? "class" : "classes"} on today’s schedule`
@@ -754,12 +722,12 @@ function GabayTodayCard({ classCount, activeClass, hasPlan, attendanceSaved, mot
 
 type GabayChatMessage = { id: string; role: "teacher" | "gabay"; text: string };
 
-function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendanceCount, quiet, motion, onQuietChange, onMotionChange, onClose, onNavigate, onPlan }: { open: boolean; view: View; teacherName: string; activeClass?: TeachingClass; latestPlan?: SavedPlan; attendanceCount: number; quiet: boolean; motion: boolean; onQuietChange: (quiet: boolean) => void; onMotionChange: (motion: boolean) => void; onClose: () => void; onNavigate: (view: View) => void; onPlan: () => void }) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendanceCount, motion, authenticated, onClose, onRequestSignIn }: { open: boolean; view: View; teacherName: string; activeClass?: TeachingClass; latestPlan?: SavedPlan; attendanceCount: number; motion: boolean; authenticated: boolean; onClose: () => void; onRequestSignIn: () => void }) {
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<GabayChatMessage[]>([]);
   const [isReplying, setIsReplying] = useState(false);
   const [connectedReplyUsed, setConnectedReplyUsed] = useState(false);
+  const [connectionIssue, setConnectionIssue] = useState(false);
   const chatInputId = useId();
 
   if (!open) return null;
@@ -810,23 +778,19 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
   };
   const context = contexts[view];
 
-  function prototypeReply(message: string) {
-    const normalized = message.toLowerCase();
-    if (/(competenc|melc|curriculum|pamantayan)/.test(normalized)) return "I can help organize a competency, pero hindi ako gagawa ng official competency mula sa wala. Paste a verified DepEd source or the teacher’s exact text, then we can arrange it by grade.";
-    if (/(attendance|present|absent|late|excuse|talaan)/.test(normalized)) return "For attendance, confirm the class and date first. Late means the learner attended; excused or absent can keep a short teacher note for context.";
-    if (/(offline|internet|signal|sync)/.test(normalized)) return context.offline;
-    if (/(where|screen|page|paano|how)/.test(normalized)) return context.screen;
-    return `${context.next} This is a prototype response based on the page you are viewing; a connected, source-grounded AI will handle open-ended questions later.`;
-  }
-
-  async function sendChat(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const message = chatInput.trim();
+  async function askGabay(message: string) {
     if (!message || isReplying) return;
     const stamp = Date.now();
     setChatMessages((current) => [...current, { id: `teacher-${stamp}`, role: "teacher", text: message }]);
     setChatInput("");
+
+    if (!authenticated) {
+      setChatMessages((current) => [...current, { id: `gabay-${stamp}`, role: "gabay", text: "Live AI is available after teacher sign-in. Prototype mode keeps your work on this device, but it cannot securely call Gemini." }]);
+      return;
+    }
+
     setIsReplying(true);
+    setConnectionIssue(false);
 
     const result = await askConnectedGabay(message, {
       view,
@@ -837,46 +801,32 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, attendan
     });
 
     setConnectedReplyUsed(result.connected);
+    setConnectionIssue(!result.connected);
     setChatMessages((current) => [...current, {
       id: `gabay-${stamp}`,
       role: "gabay",
-      text: result.connected ? result.reply : prototypeReply(message),
+      text: result.connected ? result.reply : "I could not reach connected AI right now. Check the Gabay function origin and Gemini secret, then try again. Your classroom data is still safe.",
     }]);
     setIsReplying(false);
   }
 
-  function askQuick(label: string, reply: string) {
-    const stamp = Date.now();
-    setChatMessages((current) => [...current, { id: `teacher-${stamp}`, role: "teacher", text: label }, { id: `gabay-${stamp}`, role: "gabay", text: reply }]);
-  }
-
-  function runAction(action: "plan" | "attendance" | "classes" | "library" | "home") {
-    if (action === "plan") onPlan();
-    else onNavigate(action);
+  async function sendChat(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await askGabay(chatInput.trim());
   }
 
   function closeGuide() {
-    setSettingsOpen(false);
     onClose();
   }
 
-  const actions: Record<View, Array<{ id: "plan" | "attendance" | "classes" | "library" | "home"; label: string; hint: string }>> = {
-    home: [{ id: "plan", label: "Plan a lesson", hint: "Gumawa ng ILAW plan" }, { id: "attendance", label: "Take attendance", hint: "Buksan ang talaan" }, { id: "classes", label: "Open my classes", hint: "Learners at schedule" }],
-    classes: [{ id: "plan", label: "Plan from this class", hint: "Reuse saved class details" }, { id: "attendance", label: "Take attendance", hint: "Use the saved roster" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
-    plan: [{ id: "classes", label: "Check class details", hint: "Roster and schedule" }, { id: "library", label: "Find a resource", hint: "Teacher-made materials" }, { id: "home", label: "Back to Today", hint: "Save and continue later" }],
-    library: [{ id: "plan", label: "Use in a lesson", hint: "Return to planning" }, { id: "classes", label: "Check class context", hint: "Grades and learners" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
-    attendance: [{ id: "classes", label: "Manage learners", hint: "Update the saved roster" }, { id: "plan", label: "Plan the next lesson", hint: "Open the ILAW builder" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
-    community: [{ id: "library", label: "Find shared resources", hint: "Browse teacher materials" }, { id: "plan", label: "Apply it to a lesson", hint: "Open the ILAW builder" }, { id: "home", label: "Back to Today", hint: "See today’s priorities" }],
-  };
-
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
-    <header><GabayMascot size="large" motion={motion} speaking /><div><p>{context.eyebrow}</p><h2 id="gabay-title">Chat with Gabay</h2><small>Kasama mo sa page na ito</small></div><div className="gabay-header-actions"><button type="button" aria-label="Gabay options" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((current) => !current)}>···</button><button type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button>{settingsOpen && <div className="gabay-settings" role="group" aria-label="Gabay preferences"><p>GABAY SETTINGS</p><button type="button" aria-pressed={quiet} onClick={() => onQuietChange(!quiet)}><span><b>{quiet ? "Let Gabay speak" : "Shush Gabay"}</b><small>{quiet ? "Show helpful page comments" : "Stop comments; chat stays available"}</small></span><i>{quiet ? "Off" : "On"}</i></button><button type="button" aria-pressed={!motion} onClick={() => onMotionChange(!motion)}><span><b>{motion ? "Pause animations" : "Play animations"}</b><small>Keep all guidance available</small></span><i>{motion ? "On" : "Off"}</i></button></div>}</div></header>
+    <header><GabayMascot size="medium" motion={motion} speaking={isReplying} /><div><p>{context.eyebrow}</p><h2 id="gabay-title">Ask Gabay</h2><small>{authenticated ? "Connected AI · page aware" : "Local guide · sign in for AI"}</small></div><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></header>
     <div className="gabay-chat-body">
-      <div className="gabay-chat-thread" aria-live="polite"><div className="gabay"><GabayMascot size="small" motion={motion} speaking /><p><b>{context.title}</b>{context.next}</p></div>{chatMessages.map((message) => <div className={message.role} key={message.id}>{message.role === "gabay" && <GabayMascot size="small" motion={motion} />}<p>{message.text}</p></div>)}{isReplying && <div className="gabay"><GabayMascot size="small" motion={motion} speaking /><p>Sandali—tinitingnan ko ang page context mo…</p></div>}</div>
-      <div className="gabay-questions" aria-label="Quick questions"><button type="button" onClick={() => askQuick("Anong uunahin?", context.next)}>Anong uunahin?</button><button type="button" onClick={() => askQuick("Paano ito gamitin?", context.screen)}>Paano ito gamitin?</button><button type="button" onClick={() => askQuick("Offline ba ito?", context.offline)}>Offline ba ito?</button></div>
-      <div className="gabay-action-row" aria-label="Page actions">{actions[view].slice(0, 3).map((action) => <button type="button" key={action.id} onClick={() => runAction(action.id)}><span>{action.label}</span><small>{action.hint}</small></button>)}</div>
+      {!authenticated && <div className="gabay-auth-callout"><span>Live AI is off in prototype mode.</span><button type="button" onClick={onRequestSignIn}>Sign in for AI</button></div>}
+      <div className="gabay-chat-thread" aria-live="polite"><div className="gabay"><GabayMascot size="small" motion={motion} /><p><b>{context.title}</b>{context.next}</p></div>{chatMessages.map((message) => <div className={message.role} key={message.id}>{message.role === "gabay" && <GabayMascot size="small" motion={motion} />}<p>{message.text}</p></div>)}{isReplying && <div className="gabay"><GabayMascot size="small" motion={motion} speaking /><p>Sandali—iniisip ko ang sagot…</p></div>}</div>
+      {!chatMessages.length && <div className="gabay-suggestions" aria-label="Suggested questions"><button type="button" onClick={() => void askGabay("Ano ang pinakamadaling next step sa page na ito?")}>What should I do next?</button><button type="button" onClick={() => void askGabay("Tulungan mo akong intindihin ang page na ito.")}>Explain this page</button></div>}
     </div>
-    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="Magtanong in Filipino, English, or Taglish" /><button type="submit" disabled={!chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button><small>{connectedReplyUsed ? "Connected AI reply · no learner records were sent" : isSupabaseConfigured ? "Local guidance stays available · connected AI starts after secure sign-in" : "Local guidance active · add Supabase environment values to connect AI"}</small></form>
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder={authenticated ? "Ask in Filipino, English, or Taglish" : "Sign in to ask connected AI"} /><button type="submit" disabled={!chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button><small>{connectionIssue ? "Connected AI could not be reached" : connectedReplyUsed ? "Gemini reply · learner records were not sent" : authenticated ? "Ready for a connected AI question" : "Prototype mode uses local guidance only"}</small></form>
   </aside>;
 }
 
@@ -1255,7 +1205,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   }
 
   if (!classes.length) {
-    return <section className="class-zero-state compact-zero"><span className="zero-icon">＋</span><p className="eyebrow">CREATE A LESSON</p><h1>Add a class first</h1><p>A lesson needs a saved class so its grades, attendance list, and schedule stay connected.</p><div><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button><button className="secondary-button" type="button" onClick={onBack}>Back home</button></div></section>;
+    return <section className="class-zero-state compact-zero"><span className="zero-icon">＋</span><div><p className="eyebrow">PLAN A LESSON</p><h2>Set up a class first</h2><p>Kalinga uses its grade levels, subjects, and schedule to start the lesson for you.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button><button className="secondary-button" type="button" onClick={onBack}>Back to Today</button></div></section>;
   }
 
   return (
@@ -1450,7 +1400,7 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
     setSaved(true);
   }
 
-  if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><p className="eyebrow">RECORD ATTENDANCE</p><h1>Add a class first</h1><p>Attendance uses the classes and grade groups you manage, so there is nothing to record until a class is set up.</p><div><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
+  if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><div><p className="eyebrow">RECORD ATTENDANCE</p><h2>Set up a class first</h2><p>Attendance needs a saved learner list and class schedule before there is anything to record.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
   const attendanceStatuses = ["Present", "Absent", "Late", "Excused", "Leave"];
   const counts = learners.reduce<Record<string, number>>((total, learner) => ({ ...total, [statuses[learner.id]]: (total[statuses[learner.id]] || 0) + 1 }), {});
