@@ -30,6 +30,7 @@ Link this repository to the project and apply the schema:
 ```bash
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase db push --dry-run
 npx supabase db push
 ```
 

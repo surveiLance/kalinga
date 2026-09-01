@@ -64,13 +64,16 @@ Deno.serve(async (request) => {
   if (!authorization) return json({ error: "Sign in is required" }, 401, origin);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const publishableKeys = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
+  const supabasePublishableKey = publishableKeys
+    ? JSON.parse(publishableKeys).default
+    : Deno.env.get("SUPABASE_ANON_KEY");
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!supabaseUrl || !supabaseAnonKey || !geminiApiKey) {
+  if (!supabaseUrl || !supabasePublishableKey || !geminiApiKey) {
     return json({ error: "Gabay is not configured" }, 503, origin);
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     global: { headers: { Authorization: authorization } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
