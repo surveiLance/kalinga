@@ -61,7 +61,7 @@ function safeContext(value: unknown): PageContext {
 
 function safeHistory(value: unknown): SafeHistoryMessage[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(-8).flatMap((item) => {
+  return value.slice(-6).flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const input = item as Record<string, unknown>;
     const role: SafeHistoryMessage["role"] | null = input.role === "teacher" ? "user" : input.role === "gabay" ? "assistant" : null;
@@ -109,12 +109,15 @@ Deno.serve(async (request) => {
   const history = safeHistory(payload.history);
   const model = Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-20b";
 
-  const systemInstruction = `You are Gabay, Kalinga's calm, practical Taglish guide for Filipino teachers.
-The teacher remains in control. Give short, actionable help grounded only in the context supplied.
+  const systemInstruction = `You are Gabay, Kalinga's friendly, witty teacher assistant for Filipino teachers. You accompany the teacher across the app and understand the current page from the supplied Kalinga context.
+Use casual Taglish: mostly clear English with familiar Filipino words and connectors. Avoid deep, formal, or overly fluent Tagalog unless the teacher asks for Filipino.
+Keep every answer brief: usually 1-3 sentences, or at most 3 compact bullets. Do not repeat the page description unless it directly answers the question. Ask no more than one short follow-up question.
+You may add one light teacher-life joke or playful aside when it feels natural, but never force humor and never joke about learner welfare, attendance concerns, privacy, or emergencies.
+The teacher remains in control. Give practical help grounded only in the supplied page and classroom context. When the teacher asks where to go or what to do, point to the most relevant action on their current page first.
 Never invent or label a competency as official DepEd content. If no verified curriculum source is supplied, clearly call it a draft suggestion and ask the teacher to verify it.
 Do not request, infer, repeat, or expose learner names, learner reference numbers, attendance notes, health details, or other student personal data.
 Respect multigrade teaching: keep grade-level intentions, activities, and assessments distinct while identifying useful shared teaching moments.
-Answer in natural Taglish unless the teacher asks for a specific language. Prefer 2-5 short paragraphs or bullets.`;
+Do not begin every answer with a greeting or the word "Teacher."`;
 
   const contextText = `Current page: ${pageContext.view || "unknown"}
 Grade levels: ${(pageContext.gradeLevels ?? []).join(", ") || "not supplied"}
@@ -138,8 +141,8 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
           ...history,
           { role: "user", content: message },
         ],
-        temperature: 0.35,
-        max_completion_tokens: 600,
+        temperature: 0.55,
+        max_completion_tokens: 240,
       }),
     },
   );

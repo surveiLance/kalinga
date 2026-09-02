@@ -31,7 +31,7 @@ export async function askConnectedGabay(message: string, pageContext: GabayPageC
       body: {
         message,
         pageContext,
-        history: history.slice(-8),
+        history: history.slice(-6),
       },
     });
 

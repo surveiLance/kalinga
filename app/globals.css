@@ -606,15 +606,16 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .student-row:hover, .all-schedule-list article:hover, .meeting-row:hover, .reply-item:hover { transform: translateX(2px); }
 .status-options button.active, .grade-tabs button.active, .schedule-day-tabs button.active { transform: scale(1.03); }
 
-/* Gabay stays quiet until the teacher asks for it. */
+/* Gabay stays visible in the app bar without covering teacher work. */
 .home-welcome { display: block; max-width: 760px; }
 .zero-welcome { min-height: 230px; grid-template-columns: minmax(0, 760px); }
-.gabay-nav-item { position: relative; margin-top: 10px; color: var(--teal-ink); }
-.gabay-nav-item::before { content: ""; position: absolute; top: -6px; left: 14px; right: 14px; height: 1px; background: var(--line); }
-.gabay-nav-item.has-update::after, .gabay-mobile-button.has-update::after { content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
-.gabay-nav-item.has-update::after { right: 15px; }
-.gabay-mobile-button { position: relative; width: 38px; height: 38px; padding: 0; border: 1px solid #c7ddd8; border-radius: 11px; display: none; place-items: center; color: var(--teal-ink); background: #f1f9f7; font-size: 17px; cursor: pointer; }
-.gabay-mobile-button.has-update::after { top: 4px; right: 4px; border: 2px solid #f1f9f7; }
+.gabay-topbar-assistant { position: relative; min-height: 50px; padding: 5px 12px 5px 7px; border: 1px solid #b9dcd5; border-radius: 14px; display: flex; align-items: center; gap: 8px; color: var(--ink); background: #eff9f6; box-shadow: 0 6px 16px rgba(35, 72, 70, .08); cursor: pointer; }
+.gabay-topbar-assistant:hover, .gabay-topbar-assistant[aria-expanded="true"] { border-color: #75b5aa; background: #e2f3ef; }
+.gabay-topbar-assistant .gabay-mascot { width: 38px; height: 38px; filter: none; }
+.gabay-topbar-assistant > span { display: grid; gap: 2px; text-align: left; }
+.gabay-topbar-assistant b { font-size: 12px; line-height: 1.1; }
+.gabay-topbar-assistant small { color: #66817e; font-size: 8px; white-space: nowrap; }
+.gabay-topbar-assistant.has-update::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border: 2px solid #eff9f6; border-radius: 50%; background: var(--orange); }
 
 .gabay-chat-popover { top: 90px; right: 28px; bottom: auto; width: min(350px, calc(100vw - 32px)); max-height: min(540px, calc(100dvh - 112px)); border-radius: 16px; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; box-shadow: 0 16px 42px rgba(27, 55, 54, .18); }
 .gabay-chat-popover::after { display: none; }
@@ -636,7 +637,9 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-chat-composer > small { padding: 0 3px; color: #a0473d; font-size: 9px; }
 
 @media (max-width: 720px) {
-  .gabay-mobile-button { display: grid; }
+  .gabay-topbar-assistant { width: 44px; min-height: 44px; padding: 3px; justify-content: center; }
+  .gabay-topbar-assistant .gabay-mascot { width: 35px; height: 35px; }
+  .gabay-topbar-assistant > span { display: none; }
   .gabay-chat-popover { top: 72px; left: 10px; right: 10px; bottom: auto; width: auto; max-height: calc(100dvh - 150px); border-radius: 15px; }
   .gabay-chat-popover > header { border-radius: 14px 14px 0 0; }
   .gabay-chat-popover .gabay-chat-thread { max-height: min(330px, 42dvh); }

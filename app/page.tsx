@@ -88,6 +88,14 @@ type LegacySavedPlan = Omit<SavedPlan, "grades"> & { grades: Array<GradeLevel | 
 
 const commonSubjects = ["Mathematics", "Science", "English", "Filipino", "Araling Panlipunan", "MAPEH", "Edukasyon sa Pagpapakatao", "TLE"];
 const commonGradeLevels: GradeLevel[] = ["Kindergarten", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+const gabayPageLabels: Record<View, string> = {
+  home: "Today",
+  classes: "Classes",
+  plan: "Lesson plan",
+  library: "Resources",
+  attendance: "Attendance",
+  community: "Teacher community",
+};
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino", "Mariel C. Torres", "Noel B. Pangan", "Olivia R. Cabahug", "Paolo S. Evasco", "Queenie M. Dayao", "Ramon L. Flores"];
 
@@ -480,7 +488,6 @@ export default function Home() {
           <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => beginPlan()}><span className="nav-icon">＋</span> Plan lessons</button>
           <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}><span className="nav-icon">▱</span> Find resources</button>
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => setView("community")}><span className="nav-icon">♧</span> Ask teachers</button>
-          <button className={`nav-item gabay-nav-item ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><span className="nav-icon">✦</span> Ask Gabay</button>
         </nav>
 
         <div className="offline-card">
@@ -504,7 +511,7 @@ export default function Home() {
           <div className="top-actions">
             <span className="connection"><i /> Offline-ready</span>
             <button className="language" type="button">ENG / FIL</button>
-            <button className={`gabay-mobile-button ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label="Ask Gabay" aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}>✦</button>
+            <button className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
             <button className="notification" type="button" aria-label="Notifications">●</button>
             <div className="account-anchor mobile-account">
               <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
@@ -707,12 +714,12 @@ function GabayGuide({ open, view, activeClass, latestPlan, motion, authenticated
   if (!open) return null;
 
   const pagePrompt: Record<View, string> = {
-    home: activeClass ? `Ask about today or ${activeClass.name}.` : "Ask how to begin setting up Kalinga.",
-    classes: "Ask about this class, its learners, or schedule.",
-    plan: "Ask about the lesson section you are working on.",
-    library: "Ask for help finding a suitable resource.",
-    attendance: "Ask about attendance status or notes.",
-    community: "Ask how to make your teacher question clearer.",
+    home: activeClass ? `Need a hand with today or ${activeClass.name}?` : "Need a hand setting up your first class?",
+    classes: "Ask about this class, learners, or schedule.",
+    plan: "Ask about the ILAW section you are working on.",
+    library: "Ask me to help narrow down a resource.",
+    attendance: "Ask about a status, note, or attendance step.",
+    community: "Ask me to help make your teacher question clearer.",
   };
 
   async function askGabay(message: string) {
@@ -758,7 +765,7 @@ function GabayGuide({ open, view, activeClass, latestPlan, motion, authenticated
     <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? "AI guide" : "Sign in for AI"}</small></div><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></header>
     <div className="gabay-chat-body">
       {!chatMessages.length && <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div>}
-      {!!chatMessages.length && <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message) => <div className={message.role} key={message.id}><p>{message.text}</p></div>)}{isReplying && <div className="gabay"><p>Thinking…</p></div>}</div>}
+      {!!chatMessages.length && <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message) => <div className={message.role} key={message.id}><p>{message.text}</p></div>)}{isReplying && <div className="gabay"><p>Sandali, teacher…</p></div>}</div>}
     </div>
     <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} disabled={!authenticated} onChange={(event) => setChatInput(event.target.value)} placeholder={authenticated ? "Message Gabay…" : "Sign in to chat"} /><button type="submit" disabled={!authenticated || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
   </aside>;
