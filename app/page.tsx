@@ -905,9 +905,9 @@ export default function Home() {
               <article className="home-action-card">
                 <div className="home-action-heading"><div><p className="eyebrow">WORKING WITH</p><h2>{activeClass.name}</h2><p>{gradeList(activeClass.grades)} · {activeClass.learners.length} learners</p></div>{classes.length > 1 && <select aria-label="Choose active class" value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>}</div>
                 <div className="home-essential-actions">
-                  <button type="button" onClick={() => beginPlan(latestPlan?.id)}><span>＋</span><p><b>{latestPlan ? "Review lesson" : "Plan a lesson"}</b><small>{latestPlan ? latestPlan.title : "Create an ILAW plan"}</small></p><b>→</b></button>
-                  <button type="button" onClick={() => setView("attendance")}><span>✓</span><p><b>Take attendance</b><small>{activeAttendance.length ? `${activeAttendance.length} records saved` : `${activeClass.learners.length} learners ready`}</small></p><b>→</b></button>
-                  <button type="button" onClick={() => setView("library")}><span>▤</span><p><b>Find a resource</b><small>Match this class</small></p><b>→</b></button>
+                  <button type="button" onClick={() => beginPlan(latestPlan?.id)}><span>＋</span><p><b>{latestPlan ? "Review lesson" : "Plan a lesson"}</b><small>{latestPlan ? `${latestPlan.title} is ready to edit.` : "Build a step-by-step ILAW lesson for this class."}</small></p><b>→</b></button>
+                  <button type="button" onClick={() => setView("attendance")}><span>✓</span><p><b>Take attendance</b><small>{activeAttendance.length ? `${activeAttendance.length} records saved. Open to review them.` : `Mark the status of ${activeClass.learners.length} learners.`}</small></p><b>→</b></button>
+                  <button type="button" onClick={() => setView("library")}><span>▤</span><p><b>Find a resource</b><small>Browse materials matched to these grade levels.</small></p><b>→</b></button>
                 </div>
               </article>
             </section>}
@@ -1075,6 +1075,14 @@ function normalizeGabayView(value: unknown): View {
   return typeof value === "string" && value in gabayPageLabels ? value as View : "home";
 }
 
+function FormattedGabayMessage({ text }: { text: string }) {
+  return <>{text.split(/(\*\*[^*]+\*\*|\n)/g).map((part, index) => {
+    if (part === "\n") return <br key={`line-${index}`} />;
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={`bold-${index}`}>{part.slice(2, -2)}</strong>;
+    return <Fragment key={`text-${index}`}>{part}</Fragment>;
+  })}</>;
+}
+
 function GabayTodayBriefing({ teacherName, activeClass, blocks, nextBlock, missingPlanCount, attendanceSavedCount, latestUpdate, motion, onOpen, onSetUp, onLoadSample }: { teacherName: string; activeClass?: TeachingClass; blocks: TodayTeachingBlock[]; nextBlock?: TodayTeachingBlock; missingPlanCount: number; attendanceSavedCount: number; latestUpdate: string; motion: boolean; onOpen: () => void; onSetUp: () => void; onLoadSample: () => void }) {
   const headline = !activeClass
     ? "Let’s set up your first class."
@@ -1104,7 +1112,7 @@ function GabayTodayBriefing({ teacherName, activeClass, blocks, nextBlock, missi
 function TodayScheduleSummary({ blocks, onOpenClass }: { blocks: TodayTeachingBlock[]; onOpenClass: (classId: string) => void }) {
   return <section className="today-schedule-summary">
     <header><div><p className="eyebrow">TODAY’S SCHEDULE</p><h2>{blocks.length ? `${blocks.length} ${blocks.length === 1 ? "class" : "classes"}` : "No classes today"}</h2></div><span>{weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]}</span></header>
-    {blocks.length ? <div className="today-schedule-list">{blocks.map((block) => <article key={`${block.classId}-${block.meeting.id}`}><time><b>{block.meeting.startTime}</b><span>{formatTime(toMinutes(block.meeting.startTime) + block.meeting.durationMinutes)}</span></time><div><b>{block.className}</b><span>{gradeList(block.grades)} · {block.meeting.durationMinutes} minutes</span></div><button type="button" onClick={() => onOpenClass(block.classId)}>Open →</button></article>)}</div> : <p className="today-schedule-empty">Nothing scheduled. You can use the time to prepare a lesson or browse resources.</p>}
+    {blocks.length ? <div className="today-schedule-list">{blocks.map((block) => { const endTime = formatTime(toMinutes(block.meeting.startTime) + block.meeting.durationMinutes); return <article key={`${block.classId}-${block.meeting.id}`}><div className="schedule-time-visual" aria-label={`${block.meeting.startTime} to ${endTime}`}><span>{block.meeting.startTime}</span><i><b /></i><span>{endTime}</span></div><div className="today-schedule-details"><b>{block.className}</b><span>{gradeList(block.grades)}</span><small>{block.meeting.durationMinutes}-minute {block.meeting.label || "class block"}</small></div><button type="button" onClick={() => onOpenClass(block.classId)}>Open class <span>→</span></button></article>; })}</div> : <p className="today-schedule-empty">Nothing scheduled. You can use the time to prepare a lesson or browse resources.</p>}
   </section>;
 }
 
@@ -1291,7 +1299,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? `${gabayPageLabels[view]} · same conversation` : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
     {conversationMenuOpen && <div className="gabay-conversation-menu"><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 6).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Clear current chat</button>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
     <div className="gabay-chat-body">
-      {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p>{message.text}</p></div></Fragment>)}{isReplying && <div className="gabay"><p>Sandali, teacher…</p></div>}</div>}
+      {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{isReplying && <div className="gabay"><p>Sandali, teacher…</p></div>}</div>}
     </div>
     <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId} onChange={(event) => setChatInput(event.target.value)} placeholder={authenticated ? `Ask about ${gabayPageLabels[view]}…` : "Sign in to chat"} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
   </aside>;
