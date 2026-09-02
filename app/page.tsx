@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { askConnectedGabay, isSupabaseConfigured, type GabayPageContext } from "@/lib/gabay-ai";
@@ -924,7 +924,7 @@ export default function Home() {
           </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView onGabayContext={setGabayLiveContext} />}
         </div>
 
-        <GabayGuide key={view} open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
+        <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Ask</button>
@@ -1078,7 +1078,12 @@ function GabayMascot({ size = "medium", motion = true, speaking = false }: { siz
   </span>;
 }
 
-type GabayChatMessage = { id: string; role: "teacher" | "gabay"; text: string };
+type GabayChatMessage = { id: string; conversationId: string; role: "teacher" | "gabay"; text: string; view: View; createdAt: string };
+type GabayConversation = { id: string; title: string; createdAt: string; updatedAt: string; messages: GabayChatMessage[] };
+
+function normalizeGabayView(value: unknown): View {
+  return typeof value === "string" && value in gabayPageLabels ? value as View : "home";
+}
 
 function GabayTodayBriefing({ teacherName, blocks, nextBlock, missingPlanCount, attendanceSavedCount, latestUpdate, motion, onOpen }: { teacherName: string; blocks: TodayTeachingBlock[]; nextBlock?: TodayTeachingBlock; missingPlanCount: number; attendanceSavedCount: number; latestUpdate: string; motion: boolean; onOpen: () => void }) {
   const headline = !blocks.length
@@ -1104,12 +1109,76 @@ function GabayTodayBriefing({ teacherName, blocks, nextBlock, missingPlanCount, 
   </aside>;
 }
 
-function GabayGuide({ open, view, pageContext, activeClass, motion, authenticated, onClose, onRequestSignIn }: { open: boolean; view: View; pageContext: GabayPageContext; activeClass?: TeachingClass; motion: boolean; authenticated: boolean; onClose: () => void; onRequestSignIn: () => void }) {
+function GabayGuide({ open, view, pageContext, activeClass, motion, authenticated, teacherAccountId, onClose, onRequestSignIn }: { open: boolean; view: View; pageContext: GabayPageContext; activeClass?: TeachingClass; motion: boolean; authenticated: boolean; teacherAccountId: string; onClose: () => void; onRequestSignIn: () => void }) {
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<GabayChatMessage[]>([]);
+  const [conversations, setConversations] = useState<GabayConversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState("");
+  const [hydratedChatAccountId, setHydratedChatAccountId] = useState("");
+  const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [connectionIssue, setConnectionIssue] = useState(false);
   const chatInputId = useId();
+
+  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
+  const chatMessages = activeConversation?.messages || [];
+  const chatCacheKey = teacherAccountId ? `kalinga:teacher-${teacherAccountId}:gabay-chat` : "";
+
+  useEffect(() => {
+    if (!authenticated || !teacherAccountId) return;
+    let active = true;
+    const cacheTimer = window.setTimeout(() => {
+      let cachedConversations: GabayConversation[] = [];
+      try {
+        const cached = window.localStorage.getItem(`kalinga:teacher-${teacherAccountId}:gabay-chat`);
+        if (cached) cachedConversations = JSON.parse(cached) as GabayConversation[];
+      } catch {
+        cachedConversations = [];
+      }
+      if (!active) return;
+      setConversations(cachedConversations);
+      setActiveConversationId(cachedConversations[0]?.id || "");
+      setHydratedChatAccountId(teacherAccountId);
+    }, 0);
+
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) {
+      void supabase.from("gabay_conversations").select("id,title,created_at,updated_at").eq("teacher_id", teacherAccountId).order("updated_at", { ascending: false }).limit(12).then(async ({ data: conversationRows, error }) => {
+        if (!active || error || !conversationRows) return;
+        const conversationIds = conversationRows.map((row) => row.id as string);
+        const messageResult = conversationIds.length
+          ? await supabase.from("gabay_messages").select("id,conversation_id,role,content,page_view,created_at").eq("teacher_id", teacherAccountId).in("conversation_id", conversationIds).order("created_at").limit(600)
+          : { data: [], error: null };
+        if (!active || messageResult.error) return;
+        const messages = (messageResult.data || []).map((row) => ({
+          id: row.id as string,
+          conversationId: row.conversation_id as string,
+          role: row.role === "gabay" ? "gabay" as const : "teacher" as const,
+          text: row.content as string,
+          view: normalizeGabayView(row.page_view),
+          createdAt: row.created_at as string,
+        }));
+        const nextConversations: GabayConversation[] = conversationRows.map((row) => ({
+          id: row.id as string,
+          title: row.title as string,
+          createdAt: row.created_at as string,
+          updatedAt: row.updated_at as string,
+          messages: messages.filter((message) => message.conversationId === row.id),
+        }));
+        setConversations((current) => [...nextConversations, ...current.filter((conversation) => !nextConversations.some((remote) => remote.id === conversation.id))]);
+        setActiveConversationId((current) => current || nextConversations[0]?.id || "");
+        setHydratedChatAccountId(teacherAccountId);
+      });
+    }
+    return () => {
+      active = false;
+      window.clearTimeout(cacheTimer);
+    };
+  }, [authenticated, teacherAccountId]);
+
+  useEffect(() => {
+    if (!chatCacheKey || hydratedChatAccountId !== teacherAccountId) return;
+    window.localStorage.setItem(chatCacheKey, JSON.stringify(conversations));
+  }, [chatCacheKey, conversations, hydratedChatAccountId, teacherAccountId]);
 
   if (!open) return null;
 
@@ -1128,24 +1197,60 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
       onRequestSignIn();
       return;
     }
-    const stamp = Date.now();
-    setChatMessages((current) => [...current, { id: `teacher-${stamp}`, role: "teacher", text: message }]);
+    const stamp = new Date().toISOString();
+    const conversationId = activeConversationId || crypto.randomUUID();
+    const conversationTitle = message.length > 54 ? `${message.slice(0, 51)}…` : message;
+    const teacherMessage: GabayChatMessage = { id: crypto.randomUUID(), conversationId, role: "teacher", text: message, view, createdAt: stamp };
+    if (!activeConversationId) {
+      const conversation: GabayConversation = { id: conversationId, title: conversationTitle, createdAt: stamp, updatedAt: stamp, messages: [teacherMessage] };
+      setConversations((current) => [conversation, ...current]);
+      setActiveConversationId(conversationId);
+    } else {
+      setConversations((current) => {
+        const conversation = current.find((item) => item.id === conversationId);
+        if (!conversation) return current;
+        const updated = { ...conversation, updatedAt: stamp, messages: [...conversation.messages, teacherMessage] };
+        return [updated, ...current.filter((item) => item.id !== conversationId)];
+      });
+    }
     setChatInput("");
 
     setIsReplying(true);
     setConnectionIssue(false);
 
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && teacherAccountId) {
+      if (!activeConversationId) {
+        await supabase.from("gabay_conversations").insert({ id: conversationId, teacher_id: teacherAccountId, title: conversationTitle });
+      }
+      await supabase.from("gabay_messages").insert({ id: teacherMessage.id, conversation_id: conversationId, teacher_id: teacherAccountId, role: "teacher", content: message, page_view: view });
+      void supabase.from("gabay_conversations").update({ updated_at: stamp }).eq("teacher_id", teacherAccountId).eq("id", conversationId);
+    }
+
     const result = await askConnectedGabay(message, {
       ...pageContext,
       offline: typeof navigator !== "undefined" && !navigator.onLine,
-    }, chatMessages.map(({ role, text }) => ({ role, text })));
+    }, chatMessages.slice(-12).map(({ role, text }) => ({ role, text })));
 
     setConnectionIssue(!result.connected);
-    setChatMessages((current) => [...current, {
-      id: `gabay-${stamp}`,
+    const gabayMessage: GabayChatMessage = {
+      id: crypto.randomUUID(),
+      conversationId,
       role: "gabay",
       text: result.connected ? result.reply : "I could not reach Groq right now. Please try again shortly. Your classroom data is still safe.",
-    }]);
+      view,
+      createdAt: new Date().toISOString(),
+    };
+    setConversations((current) => {
+      const conversation = current.find((item) => item.id === conversationId);
+      if (!conversation) return current;
+      const updated = { ...conversation, updatedAt: gabayMessage.createdAt, messages: [...conversation.messages, gabayMessage] };
+      return [updated, ...current.filter((item) => item.id !== conversationId)];
+    });
+    if (supabase && teacherAccountId) {
+      void supabase.from("gabay_messages").insert({ id: gabayMessage.id, conversation_id: conversationId, teacher_id: teacherAccountId, role: "gabay", content: gabayMessage.text, page_view: view });
+      void supabase.from("gabay_conversations").update({ updated_at: gabayMessage.createdAt }).eq("teacher_id", teacherAccountId).eq("id", conversationId);
+    }
     setIsReplying(false);
   }
 
@@ -1155,16 +1260,41 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   }
 
   function closeGuide() {
+    setConversationMenuOpen(false);
     onClose();
   }
 
+  function startNewConversation() {
+    setActiveConversationId("");
+    setChatInput("");
+    setConnectionIssue(false);
+    setConversationMenuOpen(false);
+  }
+
+  function openConversation(conversationId: string) {
+    setActiveConversationId(conversationId);
+    setConversationMenuOpen(false);
+    setConnectionIssue(false);
+  }
+
+  function clearCurrentConversation() {
+    if (!activeConversationId) return;
+    const conversationId = activeConversationId;
+    const remaining = conversations.filter((conversation) => conversation.id !== conversationId);
+    setConversations(remaining);
+    setActiveConversationId(remaining[0]?.id || "");
+    setConversationMenuOpen(false);
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && teacherAccountId) void supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).eq("id", conversationId);
+  }
+
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
-    <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? "AI guide" : "Sign in for AI"}</small></div><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></header>
+    <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? `${gabayPageLabels[view]} · same conversation` : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
+    {conversationMenuOpen && <div className="gabay-conversation-menu"><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 6).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Clear current chat</button>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
     <div className="gabay-chat-body">
-      {!chatMessages.length && <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div>}
-      {!!chatMessages.length && <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message) => <div className={message.role} key={message.id}><p>{message.text}</p></div>)}{isReplying && <div className="gabay"><p>Sandali, teacher…</p></div>}</div>}
+      {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p>{message.text}</p></div></Fragment>)}{isReplying && <div className="gabay"><p>Sandali, teacher…</p></div>}</div>}
     </div>
-    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} disabled={!authenticated} onChange={(event) => setChatInput(event.target.value)} placeholder={authenticated ? "Message Gabay…" : "Sign in to chat"} /><button type="submit" disabled={!authenticated || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId} onChange={(event) => setChatInput(event.target.value)} placeholder={authenticated ? `Ask about ${gabayPageLabels[view]}…` : "Sign in to chat"} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue ? <small>Gabay could not connect. Please try again.</small> : <small>Same chat across pages · Do not include learner names or private details.</small>}</form>
   </aside>;
 }
 

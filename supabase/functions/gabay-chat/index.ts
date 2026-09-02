@@ -87,7 +87,7 @@ function safeContext(value: unknown): PageContext {
 
 function safeHistory(value: unknown): SafeHistoryMessage[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(-6).flatMap((item) => {
+  return value.slice(-12).flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const input = item as Record<string, unknown>;
     const role: SafeHistoryMessage["role"] | null = input.role === "teacher" ? "user" : input.role === "gabay" ? "assistant" : null;

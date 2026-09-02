@@ -633,11 +633,25 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 
 .gabay-chat-popover { top: 90px; right: 28px; bottom: auto; width: min(350px, calc(100vw - 32px)); max-height: min(540px, calc(100dvh - 112px)); border-radius: 16px; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; box-shadow: 0 16px 42px rgba(27, 55, 54, .18); }
 .gabay-chat-popover::after { display: none; }
-.gabay-chat-popover > header { min-height: 58px; padding: 9px 11px; border-radius: 15px 15px 0 0; grid-template-columns: 32px 1fr 34px; gap: 8px; }
+.gabay-chat-popover > header { min-height: 58px; padding: 9px 11px; border-radius: 15px 15px 0 0; grid-template-columns: 32px 1fr auto; gap: 8px; }
 .gabay-chat-popover > header .gabay-mascot { width: 30px; height: 30px; filter: none; }
 .gabay-chat-popover header h2 { margin: 0; font-size: 17px; }
 .gabay-chat-popover header small { margin-top: 1px; display: block; font-size: 9px; }
 .gabay-close { width: 32px; height: 32px; border-radius: 9px; font-size: 18px; }
+.gabay-chat-header-actions { display: flex; align-items: center; gap: 5px; }
+.gabay-chat-header-actions > button { width: 32px; height: 32px; padding: 0; border: 1px solid #c7ddd8; border-radius: 9px; display: grid; place-items: center; color: #476764; background: rgba(255,255,255,.78); font-size: 13px; font-weight: 800; cursor: pointer; }
+.gabay-conversation-menu { position: absolute; z-index: 5; top: 62px; right: 9px; left: 9px; max-height: 360px; padding: 11px; border: 1px solid #bfd9d4; border-radius: 13px; overflow-y: auto; background: #fffdf8; box-shadow: 0 16px 38px rgba(27,55,54,.2); }
+.gabay-conversation-menu > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.gabay-conversation-menu > div:first-child b { font-size: 12px; }
+.gabay-conversation-menu > div:first-child button, .gabay-clear-chat { min-height: 30px; padding: 6px 9px; border: 1px solid #b9dcd5; border-radius: 8px; color: var(--teal-ink); background: #eef8f5; font-size: 9px; font-weight: 800; cursor: pointer; }
+.gabay-conversation-menu button:disabled { opacity: .45; cursor: default; }
+.gabay-recent-chats { margin: 9px 0; display: grid; gap: 5px; }
+.gabay-recent-chats > button { width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 9px; display: flex; justify-content: space-between; gap: 10px; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }
+.gabay-recent-chats > button.active { border-color: #75b5aa; background: #eaf6f3; }
+.gabay-recent-chats span { overflow: hidden; font-size: 10px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.gabay-recent-chats small { flex: 0 0 auto; color: var(--muted); font-size: 8px; }
+.gabay-conversation-menu > p, .gabay-conversation-menu > small { margin: 9px 0 0; display: block; color: var(--muted); font-size: 8px; line-height: 1.4; }
+.gabay-clear-chat { color: #a0473d; border-color: #e5beb3; background: #fff6f2; }
 .gabay-chat-body { min-height: 130px; padding: 12px; overflow: hidden; }
 .gabay-chat-empty { min-height: 106px; display: grid; place-content: center; justify-items: center; text-align: center; }
 .gabay-chat-empty b { font-size: 14px; }
@@ -645,6 +659,8 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-chat-empty button { margin-top: 12px; min-height: 36px; padding: 8px 12px; border: 0; border-radius: 9px; color: #fff; background: var(--teal-ink); font-size: 10px; font-weight: 800; cursor: pointer; }
 .gabay-chat-popover .gabay-chat-thread { max-height: 330px; margin: 0; overflow-y: auto; gap: 8px; }
 .gabay-chat-popover .gabay-chat-thread p { max-width: 88%; padding: 9px 11px; font-size: 11px; line-height: 1.45; }
+.gabay-chat-popover .gabay-chat-thread > .gabay-context-divider { justify-content: center; align-items: center; margin: 3px 0; }
+.gabay-context-divider span { padding: 3px 8px; border-radius: 999px; color: #6b7e7b; background: #edf3f1; font-size: 8px; font-weight: 750; }
 .gabay-chat-composer { padding: 9px; border-radius: 0; grid-template-columns: minmax(0, 1fr) 40px; gap: 6px; }
 .gabay-chat-composer input { min-height: 42px; font-size: 12px; }
 .gabay-chat-composer > button { width: 40px; height: 40px; border-radius: 10px; }
