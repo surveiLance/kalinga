@@ -2,12 +2,15 @@
 
 import { useEffect, useId, useState } from "react";
 import Image from "next/image";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { askConnectedGabay, isSupabaseConfigured } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
+
+type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion";
 
 type GradeLevel = string;
 
@@ -92,6 +95,47 @@ type SavedPlan = {
 
 type LegacySavedPlan = Omit<SavedPlan, "grades"> & { grades: Array<GradeLevel | number> };
 
+type RemoteClassRow = {
+  id: string;
+  name: string;
+  grade_levels: string[];
+  subjects: string[];
+  schedule: unknown;
+};
+
+type RemoteLearnerRow = {
+  id: string;
+  class_id: string;
+  display_name: string;
+  grade_level: string;
+  sex: string;
+};
+
+type RemotePlanRow = {
+  id: string;
+  class_id: string;
+  title: string;
+  subject: string | null;
+  grade_levels: string[];
+  content: unknown;
+};
+
+type RemoteAttendanceRow = {
+  class_id: string;
+  learner_id: string;
+  attendance_date: string;
+  status: string;
+  note: string | null;
+};
+
+type TeacherWorkspace = {
+  classes: TeachingClass[];
+  plans: SavedPlan[];
+  savedResourceIds: number[];
+  attendance: Record<string, Record<string, string>>;
+  attendanceNotes: Record<string, Record<string, string>>;
+};
+
 const commonSubjects = ["Mathematics", "Science", "English", "Filipino", "Araling Panlipunan", "MAPEH", "Edukasyon sa Pagpapakatao", "TLE"];
 const commonGradeLevels: GradeLevel[] = ["Kindergarten", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 const gabayPageLabels: Record<View, string> = {
@@ -104,6 +148,33 @@ const gabayPageLabels: Record<View, string> = {
 };
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino", "Mariel C. Torres", "Noel B. Pangan", "Olivia R. Cabahug", "Paolo S. Evasco", "Queenie M. Dayao", "Ramon L. Flores"];
+const legacyWorkspaceKeys: Record<WorkspaceStorageKey, string> = {
+  classes: "kalinga-classes",
+  "active-class": "kalinga-active-class",
+  plans: "kalinga-plans",
+  "saved-resources": "kalinga-saved-resources",
+  attendance: "kalinga-attendance",
+  "attendance-notes": "kalinga-attendance-notes",
+  "teacher-name": "kalinga-teacher-name",
+  "teacher-email": "kalinga-teacher-email",
+  "gabay-motion": "kalinga-gabay-motion",
+};
+
+function workspaceStorageKey(scope: string, key: WorkspaceStorageKey) {
+  return `kalinga:${scope}:${key}`;
+}
+
+function migrateLegacyPrototypeWorkspace() {
+  const alreadyMigrated = window.localStorage.getItem("kalinga:prototype:migrated") === "true";
+  if (alreadyMigrated) return;
+  for (const [key, legacyKey] of Object.entries(legacyWorkspaceKeys) as Array<[WorkspaceStorageKey, string]>) {
+    const legacyValue = window.localStorage.getItem(legacyKey);
+    if (legacyValue !== null && window.localStorage.getItem(workspaceStorageKey("prototype", key)) === null) {
+      window.localStorage.setItem(workspaceStorageKey("prototype", key), legacyValue);
+    }
+  }
+  window.localStorage.setItem("kalinga:prototype:migrated", "true");
+}
 
 function normalizeGradeLevel(grade: GradeLevel | number): GradeLevel {
   const cleaned = String(grade).trim();
@@ -192,7 +263,7 @@ function createSampleLearners(grades: GradeLevel[], count: number): ClassLearner
 }
 
 function createDefaultMeeting(days = "Monday to Friday", startTime = "8:00 AM", index = 0): ClassMeeting {
-  return { id: `meeting-${Date.now()}-${index}`, days, startTime, durationMinutes: 60, label: "Regular class" };
+  return { id: typeof crypto !== "undefined" ? crypto.randomUUID() : `meeting-${Date.now()}-${index}`, days, startTime, durationMinutes: 60, label: "Regular class" };
 }
 
 function daysForPattern(pattern: string) {
@@ -237,6 +308,164 @@ function normalizeClass(item: LegacyTeachingClass): TeachingClass {
 
 function normalizeSavedPlan(plan: LegacySavedPlan): SavedPlan {
   return { ...plan, grades: plan.grades.map(normalizeGradeLevel) };
+}
+
+function remoteSchedule(value: unknown) {
+  if (Array.isArray(value)) return { quarter: "Quarter 1", meetings: value };
+  if (value && typeof value === "object") {
+    const schedule = value as { quarter?: unknown; meetings?: unknown };
+    return {
+      quarter: typeof schedule.quarter === "string" ? schedule.quarter : "Quarter 1",
+      meetings: Array.isArray(schedule.meetings) ? schedule.meetings : [],
+    };
+  }
+  return { quarter: "Quarter 1", meetings: [] };
+}
+
+async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string): Promise<TeacherWorkspace> {
+  const [classResult, learnerResult, planResult, attendanceResult, resourceBookmarkResult] = await Promise.all([
+    supabase.from("classes").select("id,name,grade_levels,subjects,schedule").eq("teacher_id", teacherId).order("created_at"),
+    supabase.from("learners").select("id,class_id,display_name,grade_level,sex").eq("teacher_id", teacherId).order("created_at"),
+    supabase.from("lesson_plans").select("id,class_id,title,subject,grade_levels,content").eq("teacher_id", teacherId).order("updated_at", { ascending: false }),
+    supabase.from("attendance_records").select("class_id,learner_id,attendance_date,status,note").eq("teacher_id", teacherId),
+    supabase.from("resource_bookmarks").select("resource_id").eq("teacher_id", teacherId).order("created_at"),
+  ]);
+  const firstError = classResult.error || learnerResult.error || planResult.error || attendanceResult.error || resourceBookmarkResult.error;
+  if (firstError) throw firstError;
+
+  const learnerRows = (learnerResult.data || []) as RemoteLearnerRow[];
+  const learnersByClass = new Map<string, ClassLearner[]>();
+  for (const learner of learnerRows) {
+    const current = learnersByClass.get(learner.class_id) || [];
+    current.push({ id: learner.id, name: learner.display_name, grade: normalizeGradeLevel(learner.grade_level), sex: normalizeLearnerSex(learner.sex) });
+    learnersByClass.set(learner.class_id, current);
+  }
+
+  const classes = ((classResult.data || []) as RemoteClassRow[]).map((row) => {
+    const schedule = remoteSchedule(row.schedule);
+    return normalizeClass({
+      id: row.id,
+      name: row.name,
+      grades: row.grade_levels,
+      subjects: row.subjects,
+      quarter: schedule.quarter,
+      meetings: schedule.meetings as Array<Partial<ClassMeeting>>,
+      learners: learnersByClass.get(row.id) || [],
+    });
+  });
+
+  const plans = ((planResult.data || []) as RemotePlanRow[]).map((row) => {
+    const content = row.content && typeof row.content === "object" ? row.content as Partial<SavedPlan> : {};
+    return normalizeSavedPlan({
+      ...content,
+      id: row.id,
+      classId: row.class_id,
+      title: row.title,
+      subject: row.subject || content.subject || "",
+      quarter: content.quarter || "Quarter 1",
+      grades: row.grade_levels,
+      duration: content.duration || "60 minutes",
+      slots: Array.isArray(content.slots) ? content.slots : [],
+      savedAt: content.savedAt || "saved online",
+    });
+  });
+
+  const learnerGrades = new Map(learnerRows.map((learner) => [learner.id, normalizeGradeLevel(learner.grade_level)]));
+  const attendance: Record<string, Record<string, string>> = {};
+  const attendanceNotes: Record<string, Record<string, string>> = {};
+  for (const row of (attendanceResult.data || []) as RemoteAttendanceRow[]) {
+    const grade = learnerGrades.get(row.learner_id);
+    if (!grade) continue;
+    const key = `${row.class_id}-${row.attendance_date}-grade-${grade}`;
+    attendance[key] = { ...(attendance[key] || {}), [row.learner_id]: row.status };
+    if (row.note) attendanceNotes[key] = { ...(attendanceNotes[key] || {}), [row.learner_id]: row.note };
+  }
+  const savedResourceIds = (resourceBookmarkResult.data || []).map((bookmark) => Number(bookmark.resource_id)).filter(Number.isFinite);
+  return { classes, plans, savedResourceIds, attendance, attendanceNotes };
+}
+
+async function saveClassToCloud(supabase: SupabaseClient, teacherId: string, item: TeachingClass) {
+  const { error: classError } = await supabase.from("classes").upsert({
+    id: item.id,
+    teacher_id: teacherId,
+    name: item.name,
+    grade_levels: item.grades,
+    subjects: item.subjects,
+    schedule: { quarter: item.quarter, meetings: item.meetings },
+  });
+  if (classError) throw classError;
+
+  const { data: existingLearners, error: learnerReadError } = await supabase.from("learners").select("id").eq("teacher_id", teacherId).eq("class_id", item.id);
+  if (learnerReadError) throw learnerReadError;
+  const learnerIds = new Set(item.learners.map((learner) => learner.id));
+  const removedLearnerIds = (existingLearners || []).map((learner) => learner.id as string).filter((id) => !learnerIds.has(id));
+  if (removedLearnerIds.length) {
+    const { error } = await supabase.from("learners").delete().eq("teacher_id", teacherId).in("id", removedLearnerIds);
+    if (error) throw error;
+  }
+  if (item.learners.length) {
+    const { error } = await supabase.from("learners").upsert(item.learners.map((learner) => ({
+      id: learner.id,
+      class_id: item.id,
+      teacher_id: teacherId,
+      display_name: learner.name,
+      grade_level: learner.grade,
+      sex: learner.sex,
+    })));
+    if (error) throw error;
+  }
+}
+
+async function savePlanToCloud(supabase: SupabaseClient, teacherId: string, plan: SavedPlan) {
+  const { error } = await supabase.from("lesson_plans").upsert({
+    id: plan.id,
+    class_id: plan.classId,
+    teacher_id: teacherId,
+    title: plan.title,
+    subject: plan.subject,
+    grade_levels: plan.grades,
+    status: "draft",
+    content: plan,
+  });
+  if (error) throw error;
+}
+
+async function saveAttendanceToCloud(
+  supabase: SupabaseClient,
+  teacherId: string,
+  classes: TeachingClass[],
+  updates: Record<string, Record<string, string>>,
+  noteUpdates: Record<string, Record<string, string>>,
+) {
+  const classIds = new Set(classes.map((item) => item.id));
+  const rows = Object.entries(updates).flatMap(([key, learnerStatuses]) => {
+    const match = key.match(/^(.*)-(\d{4}-\d{2}-\d{2})-grade-(.+)$/);
+    if (!match || !classIds.has(match[1])) return [];
+    const [, classId, attendanceDate] = match;
+    return Object.entries(learnerStatuses).flatMap(([learnerId, status]) => {
+      if (!(["present", "late", "absent", "excused", "leave"] as string[]).includes(status)) return [];
+      return [{
+        class_id: classId,
+        learner_id: learnerId,
+        teacher_id: teacherId,
+        attendance_date: attendanceDate,
+        status,
+        note: noteUpdates[key]?.[learnerId]?.trim() || null,
+      }];
+    });
+  });
+  if (!rows.length) return;
+  const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "learner_id,attendance_date" });
+  if (error) throw error;
+}
+
+function copySampleClass() {
+  return {
+    ...sampleClass,
+    id: crypto.randomUUID(),
+    meetings: sampleClass.meetings.map((meeting) => ({ ...meeting, id: crypto.randomUUID() })),
+    learners: sampleClass.learners.map((learner) => ({ ...learner, id: crypto.randomUUID() })),
+  };
 }
 
 const sampleClass: TeachingClass = {
@@ -288,15 +517,22 @@ export default function Home() {
   const [attendanceNotes, setAttendanceNotes] = useState<Record<string, Record<string, string>>>({});
   const [editingPlanId, setEditingPlanId] = useState("");
   const [classDataReady, setClassDataReady] = useState(false);
+  const [hydratedWorkspaceScope, setHydratedWorkspaceScope] = useState("");
+  const [teacherAccountId, setTeacherAccountId] = useState("");
   const [teacherName, setTeacherName] = useState("Ana");
   const [teacherEmail, setTeacherEmail] = useState("");
+  const workspaceScope = entryMode === "authenticated" && teacherAccountId
+    ? `teacher-${teacherAccountId}`
+    : entryMode === "prototype"
+      ? "prototype"
+      : "";
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let active = true;
 
-    function applyTeacherAccount(user: { email?: string; user_metadata?: Record<string, unknown> }) {
+    function applyTeacherAccount(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
       const displayName = typeof user.user_metadata?.display_name === "string"
         ? user.user_metadata.display_name
         : typeof user.user_metadata?.full_name === "string"
@@ -304,19 +540,26 @@ export default function Home() {
           : user.email?.split("@")[0] || "Teacher";
       setTeacherName(displayName);
       setTeacherEmail(user.email || "");
+      setTeacherAccountId(user.id);
       setEntryMode("authenticated");
     }
 
     void supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       if (data.session?.user) applyTeacherAccount(data.session.user);
-      else setEntryMode((current) => current === "prototype" ? current : "signed-out");
+      else {
+        setTeacherAccountId("");
+        setEntryMode((current) => current === "prototype" ? current : "signed-out");
+      }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       if (session?.user) applyTeacherAccount(session.user);
-      else setEntryMode((current) => current === "prototype" ? current : "signed-out");
+      else {
+        setTeacherAccountId("");
+        setEntryMode((current) => current === "prototype" ? current : "signed-out");
+      }
     });
 
     return () => {
@@ -326,49 +569,86 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    try {
-      const storedClasses = window.localStorage.getItem("kalinga-classes");
-      const storedActiveClass = window.localStorage.getItem("kalinga-active-class");
-      const storedPlans = window.localStorage.getItem("kalinga-plans");
-      const storedResources = window.localStorage.getItem("kalinga-saved-resources");
-      const storedAttendance = window.localStorage.getItem("kalinga-attendance");
-      const storedAttendanceNotes = window.localStorage.getItem("kalinga-attendance-notes");
-      const storedTeacherName = window.localStorage.getItem("kalinga-teacher-name");
-      const storedTeacherEmail = window.localStorage.getItem("kalinga-teacher-email");
-      const storedGabayMotion = window.localStorage.getItem("kalinga-gabay-motion");
-      if (storedClasses) {
-        const parsed = (JSON.parse(storedClasses) as LegacyTeachingClass[]).map(normalizeClass);
-        // Hydrate device-only prototype data after the client mounts.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setClasses(parsed);
-        setActiveClassId(storedActiveClass || parsed[0]?.id || "");
+    if (!workspaceScope) return;
+    const hydrationTimer = window.setTimeout(() => {
+      setClassDataReady(false);
+      setHydratedWorkspaceScope("");
+      setClasses([]);
+      setActiveClassId("");
+      setSavedPlans([]);
+      setSavedResourceIds([]);
+      setAttendanceRecords({});
+      setAttendanceNotes({});
+      setEditingPlanId("");
+      setNotice("");
+      setGabayEventMessage("");
+
+      try {
+        if (workspaceScope === "prototype") migrateLegacyPrototypeWorkspace();
+        const storedClasses = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "classes"));
+        const storedActiveClass = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "active-class"));
+        const storedPlans = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "plans"));
+        const storedResources = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "saved-resources"));
+        const storedAttendance = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "attendance"));
+        const storedAttendanceNotes = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "attendance-notes"));
+        const storedTeacherName = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "teacher-name"));
+        const storedTeacherEmail = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "teacher-email"));
+        const storedGabayMotion = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "gabay-motion"));
+        if (storedClasses) {
+          const parsed = (JSON.parse(storedClasses) as LegacyTeachingClass[]).map(normalizeClass);
+          setClasses(parsed);
+          setActiveClassId(storedActiveClass || parsed[0]?.id || "");
+        }
+        if (storedPlans) setSavedPlans((JSON.parse(storedPlans) as LegacySavedPlan[]).map(normalizeSavedPlan));
+        if (storedResources) setSavedResourceIds(JSON.parse(storedResources) as number[]);
+        if (storedAttendance) setAttendanceRecords(JSON.parse(storedAttendance) as Record<string, Record<string, string>>);
+        if (storedAttendanceNotes) setAttendanceNotes(JSON.parse(storedAttendanceNotes) as Record<string, Record<string, string>>);
+        if (workspaceScope === "prototype" && storedTeacherName) setTeacherName(storedTeacherName);
+        if (workspaceScope === "prototype" && storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
+        if (storedGabayMotion) setGabayMotion(storedGabayMotion !== "false");
+      } catch {
+        // A clean zero state is safer than blocking the app on damaged local data.
+      } finally {
+        setHydratedWorkspaceScope(workspaceScope);
+        setClassDataReady(true);
       }
-      if (storedPlans) setSavedPlans((JSON.parse(storedPlans) as LegacySavedPlan[]).map(normalizeSavedPlan));
-      if (storedResources) setSavedResourceIds(JSON.parse(storedResources) as number[]);
-      if (storedAttendance) setAttendanceRecords(JSON.parse(storedAttendance) as Record<string, Record<string, string>>);
-      if (storedAttendanceNotes) setAttendanceNotes(JSON.parse(storedAttendanceNotes) as Record<string, Record<string, string>>);
-      if (storedTeacherName) setTeacherName(storedTeacherName);
-      if (storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
-      if (storedGabayMotion) setGabayMotion(storedGabayMotion !== "false");
-    } catch {
-      // A clean zero state is safer than blocking the prototype on damaged local data.
-    } finally {
-      setClassDataReady(true);
-    }
-  }, []);
+    }, 0);
+    return () => window.clearTimeout(hydrationTimer);
+  }, [workspaceScope]);
 
   useEffect(() => {
-    if (!classDataReady) return;
-    window.localStorage.setItem("kalinga-classes", JSON.stringify(classes));
-    window.localStorage.setItem("kalinga-active-class", activeClassId);
-    window.localStorage.setItem("kalinga-plans", JSON.stringify(savedPlans));
-    window.localStorage.setItem("kalinga-saved-resources", JSON.stringify(savedResourceIds));
-    window.localStorage.setItem("kalinga-attendance", JSON.stringify(attendanceRecords));
-    window.localStorage.setItem("kalinga-attendance-notes", JSON.stringify(attendanceNotes));
-    window.localStorage.setItem("kalinga-teacher-name", teacherName);
-    window.localStorage.setItem("kalinga-teacher-email", teacherEmail);
-    window.localStorage.setItem("kalinga-gabay-motion", String(gabayMotion));
-  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, gabayMotion, classDataReady]);
+    if (!classDataReady || !workspaceScope || hydratedWorkspaceScope !== workspaceScope) return;
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "classes"), JSON.stringify(classes));
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "active-class"), activeClassId);
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "plans"), JSON.stringify(savedPlans));
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "saved-resources"), JSON.stringify(savedResourceIds));
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "attendance"), JSON.stringify(attendanceRecords));
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "attendance-notes"), JSON.stringify(attendanceNotes));
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-name"), teacherName);
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-email"), teacherEmail);
+    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "gabay-motion"), String(gabayMotion));
+  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, gabayMotion, classDataReady, hydratedWorkspaceScope, workspaceScope]);
+
+  useEffect(() => {
+    if (entryMode !== "authenticated" || !teacherAccountId || hydratedWorkspaceScope !== workspaceScope) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let active = true;
+    void loadTeacherWorkspace(supabase, teacherAccountId).then((workspace) => {
+      if (!active) return;
+      setClasses(workspace.classes);
+      setActiveClassId((current) => workspace.classes.some((item) => item.id === current) ? current : workspace.classes[0]?.id || "");
+      setSavedPlans(workspace.plans);
+      setSavedResourceIds(workspace.savedResourceIds);
+      setAttendanceRecords(workspace.attendance);
+      setAttendanceNotes(workspace.attendanceNotes);
+    }).catch(() => {
+      if (active) setNotice("You appear to be offline. This account’s saved device copy is still available.");
+    });
+    return () => {
+      active = false;
+    };
+  }, [entryMode, hydratedWorkspaceScope, teacherAccountId, workspaceScope]);
 
   useEffect(() => {
     if (!gabayOpen) return;
@@ -411,6 +691,7 @@ export default function Home() {
     if (entryMode === "authenticated") {
       await getSupabaseBrowserClient()?.auth.signOut();
     }
+    setTeacherAccountId("");
     setEntryMode("signed-out");
   }
 
@@ -437,12 +718,16 @@ export default function Home() {
   }
 
   function saveClass(newClass: Omit<TeachingClass, "id">, classId?: string) {
-    const item = { ...newClass, id: classId || `class-${Date.now()}` };
+    const item = { ...newClass, id: classId || crypto.randomUUID() };
     setClasses((current) => classId ? current.map((entry) => entry.id === classId ? item : entry) : [...current, item]);
     setActiveClassId(item.id);
     setView("classes");
     setNotice(`${item.name} ${classId ? "was updated" : "is ready"} across planning, attendance, and resources.`);
     setGabayEventMessage(classId ? `Updated na ang ${item.name}. Ginagamit na rin ang changes sa planning at attendance.` : `Handa na ang ${item.name}! Saved na ang roster at schedule para hindi mo na ulit i-encode.`);
+    const supabase = getSupabaseBrowserClient();
+    if (entryMode === "authenticated" && teacherAccountId && supabase) {
+      void saveClassToCloud(supabase, teacherAccountId, item).catch(() => setNotice(`${item.name} is saved offline and will need to sync when your connection returns.`));
+    }
   }
 
   function deleteClass(classId: string) {
@@ -456,14 +741,25 @@ export default function Home() {
     setEditingPlanId((current) => savedPlans.some((plan) => plan.id === current && plan.classId === classId) ? "" : current);
     setNotice(`${removedClass?.name || "Class"} and its connected plans and attendance records were deleted.`);
     setGabayEventMessage(`Tinanggal na ang ${removedClass?.name || "class"} at ang connected local records nito.`);
+    const supabase = getSupabaseBrowserClient();
+    if (entryMode === "authenticated" && teacherAccountId && supabase) {
+      void supabase.from("classes").delete().eq("teacher_id", teacherAccountId).eq("id", classId).then(({ error }) => {
+        if (error) setNotice(`${removedClass?.name || "Class"} was removed on this device, but the cloud copy could not be deleted yet.`);
+      });
+    }
   }
 
   function loadSampleClass() {
-    setClasses([sampleClass]);
-    setActiveClassId(sampleClass.id);
+    const sample = copySampleClass();
+    setClasses([sample]);
+    setActiveClassId(sample.id);
     setView("classes");
     setNotice("Sample school data loaded. You can edit or add classes anytime.");
     setGabayEventMessage("Sample class loaded. Puwede mo itong galawin para makita ang buong workflow.");
+    const supabase = getSupabaseBrowserClient();
+    if (entryMode === "authenticated" && teacherAccountId && supabase) {
+      void saveClassToCloud(supabase, teacherAccountId, sample).catch(() => setNotice("The sample class is saved on this device and will need to sync later."));
+    }
   }
 
   function savePlan(plan: SavedPlan) {
@@ -471,18 +767,37 @@ export default function Home() {
     setEditingPlanId(plan.id);
     setNotice(`${plan.title} was saved under ${classes.find((item) => item.id === plan.classId)?.name || "your class"}.`);
     setGabayEventMessage(`Saved ang “${plan.title}.” Nasa class workspace na ito at puwedeng balikan offline.`);
+    const supabase = getSupabaseBrowserClient();
+    if (entryMode === "authenticated" && teacherAccountId && supabase) {
+      void savePlanToCloud(supabase, teacherAccountId, plan).catch(() => setNotice(`${plan.title} is saved offline and will need to sync later.`));
+    }
   }
 
   function toggleSavedResource(resourceId: number) {
     const willSave = !savedResourceIds.includes(resourceId);
     setSavedResourceIds((current) => current.includes(resourceId) ? current.filter((id) => id !== resourceId) : [...current, resourceId]);
     setGabayEventMessage(willSave ? "Resource saved on this device. Available na ito for your offline preparation." : "Removed na ang resource sa offline saves mo.");
+    const supabase = getSupabaseBrowserClient();
+    if (entryMode === "authenticated" && teacherAccountId && supabase) {
+      const request = willSave
+        ? supabase.from("resource_bookmarks").upsert({ teacher_id: teacherAccountId, resource_id: resourceId })
+        : supabase.from("resource_bookmarks").delete().eq("teacher_id", teacherAccountId).eq("resource_id", resourceId);
+      void request.then(({ error }) => {
+        if (error) setNotice("Your resource choice is saved offline and will need to sync later.");
+      });
+    }
   }
 
   function saveAttendance(updates: Record<string, Record<string, string>>, noteUpdates: Record<string, Record<string, string>>) {
     setAttendanceRecords((current) => ({ ...current, ...updates }));
     setAttendanceNotes((current) => ({ ...current, ...noteUpdates }));
     setGabayEventMessage("Attendance saved locally. Maaari mo pa itong i-edit before it syncs later.");
+    const supabase = getSupabaseBrowserClient();
+    if (entryMode === "authenticated" && teacherAccountId && supabase) {
+      void saveAttendanceToCloud(supabase, teacherAccountId, classes, updates, noteUpdates).then(() => {
+        setGabayEventMessage("Attendance saved for this teacher account. Editable pa rin if may correction.");
+      }).catch(() => setNotice("Attendance is saved offline and will need to sync when your connection returns."));
+    }
   }
 
   if (entryMode === "loading") {
@@ -491,6 +806,10 @@ export default function Home() {
 
   if (entryMode === "signed-out") {
     return <LoginScreen name={teacherName} email={teacherEmail} onNameChange={setTeacherName} onEmailChange={setTeacherEmail} onSignIn={signInTeacher} onCreateAccount={createTeacherAccount} onContinue={() => setEntryMode("prototype")} />;
+  }
+
+  if (!workspaceScope || hydratedWorkspaceScope !== workspaceScope) {
+    return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening this teacher’s workspace…</p></section><KalingaFooterArtwork /></main>;
   }
 
   return (
@@ -874,7 +1193,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
     setGrades([]);
     setSubjects([]);
     setCustomSubject("");
-    setMeetings([{ id: `meeting-${Date.now()}-1`, days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "" }]);
+    setMeetings([{ id: crypto.randomUUID(), days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "" }]);
     setLearners([]);
     setClassStep(1);
   }
@@ -920,7 +1239,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   }
 
   function addLearner() {
-    setLearners((current) => [...current, { id: `learner-${Date.now()}-${current.length}`, name: "", grade: grades[0] || "1", sex: "Not specified" }]);
+    setLearners((current) => [...current, { id: crypto.randomUUID(), name: "", grade: grades[0] || "1", sex: "Not specified" }]);
   }
 
   function updateLearner(id: string, field: "name" | "grade" | "sex", value: string) {
@@ -932,7 +1251,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   }
 
   function addMeeting() {
-    setMeetings((current) => [...current, { id: `meeting-${Date.now()}-${current.length + 1}`, days: "Monday", startTime: current.at(-1)?.startTime || "8:00 AM", durationMinutes: 60, label: "" }]);
+    setMeetings((current) => [...current, { id: crypto.randomUUID(), days: "Monday", startTime: current.at(-1)?.startTime || "8:00 AM", durationMinutes: 60, label: "" }]);
   }
 
   function updateMeeting(id: string, changes: Partial<ClassMeeting>) {
@@ -942,7 +1261,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   function submitClass(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (classStep !== 3 || !detailsComplete) return;
-    const safeMeetings = meetings.length ? meetings.map((meeting) => ({ ...meeting, durationMinutes: Math.max(5, Number(meeting.durationMinutes) || 60), label: meeting.label.trim() || "Regular class" })) : [{ id: `meeting-${Date.now()}-1`, days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "Regular class" }];
+    const safeMeetings = meetings.length ? meetings.map((meeting) => ({ ...meeting, durationMinutes: Math.max(5, Number(meeting.durationMinutes) || 60), label: meeting.label.trim() || "Regular class" })) : [{ id: crypto.randomUUID(), days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "Regular class" }];
     const existingQuarter = classes.find((item) => item.id === editingId)?.quarter || "Quarter 1";
     onSave({ name: name.trim(), grades, subjects, quarter: existingQuarter, meetingDays: safeMeetings[0].days, startTime: safeMeetings[0].startTime, meetings: safeMeetings, learners: learners.filter((learner) => learner.name.trim()).map((learner) => ({ ...learner, name: learner.name.trim() })) }, editingId || undefined);
     resetForm();
@@ -1084,7 +1403,6 @@ function createSchedule(grades: GradeLevel[], startTime = "8:00 AM", duration: s
 }
 
 function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void }) {
-  const generatedPlanId = useId();
   const [step, setStep] = useState<1 | 2 | 3>(initialPlan ? 3 : 1);
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
@@ -1184,7 +1502,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
 
   function saveCurrentPlan() {
     if (!selectedClass) return;
-    const plan: SavedPlan = { id: initialPlan?.id || `plan-${generatedPlanId}`, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${durationMinutes(duration)} minutes`, startTime, language, competencies, sharedTheme, multigradeModel, objectives, learnerContext, materials, formativeAssessments, exitTasks, successCriteria, reflection, remediation, enrichment, nextSessionNotes, slots, savedAt: "just now" };
+    const plan: SavedPlan = { id: initialPlan?.id || crypto.randomUUID(), classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${durationMinutes(duration)} minutes`, startTime, language, competencies, sharedTheme, multigradeModel, objectives, learnerContext, materials, formativeAssessments, exitTasks, successCriteria, reflection, remediation, enrichment, nextSessionNotes, slots, savedAt: "just now" };
     onSave(plan);
     setSaved(true);
   }
