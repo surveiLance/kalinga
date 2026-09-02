@@ -8,6 +8,11 @@ type PageContext = {
   offline?: boolean;
 };
 
+type SafeHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 const MAX_MESSAGE_LENGTH = 2_000;
 
 function allowedOrigin(request: Request) {
@@ -54,6 +59,17 @@ function safeContext(value: unknown): PageContext {
   };
 }
 
+function safeHistory(value: unknown): SafeHistoryMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-8).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const input = item as Record<string, unknown>;
+    const role: SafeHistoryMessage["role"] | null = input.role === "teacher" ? "user" : input.role === "gabay" ? "assistant" : null;
+    const content = cleanText(input.text, 1_000);
+    return role && content ? [{ role, content }] : [];
+  });
+}
+
 Deno.serve(async (request) => {
   const origin = allowedOrigin(request);
   if (!origin) return new Response("Origin not allowed", { status: 403 });
@@ -68,8 +84,8 @@ Deno.serve(async (request) => {
   const supabasePublishableKey = publishableKeys
     ? JSON.parse(publishableKeys).default
     : Deno.env.get("SUPABASE_ANON_KEY");
-  const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!supabaseUrl || !supabasePublishableKey || !geminiApiKey) {
+  const groqApiKey = Deno.env.get("GROQ_API_KEY");
+  if (!supabaseUrl || !supabasePublishableKey || !groqApiKey) {
     return json({ error: "Gabay is not configured" }, 503, origin);
   }
 
@@ -90,7 +106,8 @@ Deno.serve(async (request) => {
   const message = cleanText(payload.message, MAX_MESSAGE_LENGTH);
   if (!message) return json({ error: "A message is required" }, 400, origin);
   const pageContext = safeContext(payload.pageContext);
-  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash-lite";
+  const history = safeHistory(payload.history);
+  const model = Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-20b";
 
   const systemInstruction = `You are Gabay, Kalinga's calm, practical Taglish guide for Filipino teachers.
 The teacher remains in control. Give short, actionable help grounded only in the context supplied.
@@ -105,32 +122,38 @@ Subject: ${pageContext.subject || "not supplied"}
 Lesson topic: ${pageContext.lessonTopic || "not supplied"}
 App reports offline: ${pageContext.offline ? "yes" : "no"}`;
 
-  const geminiResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+  const groqResponse = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": geminiApiKey,
+        Authorization: `Bearer ${groqApiKey}`,
       },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-        contents: [{ role: "user", parts: [{ text: `${contextText}\n\nTeacher question: ${message}` }] }],
-        generationConfig: { temperature: 0.35, maxOutputTokens: 600 },
+        model,
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "system", content: `Current Kalinga context:\n${contextText}` },
+          ...history,
+          { role: "user", content: message },
+        ],
+        temperature: 0.35,
+        max_completion_tokens: 600,
       }),
     },
   );
 
-  if (!geminiResponse.ok) {
-    const status = geminiResponse.status === 429 ? 429 : 502;
+  if (!groqResponse.ok) {
+    console.error("Groq request failed", groqResponse.status, await groqResponse.text());
+    const status = groqResponse.status === 429 ? 429 : 502;
     return json({ error: status === 429 ? "Gabay is busy. Try again shortly." : "Gabay is temporarily unavailable." }, status, origin);
   }
 
-  const result = await geminiResponse.json();
-  const reply = result?.candidates?.[0]?.content?.parts
-    ?.map((part: { text?: string }) => part.text ?? "")
-    .join("")
-    .trim();
+  const result = await groqResponse.json();
+  const reply = typeof result?.choices?.[0]?.message?.content === "string"
+    ? result.choices[0].message.content.trim()
+    : "";
 
   if (!reply) return json({ error: "Gabay returned an empty response" }, 502, origin);
   return json({ reply, connected: true }, 200, origin);

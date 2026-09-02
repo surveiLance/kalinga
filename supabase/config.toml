@@ -1,4 +1,4 @@
 [functions.gabay-chat]
 # New Supabase publishable keys are not JWTs. Gabay verifies the teacher's
-# actual Auth session inside the function before it contacts Gemini.
+# actual Auth session inside the function before it contacts Groq.
 verify_jwt = false

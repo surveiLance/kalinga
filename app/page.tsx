@@ -734,13 +734,13 @@ function GabayGuide({ open, view, activeClass, latestPlan, motion, authenticated
       subject: latestPlan?.subject || activeClass?.subjects[0],
       lessonTopic: latestPlan?.title,
       offline: typeof navigator !== "undefined" && !navigator.onLine,
-    });
+    }, chatMessages.map(({ role, text }) => ({ role, text })));
 
     setConnectionIssue(!result.connected);
     setChatMessages((current) => [...current, {
       id: `gabay-${stamp}`,
       role: "gabay",
-      text: result.connected ? result.reply : "I could not reach connected AI right now. Check the Gabay function origin and Gemini secret, then try again. Your classroom data is still safe.",
+      text: result.connected ? result.reply : "I could not reach Groq right now. Please try again shortly. Your classroom data is still safe.",
     }]);
     setIsReplying(false);
   }

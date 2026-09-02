@@ -36,20 +36,20 @@ npx supabase db push
 
 The migration creates teacher-owned profiles, classes, learners, lesson plans, attendance, resources, a private resource bucket, and row-level security policies. Each authenticated teacher can access only their own classroom records; only explicitly shared resource metadata is readable by other teachers.
 
-## Gemini-powered Gabay
+## Groq-powered Gabay
 
-Gabay calls Gemini only through a Supabase Edge Function, so the Gemini key is never shipped to the browser. Add the secret and the allowed web origins:
+Gabay calls Groq only through a Supabase Edge Function, so the Groq key is never shipped to the browser. Add the secret and the allowed web origins:
 
 ```bash
-npx supabase secrets set GEMINI_API_KEY=YOUR_GEMINI_KEY
-npx supabase secrets set GEMINI_MODEL=gemini-2.5-flash-lite
+npx supabase secrets set GROQ_API_KEY=YOUR_GROQ_KEY
+npx supabase secrets set GROQ_MODEL=openai/gpt-oss-20b
 npx supabase secrets set ALLOWED_ORIGINS=http://localhost:3000,https://your-vercel-domain.vercel.app
 npx supabase functions deploy gabay-chat
 ```
 
-Connected Gabay requires a valid Supabase user session. Until real authentication is connected, the current prototype safely falls back to its built-in page guidance.
+Connected Gabay requires a valid Supabase user session. Prototype mode does not call the AI service or expose the secret.
 
-The AI receives only minimal classroom context: current screen, grade levels, subject, lesson topic, and connection state. Learner names, reference numbers, attendance statuses, and notes are deliberately excluded.
+The AI receives only the recent chat and minimal classroom context: current screen, grade levels, subject, lesson topic, and connection state. Saved learner names, reference numbers, attendance statuses, and notes are deliberately excluded.
 
 ## Vercel
 
@@ -58,7 +58,7 @@ Add these two values to the Vercel project’s Environment Variables and redeplo
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-Keep `GEMINI_API_KEY` in Supabase Edge Function secrets, not Vercel’s public environment and never in source control.
+Keep `GROQ_API_KEY` in Supabase Edge Function secrets, not Vercel’s public environment and never in source control.
 
 ## Verification
 

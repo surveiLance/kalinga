@@ -8,13 +8,18 @@ export type GabayPageContext = {
   offline: boolean;
 };
 
+export type GabayHistoryMessage = {
+  role: "teacher" | "gabay";
+  text: string;
+};
+
 type GabayResult =
   | { connected: true; reply: string }
   | { connected: false; reason: "not-configured" | "not-signed-in" | "unavailable" };
 
 export { isSupabaseConfigured };
 
-export async function askConnectedGabay(message: string, pageContext: GabayPageContext): Promise<GabayResult> {
+export async function askConnectedGabay(message: string, pageContext: GabayPageContext, history: GabayHistoryMessage[] = []): Promise<GabayResult> {
   try {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { connected: false, reason: "not-configured" };
@@ -26,6 +31,7 @@ export async function askConnectedGabay(message: string, pageContext: GabayPageC
       body: {
         message,
         pageContext,
+        history: history.slice(-8),
       },
     });
 
