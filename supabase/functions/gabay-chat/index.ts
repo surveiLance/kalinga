@@ -3,9 +3,19 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 type PageContext = {
   view?: string;
   teacherName?: string;
+  pageStep?: string;
+  classId?: string;
+  className?: string;
   gradeLevels?: string[];
+  subjects?: string[];
+  learnerCount?: number;
+  scheduleSummary?: string[];
   subject?: string;
   lessonTopic?: string;
+  lessonDuration?: string;
+  incompleteSections?: string[];
+  currentSummary?: string[];
+  availableActions?: string[];
   offline?: boolean;
 };
 
@@ -46,17 +56,31 @@ function cleanText(value: unknown, maxLength = 200) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
+function cleanList(value: unknown, maxItems = 12, maxLength = 160) {
+  return Array.isArray(value)
+    ? value.slice(0, maxItems).map((item) => cleanText(item, maxLength)).filter(Boolean)
+    : [];
+}
+
 function safeContext(value: unknown): PageContext {
   if (!value || typeof value !== "object") return {};
   const input = value as Record<string, unknown>;
   return {
     view: cleanText(input.view, 40),
     teacherName: cleanText(input.teacherName, 80),
-    gradeLevels: Array.isArray(input.gradeLevels)
-      ? input.gradeLevels.slice(0, 12).map((grade) => cleanText(grade, 40)).filter(Boolean)
-      : [],
+    pageStep: cleanText(input.pageStep, 100),
+    classId: cleanText(input.classId, 80),
+    className: cleanText(input.className, 120),
+    gradeLevels: cleanList(input.gradeLevels, 12, 40),
+    subjects: cleanList(input.subjects, 16, 100),
+    learnerCount: typeof input.learnerCount === "number" && Number.isFinite(input.learnerCount) ? Math.max(0, Math.min(10_000, Math.round(input.learnerCount))) : 0,
+    scheduleSummary: cleanList(input.scheduleSummary, 12, 180),
     subject: cleanText(input.subject, 100),
     lessonTopic: cleanText(input.lessonTopic, 200),
+    lessonDuration: cleanText(input.lessonDuration, 120),
+    incompleteSections: cleanList(input.incompleteSections, 16, 100),
+    currentSummary: cleanList(input.currentSummary, 16, 240),
+    availableActions: cleanList(input.availableActions, 12, 120),
     offline: Boolean(input.offline),
   };
 }
@@ -108,6 +132,47 @@ Deno.serve(async (request) => {
   const message = cleanText(payload.message, MAX_MESSAGE_LENGTH);
   if (!message) return json({ error: "A message is required" }, 400, origin);
   const pageContext = safeContext(payload.pageContext);
+  pageContext.teacherName = cleanText(userData.user.user_metadata?.display_name || userData.user.user_metadata?.full_name || pageContext.teacherName, 80);
+
+  const [{ data: ownedClassRows, error: ownedClassesError }, { data: ownedLearnerRows, error: ownedLearnersError }] = await Promise.all([
+    supabase.from("classes").select("id,name,grade_levels,subjects,schedule").order("created_at").limit(24),
+    supabase.from("learners").select("class_id").limit(10_000),
+  ]);
+  const learnerCounts = new Map<string, number>();
+  for (const learner of ownedLearnerRows || []) learnerCounts.set(learner.class_id, (learnerCounts.get(learner.class_id) || 0) + 1);
+  const verifiedAccountSummary = !ownedClassesError && !ownedLearnersError
+    ? (ownedClassRows || []).map((item) => `${cleanText(item.name, 120)}: ${cleanList(item.grade_levels, 12, 40).join(", ") || "no grades"}; ${cleanList(item.subjects, 16, 100).join(", ") || "no subjects"}; ${learnerCounts.get(item.id) || 0} learners`).join(" | ") || "This teacher has no saved classes."
+    : "The teacher's class list could not be verified right now.";
+
+  let verifiedClassSummary = "No selected class was supplied.";
+  if (pageContext.classId) {
+    const classRow = !ownedClassesError ? (ownedClassRows || []).find((item) => item.id === pageContext.classId) : null;
+    if (classRow) {
+      pageContext.className = cleanText(classRow.name, 120);
+      pageContext.gradeLevels = cleanList(classRow.grade_levels, 12, 40);
+      pageContext.subjects = cleanList(classRow.subjects, 16, 100);
+      pageContext.learnerCount = learnerCounts.get(classRow.id) || 0;
+      const schedule = classRow.schedule && typeof classRow.schedule === "object" ? classRow.schedule as Record<string, unknown> : {};
+      const meetings = Array.isArray(schedule.meetings) ? schedule.meetings : Array.isArray(classRow.schedule) ? classRow.schedule : [];
+      pageContext.scheduleSummary = meetings.slice(0, 12).flatMap((meeting) => {
+        if (!meeting || typeof meeting !== "object") return [];
+        const item = meeting as Record<string, unknown>;
+        const days = cleanText(item.days, 100);
+        const startTime = cleanText(item.startTime, 40);
+        const duration = typeof item.durationMinutes === "number" ? `${Math.round(item.durationMinutes)} minutes` : "";
+        return days || startTime ? [`${days}${startTime ? ` at ${startTime}` : ""}${duration ? ` for ${duration}` : ""}`] : [];
+      });
+      verifiedClassSummary = `Verified class: ${pageContext.className}; ${pageContext.learnerCount} enrolled learners. The Auth session and row-level security confirmed this class belongs to the current teacher.`;
+    } else {
+      pageContext.classId = "";
+      pageContext.className = "";
+      pageContext.gradeLevels = [];
+      pageContext.subjects = [];
+      pageContext.learnerCount = 0;
+      pageContext.scheduleSummary = [];
+      verifiedClassSummary = "The requested class was not available to this authenticated teacher. Do not rely on client-supplied class details.";
+    }
+  }
   const history = safeHistory(payload.history);
   const model = Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-20b";
 
@@ -117,6 +182,7 @@ Use casual Taglish: mostly clear English with familiar Filipino words and connec
 Keep every answer brief: usually 1-3 sentences, or at most 3 compact bullets. Do not repeat the page description unless it directly answers the question. Ask no more than one short follow-up question.
 You may add one light teacher-life joke or playful aside when it feels natural, but never force humor and never joke about learner welfare, attendance concerns, privacy, or emergencies.
 The teacher remains in control. Give practical help grounded only in the supplied page and classroom context. When the teacher asks where to go or what to do, point to the most relevant action on their current page first.
+Treat the verified Supabase class summary as authoritative. Use current workflow state to notice missing work and recommend one manageable next action. Do not claim to see fields or data that are not listed.
 Never invent or label a competency as official DepEd content. If no verified curriculum source is supplied, clearly call it a draft suggestion and ask the teacher to verify it.
 Do not request, infer, repeat, or expose learner names, learner reference numbers, attendance notes, health details, or other student personal data.
 Respect multigrade teaching: keep grade-level intentions, activities, and assessments distinct while identifying useful shared teaching moments.
@@ -124,9 +190,20 @@ Do not begin every answer with a greeting or the word "Teacher."`;
 
   const contextText = `Teacher's preferred name: ${pageContext.teacherName || "not supplied"}
 Current page: ${pageContext.view || "unknown"}
+Current workflow step: ${pageContext.pageStep || "not supplied"}
+Verified teacher class list: ${verifiedAccountSummary}
+${verifiedClassSummary}
+Selected class name: ${pageContext.className || "not supplied"}
 Grade levels: ${(pageContext.gradeLevels ?? []).join(", ") || "not supplied"}
+Class subjects: ${(pageContext.subjects ?? []).join(", ") || "not supplied"}
+Enrolled learner count (aggregate only): ${pageContext.learnerCount ?? 0}
+Class schedule: ${(pageContext.scheduleSummary ?? []).join(" | ") || "not supplied"}
 Subject: ${pageContext.subject || "not supplied"}
 Lesson topic: ${pageContext.lessonTopic || "not supplied"}
+Lesson duration: ${pageContext.lessonDuration || "not supplied"}
+Incomplete sections: ${(pageContext.incompleteSections ?? []).join(", ") || "none reported"}
+What the app currently reports: ${(pageContext.currentSummary ?? []).join(" | ") || "nothing supplied"}
+Actions available on this page: ${(pageContext.availableActions ?? []).join(", ") || "not supplied"}
 App reports offline: ${pageContext.offline ? "yes" : "no"}`;
 
   const groqResponse = await fetch(

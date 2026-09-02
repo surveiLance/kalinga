@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { askConnectedGabay, isSupabaseConfigured } from "@/lib/gabay-ai";
+import { askConnectedGabay, isSupabaseConfigured, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
+type GabayLiveContext = Partial<GabayPageContext> & { view: View };
 
 type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion";
 
@@ -509,6 +510,7 @@ export default function Home() {
   const [gabayOpen, setGabayOpen] = useState(false);
   const [gabayMotion, setGabayMotion] = useState(true);
   const [gabayEventMessage, setGabayEventMessage] = useState("");
+  const [gabayLiveContext, setGabayLiveContext] = useState<GabayLiveContext>({ view: "home" });
   const [classes, setClasses] = useState<TeachingClass[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
@@ -678,6 +680,42 @@ export default function Home() {
   const todayClassIds = [...new Set(todayTeachingBlocks.map((block) => block.classId))];
   const missingPlanCount = todayClassIds.filter((classId) => !savedPlans.some((plan) => plan.classId === classId)).length;
   const attendanceSavedCount = todayClassIds.filter((classId) => Object.keys(attendanceRecords).some((key) => key.startsWith(`${classId}-${today}-grade-`))).length;
+  const livePageContext = gabayLiveContext.view === view ? gabayLiveContext : {};
+  const pageActions: Record<View, string[]> = {
+    home: activeClass ? ["Open today’s class", "Plan a lesson", "Take attendance", "Find a resource"] : ["Set up the first class", "Preview sample data"],
+    classes: activeClass ? ["Manage learners", "Edit meeting times", "Create a lesson", "Take attendance"] : ["Set up the first class"],
+    plan: ["Choose a class", "Continue the lesson plan", "Review incomplete ILAW sections", "Save the lesson"],
+    library: ["Search resources", "Filter by subject", "Save a resource for offline use", "Share a resource"],
+    attendance: ["Change the attendance date", "Filter by grade", "Mark learners present", "Save attendance"],
+    community: ["Start a discussion", "Ask a clearer question", "Reply to another teacher"],
+  };
+  const gabayPageContext: GabayPageContext = {
+    view,
+    teacherName,
+    classId: activeClass?.id,
+    className: activeClass?.name,
+    gradeLevels: activeClass?.grades || [],
+    subjects: activeClass?.subjects || [],
+    learnerCount: activeClass?.learners.length || 0,
+    scheduleSummary: activeClass?.meetings.map((meeting) => `${meeting.label}: ${meeting.days} at ${meeting.startTime} for ${meeting.durationMinutes} minutes`) || [],
+    subject: latestPlan?.subject || activeClass?.subjects[0],
+    lessonTopic: latestPlan?.title,
+    lessonDuration: latestPlan?.duration,
+    currentSummary: view === "home" ? [
+      `${todayTeachingBlocks.length} class blocks scheduled today`,
+      `${missingPlanCount} scheduled classes still need a lesson plan`,
+      `${attendanceSavedCount} scheduled classes have attendance saved today`,
+      nextTeachingBlock ? `Next class: ${nextTeachingBlock.className} at ${nextTeachingBlock.meeting.startTime}` : "No later scheduled class remains today",
+    ] : [],
+    availableActions: pageActions[view],
+    offline: typeof navigator !== "undefined" && !navigator.onLine,
+    ...livePageContext,
+  };
+  gabayPageContext.currentSummary = [
+    `Teacher account has ${classes.length} classes, ${savedPlans.length} saved lesson plans, and ${savedResourceIds.length} saved resources`,
+    ...classes.slice(0, 12).map((item) => `${item.name}: ${gradeList(item.grades)}; ${item.subjects.join(", ")}; ${item.learners.length} learners`),
+    ...(gabayPageContext.currentSummary || []),
+  ];
   function beginPlan(planId?: string) {
     setEditingPlanId(typeof planId === "string" ? planId : "");
     setView("plan");
@@ -883,10 +921,10 @@ export default function Home() {
                 <button type="button" onClick={() => setView("library")}><span>▤</span><p><b>Find a resource</b><small>Search the teacher library</small></p><b>→</b></button>
               </aside>
             </section>
-          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
+          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView onGabayContext={setGabayLiveContext} />}
         </div>
 
-        <GabayGuide key={view} open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} motion={gabayMotion} authenticated={entryMode === "authenticated"} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
+        <GabayGuide key={view} open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Ask</button>
@@ -1066,7 +1104,7 @@ function GabayTodayBriefing({ teacherName, blocks, nextBlock, missingPlanCount, 
   </aside>;
 }
 
-function GabayGuide({ open, view, teacherName, activeClass, latestPlan, motion, authenticated, onClose, onRequestSignIn }: { open: boolean; view: View; teacherName: string; activeClass?: TeachingClass; latestPlan?: SavedPlan; motion: boolean; authenticated: boolean; onClose: () => void; onRequestSignIn: () => void }) {
+function GabayGuide({ open, view, pageContext, activeClass, motion, authenticated, onClose, onRequestSignIn }: { open: boolean; view: View; pageContext: GabayPageContext; activeClass?: TeachingClass; motion: boolean; authenticated: boolean; onClose: () => void; onRequestSignIn: () => void }) {
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<GabayChatMessage[]>([]);
   const [isReplying, setIsReplying] = useState(false);
@@ -1098,11 +1136,7 @@ function GabayGuide({ open, view, teacherName, activeClass, latestPlan, motion, 
     setConnectionIssue(false);
 
     const result = await askConnectedGabay(message, {
-      view,
-      teacherName,
-      gradeLevels: activeClass?.grades ?? [],
-      subject: latestPlan?.subject || activeClass?.subjects[0],
-      lessonTopic: latestPlan?.title,
+      ...pageContext,
       offline: typeof navigator !== "undefined" && !navigator.onLine,
     }, chatMessages.map(({ role, text }) => ({ role, text })));
 
@@ -1168,7 +1202,7 @@ function AllClassesSchedule({ classes, onOpenClass, onEditClass, placement = "cl
   return <section className={`all-schedule-card ${placement === "home" ? "home-schedule-card" : ""}`}><header><div><p className="eyebrow">TEACHING SCHEDULE</p><h2>{filterDay === "All days" ? "Your week at a glance" : filterDay === today ? "Today’s classes" : `${filterDay}’s classes`}</h2><p>Choose a day for its class list, or open the whole week. Possible overlaps are flagged automatically.</p></div><span>{visibleItems.length} {filterDay === "All days" ? "weekly" : "scheduled"} class {visibleItems.length === 1 ? "block" : "blocks"}</span></header><div className="schedule-day-tabs" aria-label="Choose a schedule day">{dayOptions.map((day) => { const representedDay = day === "Today" ? today : day; const count = day === "All days" ? scheduleItems.length : dayCounts[representedDay] || 0; return <button className={selectedDay === day ? "active" : ""} type="button" onClick={() => setSelectedDay(day)} key={day}><span>{day === "Today" ? "Today" : day === "All days" ? "Week" : day.slice(0, 3)}</span><small>{day === "Today" ? representedDay.slice(0, 3) : `${count} ${count === 1 ? "class" : "classes"}`}</small></button>; })}</div>{visibleItems.length ? <div className="all-schedule-list">{visibleItems.map((item) => { const conflict = hasConflict(item); return <article className={conflict ? "has-conflict" : ""} key={item.key}><time><b>{item.meeting.startTime}</b><span>{formatTime(toMinutes(item.meeting.startTime) + item.meeting.durationMinutes)}</span></time><div><span>{filterDay === "All days" ? item.day : item.meeting.label}</span><h3>{item.className}</h3><p>{filterDay === "All days" ? `${item.meeting.label} · ${gradeList(item.grades)}` : gradeList(item.grades)} · {item.meeting.durationMinutes} minutes</p></div>{conflict && <strong>⚠ Possible overlap</strong>}<div className="schedule-row-actions"><button className="schedule-open-button" type="button" onClick={() => onOpenClass(item.classId)}>Open class</button>{onEditClass && <button className="schedule-edit-button" type="button" onClick={() => onEditClass(item.teachingClass)}>Edit times</button>}</div></article>; })}</div> : <div className="all-schedule-empty"><span>○</span><p><b>No classes scheduled for {filterDay}</b><small>Use Classes &amp; learners to add or change a class meeting time.</small></p></div>}</section>;
 }
 
-function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, onSelectClass, onSave, onDelete, onLoadSample, onPlan, onAttendance }: { classes: TeachingClass[]; activeClassId: string; savedPlans: SavedPlan[]; attendanceRecords: Record<string, Record<string, string>>; onSelectClass: (classId: string) => void; onSave: (item: Omit<TeachingClass, "id">, classId?: string) => void; onDelete: (classId: string) => void; onLoadSample: () => void; onPlan: (planId?: string) => void; onAttendance: () => void }) {
+function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, onSelectClass, onSave, onDelete, onLoadSample, onPlan, onAttendance, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; savedPlans: SavedPlan[]; attendanceRecords: Record<string, Record<string, string>>; onSelectClass: (classId: string) => void; onSave: (item: Omit<TeachingClass, "id">, classId?: string) => void; onDelete: (classId: string) => void; onLoadSample: () => void; onPlan: (planId?: string) => void; onAttendance: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState("");
   const [deleteCandidateId, setDeleteCandidateId] = useState("");
@@ -1186,6 +1220,22 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   const attendanceCount = selectedClass ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${selectedClass.id}-`)).flatMap(([, records]) => Object.values(records)).length : 0;
   const detailsComplete = Boolean(name.trim() && grades.length && subjects.length);
   const namedLearnerCount = learners.filter((learner) => learner.name.trim()).length;
+
+  useEffect(() => {
+    onGabayContext({
+      view: "classes",
+      pageStep: formOpen ? `Class setup step ${classStep} of 3` : "Class workspace",
+      classId: selectedClass?.id,
+      className: selectedClass?.name,
+      gradeLevels: formOpen ? grades : selectedClass?.grades || [],
+      subjects: formOpen ? subjects : selectedClass?.subjects || [],
+      learnerCount: formOpen ? namedLearnerCount : selectedClass?.learners.length || 0,
+      scheduleSummary: (formOpen ? meetings : selectedClass?.meetings || []).map((meeting) => `${meeting.days} at ${meeting.startTime} for ${meeting.durationMinutes} minutes`),
+      incompleteSections: formOpen ? [!name.trim() && "class name", !grades.length && "grade levels", !subjects.length && "subjects", classStep < 2 && "schedule", classStep < 3 && "learners"].filter(Boolean) as string[] : [],
+      currentSummary: selectedClass ? [`${selectedPlans.length} saved lesson plans`, `${attendanceCount} attendance statuses recorded`, `${selectedClass.learners.length} learners enrolled`] : ["No class has been created yet"],
+      availableActions: formOpen ? ["Continue class setup", "Go back one setup step", "Save the class"] : ["Manage learners", "Edit meeting times", "Create a lesson", "Take attendance"],
+    });
+  }, [attendanceCount, classStep, formOpen, grades, learners, meetings, name, namedLearnerCount, onGabayContext, selectedClass, selectedPlans.length, subjects]);
 
   function resetForm() {
     setEditingId("");
@@ -1402,7 +1452,7 @@ function createSchedule(grades: GradeLevel[], startTime = "8:00 AM", duration: s
   return [{ id: "slot-shared", time: startTime, teacherFocus: "All grades together", gradeTasks: sharedTasks }, ...guidedSlots];
 }
 
-function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void }) {
+function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(initialPlan ? 3 : 1);
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
@@ -1429,6 +1479,30 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [saved, setSaved] = useState(false);
   const planRosterCounts = learnerSexCounts(selectedClass?.learners || []);
+  const incompletePlanSections = useMemo(() => [
+    !subject.trim() && "lesson subject",
+    step === 3 && !grades.every((grade) => competencies[grade]?.trim() || objectives[grade]?.trim()) && "grade-level intentions",
+    step === 3 && !slots.some((slot) => Object.values(slot.gradeTasks).some((task) => task.trim())) && "learning experience",
+    step === 3 && !grades.every((grade) => formativeAssessments[grade]?.trim()) && "assessment",
+  ].filter(Boolean) as string[], [competencies, formativeAssessments, grades, objectives, slots, step, subject]);
+
+  useEffect(() => {
+    onGabayContext({
+      view: "plan",
+      pageStep: step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : "ILAW plan",
+      classId: selectedClass?.id,
+      className: selectedClass?.name,
+      gradeLevels: grades,
+      subjects: selectedClass?.subjects || [],
+      learnerCount: selectedClass?.learners.length || 0,
+      subject,
+      lessonTopic: lessonTitle || "Untitled lesson",
+      lessonDuration: `${durationMinutes(duration)} minutes starting at ${startTime}`,
+      incompleteSections: incompletePlanSections,
+      currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", saved ? "Draft is saved" : "Draft has unsaved changes"],
+      availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Continue to the ILAW plan"] : ["Complete intentions", "Build the learning experience", "Add assessment", "Save the lesson"],
+    });
+  }, [duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, onGabayContext, saved, selectedClass, sharedTheme, startTime, step, subject]);
 
   function canOpenPlanStep(nextStep: 1 | 2 | 3) {
     if (nextStep === 1) return true;
@@ -1618,12 +1692,27 @@ const resources = [
   { id: 4, icon: "123", title: "Number drills with bottle caps", type: "Activity cards", grades: "Grades 1–3", subject: "Mathematics", tags: ["No printer", "Limited materials"], rating: "4.9", saves: 164, verified: true },
 ];
 
-function LibraryView({ classes, activeClassId, savedResourceIds, onToggleSaved, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; savedResourceIds: number[]; onToggleSaved: (id: number) => void; onSetUpClass: () => void }) {
+function LibraryView({ classes, activeClassId, savedResourceIds, onToggleSaved, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; savedResourceIds: number[]; onToggleSaved: (id: number) => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All resources");
   const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const visible = resources.filter((resource) => `${resource.title} ${resource.subject} ${resource.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase()) && (filter === "All resources" || filter === "Saved on device" ? filter !== "Saved on device" || savedResourceIds.includes(resource.id) : resource.subject === filter));
+  const visibleResourceSummary = visible.map((resource) => `${resource.title} (${resource.subject}, ${resource.grades})`).join("; ");
+
+  useEffect(() => {
+    onGabayContext({
+      view: "library",
+      pageStep: "Browse teacher resources",
+      classId: selectedClass?.id,
+      className: selectedClass?.name,
+      gradeLevels: selectedClass?.grades || [],
+      subjects: selectedClass?.subjects || [],
+      learnerCount: selectedClass?.learners.length || 0,
+      currentSummary: [`Search: ${query || "none"}`, `Filter: ${filter}`, `${savedResourceIds.length} resources saved`, `${visible.length} resources currently shown`, visibleResourceSummary ? `Visible matches: ${visibleResourceSummary}` : "No resources match the current search"],
+      availableActions: ["Search resources", "Filter by subject", "Save a visible resource", "Share a resource"],
+    });
+  }, [filter, onGabayContext, query, savedResourceIds.length, selectedClass, visible.length, visibleResourceSummary]);
 
   return <div className="view-page">
     <PageIntro eyebrow="SHARED LIBRARY" title="Resources made by teachers" description="Find materials that fit your grades, competencies, and classroom context." action={<button className="primary-button" type="button">↑ Share a resource</button>} />
@@ -1660,7 +1749,7 @@ function attendanceNotesForClass(item: TeachingClass, attendanceNotes: Record<st
   }));
 }
 
-function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceNotes, onSave, onSetUpClass }: { classes: TeachingClass[]; activeClassId: string; attendanceRecords: Record<string, Record<string, string>>; attendanceNotes: Record<string, Record<string, string>>; onSave: (updates: Record<string, Record<string, string>>, noteUpdates: Record<string, Record<string, string>>) => void; onSetUpClass: () => void }) {
+function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceNotes, onSave, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; attendanceRecords: Record<string, Record<string, string>>; attendanceNotes: Record<string, Record<string, string>>; onSave: (updates: Record<string, Record<string, string>>, noteUpdates: Record<string, Record<string, string>>) => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
   const [selectedDate, setSelectedDate] = useState(dateInputValue());
   const selectedClass = classes.find((item) => item.id === selectedClassId);
@@ -1703,12 +1792,26 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
     setSaved(true);
   }
 
-  if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><div><p className="eyebrow">RECORD ATTENDANCE</p><h2>Set up a class first</h2><p>Attendance needs a saved learner list and class schedule before there is anything to record.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
-
   const attendanceStatuses = ["Present", "Absent", "Late", "Excused", "Leave"];
   const counts = learners.reduce<Record<string, number>>((total, learner) => ({ ...total, [statuses[learner.id]]: (total[statuses[learner.id]] || 0) + 1 }), {});
   const attendedCount = (counts.Present || 0) + (counts.Late || 0);
   const attendanceRate = learners.length ? Math.round((attendedCount / learners.length) * 100) : 0;
+
+  useEffect(() => {
+    onGabayContext({
+      view: "attendance",
+      pageStep: selectedDate === dateInputValue() ? "Today’s attendance" : "Past or future attendance date",
+      classId: selectedClass?.id,
+      className: selectedClass?.name,
+      gradeLevels: selectedClass?.grades || [],
+      subjects: selectedClass?.subjects || [],
+      learnerCount: selectedClass?.learners.length || 0,
+      currentSummary: selectedClass ? [`Date: ${displayDate(selectedDate)}`, `Showing: ${gradeFilter === "all" ? "all grade levels" : gradeLabel(gradeFilter)}`, `${learners.length} learners in the current view`, `${counts.Present || 0} present`, `${counts.Late || 0} late`, `${counts.Absent || 0} absent`, `${counts.Excused || 0} excused`, `${counts.Leave || 0} on leave`, saved ? "Attendance is saved" : "Attendance has unsaved changes"] : ["No class roster is available for attendance"],
+      availableActions: selectedClass ? ["Change the date", "Filter by grade", "Mark the current group present", "Save attendance"] : ["Set up a class"],
+    });
+  }, [counts.Absent, counts.Excused, counts.Late, counts.Leave, counts.Present, gradeFilter, learners.length, onGabayContext, saved, selectedClass, selectedDate]);
+
+  if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><div><p className="eyebrow">RECORD ATTENDANCE</p><h2>Set up a class first</h2><p>Attendance needs a saved learner list and class schedule before there is anything to record.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
   return <div className="view-page attendance-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
     <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div className="attendance-date-picker"><button type="button" aria-label="Previous day" onClick={() => chooseDate(moveDate(selectedDate, -1))}>←</button><label>Date<input type="date" value={selectedDate} onChange={(event) => chooseDate(event.target.value)} /></label><button type="button" aria-label="Next day" onClick={() => chooseDate(moveDate(selectedDate, 1))}>→</button><button type="button" onClick={() => chooseDate(dateInputValue())}>Today</button></div><span>{selectedClass.meetings.map((meeting) => `${meeting.days} · ${meeting.startTime}`).join("  |  ")}</span></section>
@@ -1736,10 +1839,19 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
   </div>;
 }
 
-function CommunityView() {
+function CommunityView({ onGabayContext }: { onGabayContext: (context: GabayLiveContext) => void }) {
   const [tab, setTab] = useState("Questions");
   const [reply, setReply] = useState("");
   const [replies, setReplies] = useState(["Try picture cards first, then let Grade 4 explain the written directions to their group."]);
+  useEffect(() => {
+    onGabayContext({
+      view: "community",
+      pageStep: `${tab} tab`,
+      gradeLevels: [],
+      currentSummary: [`Viewing the ${tab} community feed`, `${replies.length} replies in the open discussion`, reply.trim() ? "A reply is being drafted" : "No reply is being drafted"],
+      availableActions: ["Start a discussion", "Improve the wording of a question", "Draft a helpful reply", "Review community guidelines"],
+    });
+  }, [onGabayContext, replies.length, reply, tab]);
   function submitReply() { if (reply.trim()) { setReplies((items) => [...items, reply.trim()]); setReply(""); } }
   return <div className="view-page"><PageIntro eyebrow="TEACHER COMMUNITY" title="Ask, review, and improve together" description="Conversations stay connected to the resources teachers are using." action={<button className="primary-button" type="button">＋ Start a discussion</button>} />
     <div className="community-tabs">{["Questions", "Reviews", "My division"].map((item) => <button className={tab === item ? "active" : ""} type="button" onClick={() => setTab(item)} key={item}>{item}</button>)}</div>
