@@ -28,6 +28,12 @@ type ClassMeeting = {
   label: string;
 };
 
+type TodayTeachingBlock = {
+  classId: string;
+  className: string;
+  meeting: ClassMeeting;
+};
+
 type TeachingClass = {
   id: string;
   name: string;
@@ -380,6 +386,18 @@ export default function Home() {
   const activeAttendance = activeClass
     ? Object.entries(attendanceRecords).filter(([key]) => key.startsWith(`${activeClass.id}-${today}-grade-`) || key.startsWith(`${activeClass.id}-grade-`)).flatMap(([, records]) => Object.values(records))
     : [];
+  const currentWeekday = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const todayTeachingBlocks: TodayTeachingBlock[] = classes
+    .flatMap((item) => item.meetings
+      .filter((meeting) => daysForPattern(meeting.days).includes(currentWeekday))
+      .map((meeting) => ({ classId: item.id, className: item.name, meeting })))
+    .sort((a, b) => toMinutes(a.meeting.startTime) - toMinutes(b.meeting.startTime));
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nextTeachingBlock = todayTeachingBlocks.find((block) => toMinutes(block.meeting.startTime) + block.meeting.durationMinutes >= nowMinutes);
+  const todayClassIds = [...new Set(todayTeachingBlocks.map((block) => block.classId))];
+  const missingPlanCount = todayClassIds.filter((classId) => !savedPlans.some((plan) => plan.classId === classId)).length;
+  const attendanceSavedCount = todayClassIds.filter((classId) => Object.keys(attendanceRecords).some((key) => key.startsWith(`${classId}-${today}-grade-`))).length;
   function beginPlan(planId?: string) {
     setEditingPlanId(typeof planId === "string" ? planId : "");
     setView("plan");
@@ -525,6 +543,7 @@ export default function Home() {
             <section className="welcome-row home-welcome">
               <div><p className="eyebrow">{displayDate(today).toUpperCase()}</p><h1 className="welcome-title"><span>MAGANDANG ARAW,</span><em>{teacherLabel(teacherName)}!</em></h1><p className="lead">See what you teach today, then open the exact class tool you need.</p></div>
             </section>
+            <GabayTodayBriefing teacherName={teacherName} blocks={todayTeachingBlocks} nextBlock={nextTeachingBlock} missingPlanCount={missingPlanCount} attendanceSavedCount={attendanceSavedCount} latestUpdate={gabayEventMessage} motion={gabayMotion} onOpen={() => setGabayOpen(true)} />
             {notice && <p className="notice" role="status">{notice}</p>}
             <AllClassesSchedule classes={classes} placement="home" onOpenClass={(classId) => { setActiveClassId(classId); setView("classes"); }} />
             <section className="home-command-grid">
@@ -548,7 +567,7 @@ export default function Home() {
           </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} /> : <CommunityView />}
         </div>
 
-        <GabayGuide key={view} open={gabayOpen} view={view} activeClass={activeClass} latestPlan={latestPlan} motion={gabayMotion} authenticated={entryMode === "authenticated"} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
+        <GabayGuide key={view} open={gabayOpen} view={view} teacherName={teacherName} activeClass={activeClass} latestPlan={latestPlan} motion={gabayMotion} authenticated={entryMode === "authenticated"} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Ask</button>
@@ -704,7 +723,31 @@ function GabayMascot({ size = "medium", motion = true, speaking = false }: { siz
 
 type GabayChatMessage = { id: string; role: "teacher" | "gabay"; text: string };
 
-function GabayGuide({ open, view, activeClass, latestPlan, motion, authenticated, onClose, onRequestSignIn }: { open: boolean; view: View; activeClass?: TeachingClass; latestPlan?: SavedPlan; motion: boolean; authenticated: boolean; onClose: () => void; onRequestSignIn: () => void }) {
+function GabayTodayBriefing({ teacherName, blocks, nextBlock, missingPlanCount, attendanceSavedCount, latestUpdate, motion, onOpen }: { teacherName: string; blocks: TodayTeachingBlock[]; nextBlock?: TodayTeachingBlock; missingPlanCount: number; attendanceSavedCount: number; latestUpdate: string; motion: boolean; onOpen: () => void }) {
+  const headline = !blocks.length
+    ? "No classes scheduled today—nice chance to prep ahead."
+    : nextBlock
+      ? `Next up: ${nextBlock.className} at ${nextBlock.meeting.startTime}.`
+      : "Your scheduled classes for today are done.";
+
+  return <aside className="gabay-today-briefing" aria-label={`Gabay’s briefing for ${teacherLabel(teacherName)}`}>
+    <button className="gabay-briefing-mascot" type="button" aria-label="Open Gabay" onClick={onOpen}><GabayMascot size="medium" motion={motion} speaking /></button>
+    <div className="gabay-briefing-copy">
+      <p>GABAY’S QUICK BRIEFING</p>
+      <h2>Hi, {teacherLabel(teacherName)}. {headline}</h2>
+      <span>Shorter than a faculty meeting, promise.</span>
+      <div className="gabay-briefing-updates">
+        <span><b>{blocks.length}</b> class {blocks.length === 1 ? "block" : "blocks"} today</span>
+        <span><b>{attendanceSavedCount}</b> attendance {attendanceSavedCount === 1 ? "record" : "records"} saved</span>
+        <span className={missingPlanCount ? "needs-attention" : "is-ready"}><b>{missingPlanCount}</b> {missingPlanCount === 1 ? "class needs" : "classes need"} a plan</span>
+      </div>
+      {latestUpdate && <small className="gabay-briefing-latest"><b>Latest:</b> {latestUpdate}</small>}
+    </div>
+    <button className="gabay-briefing-action" type="button" onClick={onOpen}>Ask Gabay <span>→</span></button>
+  </aside>;
+}
+
+function GabayGuide({ open, view, teacherName, activeClass, latestPlan, motion, authenticated, onClose, onRequestSignIn }: { open: boolean; view: View; teacherName: string; activeClass?: TeachingClass; latestPlan?: SavedPlan; motion: boolean; authenticated: boolean; onClose: () => void; onRequestSignIn: () => void }) {
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<GabayChatMessage[]>([]);
   const [isReplying, setIsReplying] = useState(false);
@@ -737,6 +780,7 @@ function GabayGuide({ open, view, activeClass, latestPlan, motion, authenticated
 
     const result = await askConnectedGabay(message, {
       view,
+      teacherName,
       gradeLevels: activeClass?.grades ?? [],
       subject: latestPlan?.subject || activeClass?.subjects[0],
       lessonTopic: latestPlan?.title,

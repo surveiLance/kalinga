@@ -2,6 +2,7 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/c
 
 export type GabayPageContext = {
   view: string;
+  teacherName?: string;
   gradeLevels: string[];
   subject?: string;
   lessonTopic?: string;

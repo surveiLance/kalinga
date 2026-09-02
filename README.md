@@ -49,7 +49,7 @@ npx supabase functions deploy gabay-chat
 
 Connected Gabay requires a valid Supabase user session. Prototype mode does not call the AI service or expose the secret.
 
-The AI receives only the recent chat and minimal classroom context: current screen, grade levels, subject, lesson topic, and connection state. Saved learner names, reference numbers, attendance statuses, and notes are deliberately excluded.
+The AI receives only the recent chat and minimal classroom context: the teacher’s preferred display name, current screen, grade levels, subject, lesson topic, and connection state. Saved learner names, reference numbers, attendance statuses, and notes are deliberately excluded.
 
 ## Vercel
 

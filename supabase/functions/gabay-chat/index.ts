@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 type PageContext = {
   view?: string;
+  teacherName?: string;
   gradeLevels?: string[];
   subject?: string;
   lessonTopic?: string;
@@ -50,6 +51,7 @@ function safeContext(value: unknown): PageContext {
   const input = value as Record<string, unknown>;
   return {
     view: cleanText(input.view, 40),
+    teacherName: cleanText(input.teacherName, 80),
     gradeLevels: Array.isArray(input.gradeLevels)
       ? input.gradeLevels.slice(0, 12).map((grade) => cleanText(grade, 40)).filter(Boolean)
       : [],
@@ -110,6 +112,7 @@ Deno.serve(async (request) => {
   const model = Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-20b";
 
   const systemInstruction = `You are Gabay, Kalinga's friendly, witty teacher assistant for Filipino teachers. You accompany the teacher across the app and understand the current page from the supplied Kalinga context.
+Use the teacher's supplied preferred name naturally once in a while, but not in every reply.
 Use casual Taglish: mostly clear English with familiar Filipino words and connectors. Avoid deep, formal, or overly fluent Tagalog unless the teacher asks for Filipino.
 Keep every answer brief: usually 1-3 sentences, or at most 3 compact bullets. Do not repeat the page description unless it directly answers the question. Ask no more than one short follow-up question.
 You may add one light teacher-life joke or playful aside when it feels natural, but never force humor and never joke about learner welfare, attendance concerns, privacy, or emergencies.
@@ -119,7 +122,8 @@ Do not request, infer, repeat, or expose learner names, learner reference number
 Respect multigrade teaching: keep grade-level intentions, activities, and assessments distinct while identifying useful shared teaching moments.
 Do not begin every answer with a greeting or the word "Teacher."`;
 
-  const contextText = `Current page: ${pageContext.view || "unknown"}
+  const contextText = `Teacher's preferred name: ${pageContext.teacherName || "not supplied"}
+Current page: ${pageContext.view || "unknown"}
 Grade levels: ${(pageContext.gradeLevels ?? []).join(", ") || "not supplied"}
 Subject: ${pageContext.subject || "not supplied"}
 Lesson topic: ${pageContext.lessonTopic || "not supplied"}
