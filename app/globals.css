@@ -659,7 +659,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .home-essential-actions > button > span { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; color: var(--orange-dark); background: #f9dfd3; font-size: 22px; font-weight: 850; }
 .home-essential-actions p { margin: 0; }.home-essential-actions b, .home-essential-actions small { display: block; }.home-essential-actions b { font-size: 14px; }.home-essential-actions small { max-width: 340px; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.35; }.home-essential-actions > button > b { color: var(--teal-ink); font-size: 18px; }
 
-.gabay-chat-popover { top: 90px; right: 28px; bottom: auto; width: min(480px, calc(100vw - 56px)); height: min(640px, calc(100dvh - 118px)); min-width: 340px; min-height: 360px; max-width: calc(100vw - 56px); max-height: calc(100dvh - 112px); border-radius: 16px; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; resize: both; box-shadow: 0 16px 42px rgba(27, 55, 54, .18); }
+.gabay-chat-popover { top: 90px; right: 28px; bottom: auto; width: min(480px, calc(100vw - 56px)); height: min(640px, calc(100dvh - 118px)); min-width: 340px; min-height: 360px; max-width: calc(100vw - 56px); max-height: calc(100dvh - 112px); border-radius: 16px; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; resize: both; box-shadow: 0 16px 42px rgba(27, 55, 54, .18); }
 .gabay-chat-popover::after { display: none; }
 .gabay-chat-popover > header { min-height: 58px; padding: 9px 11px; border-radius: 15px 15px 0 0; grid-template-columns: 32px 1fr auto; gap: 8px; }
 .gabay-chat-popover > header .gabay-mascot { width: 30px; height: 30px; filter: none; }
@@ -668,6 +668,11 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-close { width: 32px; height: 32px; border-radius: 9px; font-size: 18px; }
 .gabay-chat-header-actions { display: flex; align-items: center; gap: 5px; }
 .gabay-chat-header-actions > button { width: 32px; height: 32px; padding: 0; border: 1px solid #c7ddd8; border-radius: 9px; display: grid; place-items: center; color: #476764; background: rgba(255,255,255,.78); font-size: 13px; font-weight: 800; cursor: pointer; }
+.gabay-context-status { min-height: 30px; padding: 6px 12px; border-bottom: 1px solid #dbe9e6; display: flex; align-items: center; gap: 7px; color: #56706d; background: #f4faf8; font-size: 10px; font-weight: 750; }
+.gabay-context-status i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: #8b9997; }
+.gabay-context-status.loading i { border: 2px solid #bfd2ce; border-top-color: var(--teal-ink); background: transparent; animation: context-spin .7s linear infinite; }
+.gabay-context-status.ready i { background: #42ad98; box-shadow: 0 0 0 3px rgba(66, 173, 152, .12); }
+@keyframes context-spin { to { transform: rotate(360deg); } }
 .gabay-conversation-menu { position: absolute; z-index: 5; top: 62px; right: 9px; left: 9px; max-height: 360px; padding: 11px; border: 1px solid #bfd9d4; border-radius: 13px; overflow-y: auto; background: #fffdf8; box-shadow: 0 16px 38px rgba(27,55,54,.2); }
 .gabay-conversation-menu > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .gabay-conversation-menu > div:first-child b { font-size: 12px; }
@@ -695,6 +700,18 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-chat-composer > button { width: 40px; height: 40px; border-radius: 10px; }
 .gabay-chat-composer > small { padding: 0 3px; color: #a0473d; font-size: 9px; }
 
+.gabay-draft-intention { margin: 14px 0 12px; padding: 12px; border: 1px solid #bddbd5; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px; background: #eef8f5; }
+.gabay-draft-intention > div { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.gabay-draft-intention .gabay-mascot { width: 38px; height: 38px; flex: 0 0 38px; filter: none; }
+.gabay-draft-intention p { margin: 0; }.gabay-draft-intention b, .gabay-draft-intention span { display: block; }.gabay-draft-intention b { color: var(--ink); font-size: 11px; }.gabay-draft-intention span { margin-top: 3px; color: #607673; font-size: 9px; line-height: 1.4; }
+.gabay-draft-intention > button { min-height: 38px; padding: 8px 11px; border: 0; border-radius: 9px; color: #fff; background: var(--teal-ink); font-size: 9px; font-weight: 850; white-space: nowrap; cursor: pointer; }
+.gabay-draft-intention > button:disabled { opacity: .5; cursor: wait; }
+.gabay-draft-error { margin: -3px 0 12px; padding: 9px 11px; border-radius: 9px; color: #9d3f2c; background: #fff0e9; font-size: 9px; line-height: 1.45; }
+.gabay-intention-review { margin: 0 0 14px; padding: 14px; border: 1px solid #75b5aa; border-radius: 12px; background: #f7fcfa; }
+.gabay-intention-review > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gabay-intention-review > div > p { margin: 0; padding: 11px; border-radius: 9px; background: #fff; }.gabay-intention-review b, .gabay-intention-review span { display: block; }.gabay-intention-review b { color: var(--teal-ink); font-size: 9px; }.gabay-intention-review span { margin-top: 5px; color: var(--ink); font-size: 11px; line-height: 1.5; }
+.gabay-intention-review footer { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }.gabay-intention-review footer button { min-height: 38px; padding: 9px 12px; font-size: 9px; }
+
 @media (max-width: 720px) {
   .gabay-topbar-assistant { width: 44px; min-height: 44px; padding: 3px; justify-content: center; }
   .gabay-topbar-assistant .gabay-mascot { width: 35px; height: 35px; }
@@ -714,6 +731,9 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
   .home-action-heading select { width: 100%; max-width: none; }
   .home-essential-actions > button { grid-template-columns: 42px 1fr auto; padding: 12px; }
   .home-essential-actions > button > span { width: 42px; height: 42px; }
+  .gabay-draft-intention { align-items: stretch; flex-direction: column; }
+  .gabay-intention-review > div { grid-template-columns: 1fr; }
+  .gabay-intention-review footer { display: grid; }
 }
 
 @media (prefers-reduced-motion: reduce) {

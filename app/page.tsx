@@ -1075,6 +1075,15 @@ function normalizeGabayView(value: unknown): View {
   return typeof value === "string" && value in gabayPageLabels ? value as View : "home";
 }
 
+function readStoredStringArray(key: string) {
+  if (!key || typeof window === "undefined") return [] as string[];
+  try {
+    return JSON.parse(window.localStorage.getItem(key) || "[]") as string[];
+  } catch {
+    return [] as string[];
+  }
+}
+
 function FormattedGabayMessage({ text }: { text: string }) {
   return <>{text.split(/(\*\*[^*]+\*\*|\n)/g).map((part, index) => {
     if (part === "\n") return <br key={`line-${index}`} />;
@@ -1124,11 +1133,20 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [connectionIssue, setConnectionIssue] = useState(false);
+  const [readyContextSignature, setReadyContextSignature] = useState("");
   const chatInputId = useId();
 
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
   const chatMessages = activeConversation?.messages || [];
   const chatCacheKey = teacherAccountId ? `kalinga:teacher-${teacherAccountId}:gabay-chat` : "";
+  const deletedChatIdsKey = teacherAccountId ? `kalinga:teacher-${teacherAccountId}:gabay-deleted-chats` : "";
+  const contextSignature = JSON.stringify({ view, pageStep: pageContext.pageStep, classId: pageContext.classId, subject: pageContext.subject, lessonTopic: pageContext.lessonTopic, incompleteSections: pageContext.incompleteSections });
+  const contextReady = readyContextSignature === contextSignature;
+
+  useEffect(() => {
+    const contextTimer = window.setTimeout(() => setReadyContextSignature(contextSignature), 280);
+    return () => window.clearTimeout(contextTimer);
+  }, [contextSignature]);
 
   useEffect(() => {
     if (!authenticated || !teacherAccountId) return;
@@ -1142,8 +1160,10 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
         cachedConversations = [];
       }
       if (!active) return;
-      setConversations(cachedConversations);
-      setActiveConversationId(cachedConversations[0]?.id || "");
+      const deletedIds = readStoredStringArray(deletedChatIdsKey);
+      const visibleCachedConversations = cachedConversations.filter((conversation) => !deletedIds.includes(conversation.id));
+      setConversations(visibleCachedConversations);
+      setActiveConversationId(visibleCachedConversations[0]?.id || "");
       setHydratedChatAccountId(teacherAccountId);
     }, 0);
 
@@ -1151,7 +1171,9 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     if (supabase) {
       void supabase.from("gabay_conversations").select("id,title,created_at,updated_at").eq("teacher_id", teacherAccountId).order("updated_at", { ascending: false }).limit(12).then(async ({ data: conversationRows, error }) => {
         if (!active || error || !conversationRows) return;
-        const conversationIds = conversationRows.map((row) => row.id as string);
+        const deletedIds = readStoredStringArray(deletedChatIdsKey);
+        const visibleConversationRows = conversationRows.filter((row) => !deletedIds.includes(row.id as string));
+        const conversationIds = visibleConversationRows.map((row) => row.id as string);
         const messageResult = conversationIds.length
           ? await supabase.from("gabay_messages").select("id,conversation_id,role,content,page_view,created_at").eq("teacher_id", teacherAccountId).in("conversation_id", conversationIds).order("created_at").limit(600)
           : { data: [], error: null };
@@ -1164,23 +1186,35 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
           view: normalizeGabayView(row.page_view),
           createdAt: row.created_at as string,
         }));
-        const nextConversations: GabayConversation[] = conversationRows.map((row) => ({
+        const nextConversations: GabayConversation[] = visibleConversationRows.map((row) => ({
           id: row.id as string,
           title: row.title as string,
           createdAt: row.created_at as string,
           updatedAt: row.updated_at as string,
           messages: messages.filter((message) => message.conversationId === row.id),
         }));
-        setConversations((current) => [...nextConversations, ...current.filter((conversation) => !nextConversations.some((remote) => remote.id === conversation.id))]);
+        setConversations((current) => {
+          const latestDeletedIds = readStoredStringArray(deletedChatIdsKey);
+          const mergedRemote = nextConversations.filter((conversation) => !latestDeletedIds.includes(conversation.id)).map((remote) => {
+            const local = current.find((conversation) => conversation.id === remote.id);
+            if (!local) return remote;
+            const mergedMessages = [...remote.messages, ...local.messages.filter((message) => !remote.messages.some((remoteMessage) => remoteMessage.id === message.id))]
+              .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            return { ...remote, updatedAt: remote.updatedAt > local.updatedAt ? remote.updatedAt : local.updatedAt, messages: mergedMessages };
+          });
+          return [...mergedRemote, ...current.filter((conversation) => !latestDeletedIds.includes(conversation.id) && !mergedRemote.some((remote) => remote.id === conversation.id))];
+        });
         setActiveConversationId((current) => current || nextConversations[0]?.id || "");
         setHydratedChatAccountId(teacherAccountId);
       });
+      const deletedIds = readStoredStringArray(deletedChatIdsKey);
+      if (deletedIds.length) void supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).in("id", deletedIds);
     }
     return () => {
       active = false;
       window.clearTimeout(cacheTimer);
     };
-  }, [authenticated, teacherAccountId]);
+  }, [authenticated, deletedChatIdsKey, teacherAccountId]);
 
   useEffect(() => {
     if (!chatCacheKey || hydratedChatAccountId !== teacherAccountId) return;
@@ -1240,11 +1274,12 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     }, chatMessages.slice(-12).map(({ role, text }) => ({ role, text })));
 
     setConnectionIssue(!result.connected);
+    const gabayReply = result.connected ? result.reply.slice(0, 3990) : "I could not reach Groq right now. Please try again shortly. Your classroom data is still safe.";
     const gabayMessage: GabayChatMessage = {
       id: crypto.randomUUID(),
       conversationId,
       role: "gabay",
-      text: result.connected ? result.reply : "I could not reach Groq right now. Please try again shortly. Your classroom data is still safe.",
+      text: gabayReply,
       view,
       createdAt: new Date().toISOString(),
     };
@@ -1255,8 +1290,8 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
       return [updated, ...current.filter((item) => item.id !== conversationId)];
     });
     if (supabase && teacherAccountId) {
-      void supabase.from("gabay_messages").insert({ id: gabayMessage.id, conversation_id: conversationId, teacher_id: teacherAccountId, role: "gabay", content: gabayMessage.text, page_view: view });
-      void supabase.from("gabay_conversations").update({ updated_at: gabayMessage.createdAt }).eq("teacher_id", teacherAccountId).eq("id", conversationId);
+      await supabase.from("gabay_messages").upsert({ id: gabayMessage.id, conversation_id: conversationId, teacher_id: teacherAccountId, role: "gabay", content: gabayMessage.text, page_view: view });
+      await supabase.from("gabay_conversations").update({ updated_at: gabayMessage.createdAt }).eq("teacher_id", teacherAccountId).eq("id", conversationId);
     }
     setIsReplying(false);
   }
@@ -1284,24 +1319,27 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     setConnectionIssue(false);
   }
 
-  function clearCurrentConversation() {
+  async function clearCurrentConversation() {
     if (!activeConversationId) return;
     const conversationId = activeConversationId;
+    const deletedIds = [...new Set([...readStoredStringArray(deletedChatIdsKey), conversationId])];
+    if (deletedChatIdsKey) window.localStorage.setItem(deletedChatIdsKey, JSON.stringify(deletedIds));
     const remaining = conversations.filter((conversation) => conversation.id !== conversationId);
     setConversations(remaining);
     setActiveConversationId(remaining[0]?.id || "");
     setConversationMenuOpen(false);
     const supabase = getSupabaseBrowserClient();
-    if (supabase && teacherAccountId) void supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).eq("id", conversationId);
+    if (supabase && teacherAccountId) await supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).eq("id", conversationId);
   }
 
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
-    <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? `${gabayPageLabels[view]} · same conversation` : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
+    <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? isReplying ? "Thinking with your page context…" : contextReady ? `${gabayPageLabels[view]} context ready` : "Reading this page…" : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
+    {authenticated && <div className={`gabay-context-status ${contextReady ? "ready" : "loading"}`} role="status" aria-live="polite"><i />{contextReady ? `Ready to help with ${pageContext.pageStep || gabayPageLabels[view]}` : "Loading the current page context…"}</div>}
     {conversationMenuOpen && <div className="gabay-conversation-menu"><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 6).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Clear current chat</button>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
     <div className="gabay-chat-body">
       {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{isReplying && <div className="gabay"><p>Sandali, teacher…</p></div>}</div>}
     </div>
-    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId} onChange={(event) => setChatInput(event.target.value)} placeholder={authenticated ? `Ask about ${gabayPageLabels[view]}…` : "Sign in to chat"} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady} onChange={(event) => setChatInput(event.target.value)} placeholder={!authenticated ? "Sign in to chat" : contextReady ? `Ask about ${gabayPageLabels[view]}…` : "Reading this page…"} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
   </aside>;
 }
 
@@ -1581,6 +1619,10 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [nextSessionNotes, setNextSessionNotes] = useState(initialPlan?.nextSessionNotes || "");
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [saved, setSaved] = useState(false);
+  const [activeIntentionGrade, setActiveIntentionGrade] = useState<GradeLevel>("");
+  const [draftingIntentionGrade, setDraftingIntentionGrade] = useState<GradeLevel>("");
+  const [intentionSuggestions, setIntentionSuggestions] = useState<Record<GradeLevel, { competency: string; objective: string }>>({});
+  const [intentionDraftErrors, setIntentionDraftErrors] = useState<Record<GradeLevel, string>>({});
   const planRosterCounts = learnerSexCounts(selectedClass?.learners || []);
   const incompletePlanSections = useMemo(() => [
     !subject.trim() && "lesson subject",
@@ -1592,7 +1634,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   useEffect(() => {
     onGabayContext({
       view: "plan",
-      pageStep: step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : "ILAW plan",
+      pageStep: step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : activeIntentionGrade ? `ILAW plan · ${gradeLabel(activeIntentionGrade)} intentions` : "ILAW plan",
       classId: selectedClass?.id,
       className: selectedClass?.name,
       gradeLevels: grades,
@@ -1602,10 +1644,10 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
       lessonTopic: lessonTitle || "Untitled lesson",
       lessonDuration: `${durationMinutes(duration)} minutes starting at ${startTime}`,
       incompleteSections: incompletePlanSections,
-      currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", saved ? "Draft is saved" : "Draft has unsaved changes"],
+      currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`), saved ? "Draft is saved" : "Draft has unsaved changes"],
       availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Continue to the ILAW plan"] : ["Complete intentions", "Build the learning experience", "Add assessment", "Save the lesson"],
     });
-  }, [duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, onGabayContext, saved, selectedClass, sharedTheme, startTime, step, subject]);
+  }, [activeIntentionGrade, competencies, duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, saved, selectedClass, sharedTheme, startTime, step, subject]);
 
   function canOpenPlanStep(nextStep: 1 | 2 | 3) {
     if (nextStep === 1) return true;
@@ -1675,6 +1717,55 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
 
   function addSlot() {
     setSlots((current) => [...current, { id: `slot-${Date.now()}`, time: formatTime(toMinutes(current.at(-1)?.time || startTime) + 15), teacherFocus: "", gradeTasks: Object.fromEntries(grades.map((grade) => [grade, ""])) }]);
+  }
+
+  async function draftGradeIntention(grade: GradeLevel) {
+    if (!selectedClass || draftingIntentionGrade) return;
+    setActiveIntentionGrade(grade);
+    setDraftingIntentionGrade(grade);
+    setIntentionDraftErrors((current) => ({ ...current, [grade]: "" }));
+    const topic = lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`;
+    const result = await askConnectedGabay(
+      `Create one editable draft learning competency and one measurable learning objective for ${gradeLabel(grade)} in ${subject}, about "${topic}". Keep them realistic for a ${durationMinutes(duration)}-minute multigrade class. These are suggestions, not official DepEd competencies. Return exactly two plain lines: COMPETENCY: [draft] and OBJECTIVE: [draft].`,
+      {
+        view: "plan",
+        pageStep: `ILAW plan · ${gradeLabel(grade)} intentions`,
+        classId: selectedClass.id,
+        className: selectedClass.name,
+        gradeLevels: grades,
+        subjects: selectedClass.subjects,
+        learnerCount: selectedClass.learners.length,
+        subject,
+        lessonTopic: topic,
+        lessonDuration: `${durationMinutes(duration)} minutes starting at ${startTime}`,
+        incompleteSections: incompletePlanSections,
+        currentSummary: [`Drafting only for ${gradeLabel(grade)}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered"],
+        availableActions: ["Review the AI draft", "Apply the draft", "Edit every field"],
+        offline: typeof navigator !== "undefined" && !navigator.onLine,
+      },
+    );
+    setDraftingIntentionGrade("");
+    if (!result.connected) {
+      setIntentionDraftErrors((current) => ({ ...current, [grade]: "Gabay could not create a draft right now. Check the connection and try again." }));
+      return;
+    }
+    const cleanReply = result.reply.replace(/\*\*/g, "").trim();
+    const competency = cleanReply.match(/COMPETENCY\s*:\s*([\s\S]*?)(?=\n\s*OBJECTIVE\s*:)/i)?.[1]?.trim();
+    const objective = cleanReply.match(/OBJECTIVE\s*:\s*([\s\S]*)$/i)?.[1]?.trim();
+    if (!competency || !objective) {
+      setIntentionDraftErrors((current) => ({ ...current, [grade]: "Gabay’s draft was not in the expected format. Please try once more." }));
+      return;
+    }
+    setIntentionSuggestions((current) => ({ ...current, [grade]: { competency, objective } }));
+  }
+
+  function applyGradeIntention(grade: GradeLevel) {
+    const suggestion = intentionSuggestions[grade];
+    if (!suggestion) return;
+    setCompetencies((current) => ({ ...current, [grade]: suggestion.competency }));
+    setObjectives((current) => ({ ...current, [grade]: suggestion.objective }));
+    setIntentionSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)));
+    setSaved(false);
   }
 
   function saveCurrentPlan() {
@@ -1759,7 +1850,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
             <div className="ilaw-disclosure-body intentions-body">
               <p className="competency-guidance">Nothing is generated without a verified source. Enter only what you know, or leave a field blank and return later.</p>
               <details className="ilaw-optional-disclosure"><summary><span>Shared theme and multigrade approach</span><small>Optional lesson setup</small></summary><div className="ilaw-intention-grid"><label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label><label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label></div></details>
-              <div className="intention-grade-list">{grades.map((grade) => <details className={`competency-card competency-disclosure grade-${grade}`} key={grade}><summary><span><b>{gradeLabel(grade)}</b><small>{subject || "Subject not entered"} · {quarter}</small></span><span>{competencies[grade] || objectives[grade] ? "Started" : "Not started"}</span></summary><div className="competency-fields"><label>Learning competency<textarea value={competencies[grade] || ""} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label><p className="competency-helper">Saved offline and editable at any time.</p></div></details>)}</div>
+              <div className="intention-grade-list">{grades.map((grade) => <details className={`competency-card competency-disclosure grade-${grade}`} onToggle={(event) => { if (event.currentTarget.open) setActiveIntentionGrade(grade); }} key={grade}><summary><span><b>{gradeLabel(grade)}</b><small>{subject || "Subject not entered"} · {quarter}</small></span><span>{competencies[grade] || objectives[grade] ? "Started" : "Not started"}</span></summary><div className="competency-fields"><div className="gabay-draft-intention"><div><GabayMascot size="small" motion /><p><b>Need a starting point?</b><span>Gabay can suggest an editable—not official—draft for this grade.</span></p></div><button type="button" disabled={Boolean(draftingIntentionGrade)} onClick={() => draftGradeIntention(grade)}>{draftingIntentionGrade === grade ? "Drafting…" : intentionSuggestions[grade] ? "Try another draft" : "Draft with Gabay"}</button></div>{intentionDraftErrors[grade] && <p className="gabay-draft-error" role="alert">{intentionDraftErrors[grade]}</p>}{intentionSuggestions[grade] && <aside className="gabay-intention-review"><p className="eyebrow">GABAY’S DRAFT · REVIEW FIRST</p><div><p><b>Possible competency</b><span>{intentionSuggestions[grade].competency}</span></p><p><b>Possible objective</b><span>{intentionSuggestions[grade].objective}</span></p></div><footer><button className="secondary-button" type="button" onClick={() => setIntentionSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)))}>Dismiss</button><button className="primary-button" type="button" onClick={() => applyGradeIntention(grade)}>Use and edit this draft</button></footer></aside>}<label>Learning competency<textarea value={competencies[grade] || ""} onFocus={() => setActiveIntentionGrade(grade)} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onFocus={() => setActiveIntentionGrade(grade)} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label><p className="competency-helper">Saved offline and editable at any time.</p></div></details>)}</div>
             </div>
           </details>
 
