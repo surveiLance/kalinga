@@ -10,6 +10,7 @@ type View = "home" | "classes" | "plan" | "library" | "attendance" | "community"
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
+type AppNotification = { id: string; kind: "reply" | "resource"; title: string; body: string; createdAt?: string; view: View };
 
 type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion";
 
@@ -149,6 +150,10 @@ const gabayPageLabels: Record<View, string> = {
   community: "Teacher community",
 };
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const notificationResourceCatalog = [
+  { id: "starter-math", subject: "Mathematics", title: "Fraction Market with Bottle Caps" },
+  { id: "starter-science", subject: "Science", title: "Schoolyard Plant Detectives" },
+];
 const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino", "Mariel C. Torres", "Noel B. Pangan", "Olivia R. Cabahug", "Paolo S. Evasco", "Queenie M. Dayao", "Ramon L. Flores"];
 const legacyWorkspaceKeys: Record<WorkspaceStorageKey, string> = {
   classes: "kalinga-classes",
@@ -169,6 +174,10 @@ function workspaceStorageKey(scope: string, key: WorkspaceStorageKey) {
 function normalizeResourceBookmarkId(value: string | number) {
   const id = String(value);
   return /^\d+$/.test(id) ? `catalog-${id}` : id;
+}
+
+function isStarterResourceId(value: string) {
+  return value === "starter-math" || value === "starter-science";
 }
 
 function migrateLegacyPrototypeWorkspace() {
@@ -387,7 +396,7 @@ async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string)
     attendance[key] = { ...(attendance[key] || {}), [row.learner_id]: row.status };
     if (row.note) attendanceNotes[key] = { ...(attendanceNotes[key] || {}), [row.learner_id]: row.note };
   }
-  const savedResourceIds = (resourceBookmarkResult.data || []).map((bookmark) => normalizeResourceBookmarkId(bookmark.resource_id)).filter(Boolean);
+  const savedResourceIds = (resourceBookmarkResult.data || []).map((bookmark) => normalizeResourceBookmarkId(bookmark.resource_id)).filter(isStarterResourceId);
   return { classes, plans, savedResourceIds, attendance, attendanceNotes };
 }
 
@@ -529,6 +538,10 @@ export default function Home() {
   const [teacherAccountId, setTeacherAccountId] = useState("");
   const [teacherName, setTeacherName] = useState("Ana");
   const [teacherEmail, setTeacherEmail] = useState("");
+  const [authWelcomeMessage, setAuthWelcomeMessage] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [replyNotifications, setReplyNotifications] = useState<AppNotification[]>([]);
+  const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
   const workspaceScope = entryMode === "authenticated" && teacherAccountId
     ? `teacher-${teacherAccountId}`
     : entryMode === "prototype"
@@ -550,6 +563,11 @@ export default function Home() {
       setTeacherEmail(user.email || "");
       setTeacherAccountId(user.id);
       setEntryMode("authenticated");
+      if (new URLSearchParams(window.location.search).get("confirmed") === "1") {
+        setAuthWelcomeMessage("Email confirmed—welcome to Kalinga. Your teacher workspace is ready.");
+        setView("home");
+        window.history.replaceState(null, "", window.location.pathname);
+      }
     }
 
     void supabase.auth.getSession().then(({ data }) => {
@@ -608,7 +626,7 @@ export default function Home() {
           setActiveClassId(storedActiveClass || parsed[0]?.id || "");
         }
         if (storedPlans) setSavedPlans((JSON.parse(storedPlans) as LegacySavedPlan[]).map(normalizeSavedPlan));
-        if (storedResources) setSavedResourceIds((JSON.parse(storedResources) as Array<string | number>).map(normalizeResourceBookmarkId));
+        if (storedResources) setSavedResourceIds((JSON.parse(storedResources) as Array<string | number>).map(normalizeResourceBookmarkId).filter(isStarterResourceId));
         if (storedAttendance) setAttendanceRecords(JSON.parse(storedAttendance) as Record<string, Record<string, string>>);
         if (storedAttendanceNotes) setAttendanceNotes(JSON.parse(storedAttendanceNotes) as Record<string, Record<string, string>>);
         if (workspaceScope === "prototype" && storedTeacherName) setTeacherName(storedTeacherName);
@@ -659,6 +677,51 @@ export default function Home() {
   }, [entryMode, hydratedWorkspaceScope, teacherAccountId, workspaceScope]);
 
   useEffect(() => {
+    if (entryMode !== "authenticated" || !teacherAccountId) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let active = true;
+
+    async function refreshNotifications() {
+      const [discussionResult, readResult] = await Promise.all([
+        supabase!.from("teacher_discussions").select("id,title").eq("author_id", teacherAccountId),
+        supabase!.from("notification_reads").select("notification_id").eq("teacher_id", teacherAccountId),
+      ]);
+      if (!active) return;
+      if (!readResult.error) setNotificationReadIds((readResult.data || []).map((row) => String(row.notification_id)));
+      if (discussionResult.error || !discussionResult.data?.length) {
+        setReplyNotifications([]);
+        return;
+      }
+      const discussionTitles = new Map(discussionResult.data.map((row) => [String(row.id), String(row.title)]));
+      const { data, error } = await supabase!.from("teacher_replies")
+        .select("id,discussion_id,author_id,author_name,created_at")
+        .in("discussion_id", [...discussionTitles.keys()])
+        .neq("author_id", teacherAccountId)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (!active || error) return;
+      setReplyNotifications((data || []).map((row) => ({
+        id: `reply:${String(row.id)}`,
+        kind: "reply",
+        title: `${String(row.author_name)} replied`,
+        body: discussionTitles.get(String(row.discussion_id)) || "Your teacher question",
+        createdAt: String(row.created_at),
+        view: "community",
+      })));
+    }
+
+    void refreshNotifications();
+    const channel = supabase.channel(`notifications-${teacherAccountId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_replies" }, () => { void refreshNotifications(); })
+      .subscribe();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [entryMode, teacherAccountId]);
+
+  useEffect(() => {
     if (!gabayOpen) return;
     function closeWithEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setGabayOpen(false);
@@ -668,6 +731,17 @@ export default function Home() {
   }, [gabayOpen]);
 
   const activeClass = classes.find((item) => item.id === activeClassId) || classes[0];
+  const resourceNotifications: AppNotification[] = entryMode === "authenticated" && activeClass
+    ? notificationResourceCatalog.filter((resource) => activeClass.subjects.includes(resource.subject) && !savedResourceIds.includes(resource.id)).map((resource) => ({
+      id: `resource:${activeClass.id}:${resource.id}`,
+      kind: "resource" as const,
+      title: `New match for ${activeClass.name}`,
+      body: `${resource.title} · ${resource.subject}`,
+      view: "library" as const,
+    }))
+    : [];
+  const notifications = entryMode === "authenticated" ? [...replyNotifications, ...resourceNotifications] : [];
+  const unreadNotifications = notifications.filter((item) => !notificationReadIds.includes(item.id));
   const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
   const latestPlan = activePlans[0];
@@ -728,10 +802,32 @@ export default function Home() {
     setNotice("");
   }
 
+  function markNotificationsRead(ids: string[]) {
+    const newIds = ids.filter((id) => !notificationReadIds.includes(id));
+    if (!newIds.length) return;
+    setNotificationReadIds((current) => [...new Set([...current, ...newIds])]);
+    const supabase = getSupabaseBrowserClient();
+    if (entryMode === "authenticated" && teacherAccountId && supabase) {
+      void supabase.from("notification_reads").upsert(newIds.map((notificationId) => ({ teacher_id: teacherAccountId, notification_id: notificationId }))).then(({ error }) => {
+        if (error) setNotice("Notifications were read on this device, but could not sync yet.");
+      });
+    }
+  }
+
+  function openNotification(item: AppNotification) {
+    markNotificationsRead([item.id]);
+    setNotificationsOpen(false);
+    setView(item.view);
+  }
+
   async function signOut() {
     setAccountOpen(false);
     setView("home");
     setNotice("");
+    setAuthWelcomeMessage("");
+    setNotificationsOpen(false);
+    setReplyNotifications([]);
+    setNotificationReadIds([]);
     if (entryMode === "authenticated") {
       await getSupabaseBrowserClient()?.auth.signOut();
     }
@@ -754,10 +850,13 @@ export default function Home() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: name.trim() } },
+      options: {
+        data: { display_name: name.trim() },
+        emailRedirectTo: `${window.location.origin}/?confirmed=1`,
+      },
     });
     if (error) return { ok: false, message: error.message };
-    if (!data.session) return { ok: true, message: "Check your email to confirm the account, then return here to sign in." };
+    if (!data.session) return { ok: true, message: "Check your email and tap Confirm. Kalinga will bring you straight into your teacher workspace." };
     return { ok: true };
   }
 
@@ -893,7 +992,10 @@ export default function Home() {
             <span className="connection"><i /> Offline-ready</span>
             <button className="language" type="button">ENG / FIL</button>
             <button className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
-            <button className="notification" type="button" aria-label="Notifications">●</button>
+            <div className="notification-anchor">
+              <button className={`notification ${unreadNotifications.length ? "has-unread" : ""}`} type="button" aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ""}`} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><span aria-hidden="true">♢</span>{unreadNotifications.length > 0 && <b>{Math.min(unreadNotifications.length, 9)}</b>}</button>
+              {notificationsOpen && <NotificationPanel notifications={notifications} readIds={notificationReadIds} authenticated={entryMode === "authenticated"} onOpen={openNotification} onMarkAll={() => markNotificationsRead(unreadNotifications.map((item) => item.id))} />}
+            </div>
             <div className="account-anchor mobile-account">
               <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
               {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
@@ -904,7 +1006,7 @@ export default function Home() {
         <div className="content">
           {view === "home" ? <>
             <GabayTodayBriefing teacherName={teacherName} activeClass={activeClass} blocks={todayTeachingBlocks} nextBlock={nextTeachingBlock} missingPlanCount={missingPlanCount} attendanceSavedCount={attendanceSavedCount} latestUpdate={gabayEventMessage} motion={gabayMotion} onOpen={() => setGabayOpen(true)} onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} />
-            {notice && <p className="notice" role="status">{notice}</p>}
+            {(authWelcomeMessage || notice) && <p className="notice" role="status">{authWelcomeMessage || notice}</p>}
             {activeClass && <section className="home-essentials-grid">
               <TodayScheduleSummary blocks={todayTeachingBlocks} onOpenClass={(classId) => { setActiveClassId(classId); setView("classes"); }} />
               <article className="home-action-card">
@@ -1045,6 +1147,15 @@ function AccountMenu({ name, email, onSignOut }: { name: string; email: string; 
       <button className="signout-button" type="button" role="menuitem" onClick={onSignOut}><span>↪</span> Sign out</button>
     </div>
   );
+}
+
+function NotificationPanel({ notifications, readIds, authenticated, onOpen, onMarkAll }: { notifications: AppNotification[]; readIds: string[]; authenticated: boolean; onOpen: (item: AppNotification) => void; onMarkAll: () => void }) {
+  const unreadCount = notifications.filter((item) => !readIds.includes(item.id)).length;
+  return <section className="notification-panel" role="dialog" aria-label="Notifications">
+    <header><div><p className="eyebrow">WHAT NEEDS YOU</p><h2>Notifications</h2></div>{unreadCount > 0 && <button type="button" onClick={onMarkAll}>Mark all read</button>}</header>
+    {!authenticated ? <div className="notification-empty"><b>Sign in for personal notifications</b><p>Replies and class-matched resources belong to a teacher account.</p></div> : notifications.length ? <div className="notification-list">{notifications.map((item) => { const read = readIds.includes(item.id); return <button className={read ? "read" : ""} type="button" onClick={() => onOpen(item)} key={item.id}><span>{item.kind === "reply" ? "♧" : "▱"}</span><p><b>{item.title}</b><small>{item.body}</small>{item.createdAt && <em>{communityTime(item.createdAt)}</em>}</p>{!read && <i aria-label="Unread" />}</button>; })}</div> : <div className="notification-empty"><b>You’re caught up</b><p>New replies and useful class matches will appear here.</p></div>}
+    <footer>Only useful signals—no noisy activity feed.</footer>
+  </section>;
 }
 
 function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
@@ -1970,7 +2081,6 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
 
 type LibraryResource = {
   id: string;
-  ownerId?: string;
   icon: string;
   title: string;
   type: string;
@@ -1979,149 +2089,111 @@ type LibraryResource = {
   tags: string[];
   description: string;
   author: string;
-  visibility: "catalog" | "private" | "shared";
-  rating?: string;
-  saves?: number;
-  verified?: boolean;
-  updatedLabel: string;
+  pages: number;
+  pdfPath: string;
 };
 
-const catalogResources: LibraryResource[] = [
-  { id: "catalog-1", icon: "½", title: "Fractions using local objects", type: "Activity sheet", grades: "Grades 3–5", subject: "Mathematics", tags: ["Multigrade", "No printer", "Local objects"], description: "A hands-on fraction activity using bottle caps, seeds, or other objects already in the classroom.", author: "Kalinga Library", visibility: "catalog", rating: "4.8", saves: 132, verified: true, updatedLabel: "Curated resource" },
-  { id: "catalog-2", icon: "Aa", title: "Stories from our community", type: "Reading material", grades: "Grades 2–4", subject: "English", tags: ["Low connectivity", "Local context"], description: "Short reading prompts that invite learners to connect a text with people and places in their community.", author: "Kalinga Library", visibility: "catalog", rating: "4.7", saves: 98, verified: true, updatedLabel: "Curated resource" },
-  { id: "catalog-3", icon: "☘", title: "Plants around our school", type: "Lesson plan", grades: "Grades 4–6", subject: "Science", tags: ["Outdoor", "Multigrade"], description: "A simple observation walk and comparison activity for classrooms with limited science materials.", author: "Kalinga Library", visibility: "catalog", rating: "4.6", saves: 76, updatedLabel: "Curated resource" },
-  { id: "catalog-4", icon: "123", title: "Number drills with bottle caps", type: "Activity cards", grades: "Grades 1–3", subject: "Mathematics", tags: ["No printer", "Limited materials"], description: "Quick number-sense routines teachers can adjust for several grade groups at once.", author: "Kalinga Library", visibility: "catalog", rating: "4.9", saves: 164, verified: true, updatedLabel: "Curated resource" },
+type ResourceComment = { id: string; resourceId: string; teacherId: string; teacherName: string; body: string; createdAt: string };
+type ResourceApproval = { resourceId: string; teacherId: string };
+
+const starterResources: LibraryResource[] = [
+  { id: "starter-math", icon: "½", title: "Fraction Market with Bottle Caps", type: "Teacher guide + learner sheet", grades: "Grades 3-5", subject: "Mathematics", tags: ["Multigrade", "No printer", "Local objects"], description: "A ready-to-teach fraction activity with differentiated grade guidance, a learner record sheet, and an exit check.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/fraction-market-bottle-cap-math.pdf" },
+  { id: "starter-science", icon: "☘", title: "Schoolyard Plant Detectives", type: "Investigation guide + field notes", grades: "Grades 3-5", subject: "Science", tags: ["Outdoor", "Low-cost", "Evidence-based"], description: "A safe local-plant investigation with multigrade prompts, an observation table, and an evidence-based claim activity.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/schoolyard-plant-detectives-science.pdf" },
 ];
 
-async function readCloudResources(supabase: SupabaseClient): Promise<LibraryResource[]> {
-  const { data, error } = await supabase.from("resources").select("id,owner_id,title,visibility,metadata,updated_at").order("updated_at", { ascending: false });
-  if (error) throw error;
-  return (data || []).map((row): LibraryResource => {
-    const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {};
-    return {
-      id: String(row.id), ownerId: String(row.owner_id), title: String(row.title),
-      icon: typeof metadata.icon === "string" ? metadata.icon : "▤",
-      type: typeof metadata.type === "string" ? metadata.type : "Teacher resource",
-      grades: typeof metadata.grades === "string" ? metadata.grades : "Grade levels not set",
-      subject: typeof metadata.subject === "string" ? metadata.subject : "General",
-      tags: Array.isArray(metadata.tags) ? metadata.tags.filter((tag): tag is string => typeof tag === "string") : [],
-      description: typeof metadata.description === "string" ? metadata.description : "Shared by a Kalinga teacher.",
-      author: typeof metadata.authorName === "string" ? metadata.authorName : "Kalinga teacher",
-      visibility: row.visibility === "private" ? "private" : "shared",
-      updatedLabel: `Updated ${new Date(String(row.updated_at)).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}`,
-    };
-  });
-}
-
 function LibraryView({ classes, activeClassId, savedResourceIds, authenticated, teacherAccountId, teacherName, onToggleSaved, onSetUpClass, onRequestSignIn, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; savedResourceIds: string[]; authenticated: boolean; teacherAccountId: string; teacherName: string; onToggleSaved: (id: string) => void; onSetUpClass: () => void; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
-  const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<"class" | "shared" | "mine" | "saved">("class");
-  const [subjectFilter, setSubjectFilter] = useState("All subjects");
-  const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
-  const [cloudResources, setCloudResources] = useState<LibraryResource[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(authenticated);
+  const [filter, setFilter] = useState<"all" | "Mathematics" | "Science" | "saved">("all");
   const [libraryError, setLibraryError] = useState("");
-  const [shareOpen, setShareOpen] = useState(false);
-  const [shareTitle, setShareTitle] = useState("");
-  const [shareSubject, setShareSubject] = useState("Mathematics");
-  const [shareGrades, setShareGrades] = useState("");
-  const [shareType, setShareType] = useState("Activity sheet");
-  const [shareTags, setShareTags] = useState("");
-  const [shareDescription, setShareDescription] = useState("");
-  const [shareVisibility, setShareVisibility] = useState<"shared" | "private">("shared");
-  const [sharing, setSharing] = useState(false);
   const [previewResource, setPreviewResource] = useState<LibraryResource>();
-  const selectedClass = classes.find((item) => item.id === selectedClassId);
-
-  async function loadCloudResources() {
-    if (!authenticated || !teacherAccountId) {
-      setCloudResources([]);
-      setLibraryLoading(false);
-      return;
-    }
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setLibraryLoading(true);
-    try {
-      const mapped = await readCloudResources(supabase);
-      setCloudResources(mapped);
-      setLibraryError("");
-    } catch {
-      setLibraryError("The shared library could not refresh. Your saved catalog is still available.");
-    }
-    setLibraryLoading(false);
-  }
+  const [comments, setComments] = useState<ResourceComment[]>([]);
+  const [approvals, setApprovals] = useState<ResourceApproval[]>([]);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
+  const activeClass = classes.find((item) => item.id === activeClassId);
 
   useEffect(() => {
     if (!authenticated || !teacherAccountId) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let active = true;
-    void readCloudResources(supabase).then((items) => {
+    async function refresh() {
+      const [commentResult, approvalResult] = await Promise.all([
+        supabase!.from("resource_comments").select("id,resource_id,teacher_id,teacher_name,body,created_at").in("resource_id", starterResources.map((item) => item.id)).order("created_at"),
+        supabase!.from("resource_approvals").select("resource_id,teacher_id").in("resource_id", starterResources.map((item) => item.id)),
+      ]);
       if (!active) return;
-      setCloudResources(items); setLibraryError(""); setLibraryLoading(false);
-    }).catch(() => {
-      if (!active) return;
-      setLibraryError("The shared library could not refresh. Your saved catalog is still available."); setLibraryLoading(false);
-    });
-    return () => { active = false; };
+      if (commentResult.error || approvalResult.error) { setLibraryError("Teacher comments and approvals could not refresh. The PDFs are still available."); return; }
+      setComments((commentResult.data || []).map((row) => ({ id: String(row.id), resourceId: String(row.resource_id), teacherId: String(row.teacher_id), teacherName: String(row.teacher_name), body: String(row.body), createdAt: String(row.created_at) })));
+      setApprovals((approvalResult.data || []).map((row) => ({ resourceId: String(row.resource_id), teacherId: String(row.teacher_id) })));
+      setLibraryError("");
+    }
+    void refresh();
+    const channel = supabase.channel(`resource-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "resource_comments" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "resource_approvals" }, () => { void refresh(); }).subscribe();
+    return () => { active = false; void supabase.removeChannel(channel); };
   }, [authenticated, teacherAccountId]);
 
-  const allResources = [...cloudResources, ...catalogResources];
-  const searchableQuery = query.trim().toLowerCase();
-  const visible = allResources.filter((resource) => {
-    const matchesQuery = !searchableQuery || `${resource.title} ${resource.subject} ${resource.grades} ${resource.type} ${resource.description} ${resource.author} ${resource.tags.join(" ")}`.toLowerCase().includes(searchableQuery);
-    const matchesSubject = subjectFilter === "All subjects" || resource.subject === subjectFilter;
-    const matchesScope = scope === "shared" ? resource.visibility !== "private"
-      : scope === "mine" ? resource.ownerId === teacherAccountId
-        : scope === "saved" ? savedResourceIds.includes(resource.id)
-          : !selectedClass || resource.subject === "General" || selectedClass.subjects.includes(resource.subject) || resource.tags.some((tag) => tag.toLowerCase() === "multigrade");
-    return matchesQuery && matchesSubject && matchesScope;
-  });
-  const visibleResourceSummary = visible.slice(0, 5).map((resource) => `${resource.title} (${resource.subject}, ${resource.grades})`).join("; ");
+  const visible = starterResources.filter((resource) => filter === "all" || filter === "saved" ? filter !== "saved" || savedResourceIds.includes(resource.id) : resource.subject === filter);
+  const previewComments = comments.filter((comment) => comment.resourceId === previewResource?.id);
+  const previewApprovals = approvals.filter((approval) => approval.resourceId === previewResource?.id);
+  const teacherApprovedPreview = previewApprovals.some((approval) => approval.teacherId === teacherAccountId);
 
   useEffect(() => {
     onGabayContext({
-      view: "library", pageStep: "Search the teacher resource library", classId: selectedClass?.id, className: selectedClass?.name,
-      gradeLevels: selectedClass?.grades || [], subjects: selectedClass?.subjects || [], learnerCount: selectedClass?.learners.length || 0,
-      currentSummary: [`Search: ${query || "none"}`, `Library section: ${scope}`, `Subject: ${subjectFilter}`, `${savedResourceIds.length} resources saved by this account`, `${visible.length} resources currently shown`, visibleResourceSummary ? `Visible matches: ${visibleResourceSummary}` : "No resources match the current search"],
-      availableActions: ["Suggest a search phrase", "Explain a visible resource", "Help share a teacher resource", "Match a resource to the active class"],
+      view: "library", pageStep: previewResource ? `Review ${previewResource.title}` : "Choose a ready-to-use PDF resource", classId: activeClass?.id, className: activeClass?.name,
+      gradeLevels: activeClass?.grades || [], subjects: activeClass?.subjects || [], learnerCount: activeClass?.learners.length || 0,
+      currentSummary: [`Filter: ${filter}`, `${visible.length} of 2 starter resources shown`, `${savedResourceIds.filter((id) => starterResources.some((resource) => resource.id === id)).length} starter resources saved by this account`, previewResource ? `${previewComments.length} comments and ${previewApprovals.length} teacher approvals on the open resource` : "No resource is currently open"],
+      availableActions: ["Help adapt the Mathematics activity", "Help adapt the Science investigation", "Summarize the open PDF", "Draft a useful teacher comment"],
     });
-  }, [onGabayContext, query, savedResourceIds.length, scope, selectedClass, subjectFilter, visible.length, visibleResourceSummary]);
+  }, [activeClass, filter, onGabayContext, previewApprovals.length, previewComments.length, previewResource, savedResourceIds, visible.length]);
 
-  async function shareResource(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function toggleApproval(resource: LibraryResource) {
     if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || !shareTitle.trim() || !shareDescription.trim()) return;
-    setSharing(true);
-    const { error } = await supabase.from("resources").insert({
-      owner_id: teacherAccountId, title: shareTitle.trim(), visibility: shareVisibility,
-      metadata: { icon: "▤", type: shareType, grades: shareGrades.trim() || "Grade levels not set", subject: shareSubject, tags: shareTags.split(",").map((tag) => tag.trim()).filter(Boolean), description: shareDescription.trim(), authorName: teacherLabel(teacherName) },
-    });
-    setSharing(false);
-    if (error) { setLibraryError("That resource could not be shared yet. Please check your connection and try again."); return; }
-    setShareTitle(""); setShareGrades(""); setShareTags(""); setShareDescription(""); setShareOpen(false); setScope("mine");
-    await loadCloudResources();
+    if (!supabase) return;
+    const approved = approvals.some((approval) => approval.resourceId === resource.id && approval.teacherId === teacherAccountId);
+    setApprovals((current) => approved ? current.filter((approval) => !(approval.resourceId === resource.id && approval.teacherId === teacherAccountId)) : [...current, { resourceId: resource.id, teacherId: teacherAccountId }]);
+    const { error } = approved
+      ? await supabase.from("resource_approvals").delete().eq("resource_id", resource.id).eq("teacher_id", teacherAccountId)
+      : await supabase.from("resource_approvals").insert({ resource_id: resource.id, teacher_id: teacherAccountId });
+    if (error) setLibraryError("That approval could not be saved. Please try again.");
+  }
+
+  async function shareResource(resource: LibraryResource) {
+    const url = `${window.location.origin}${resource.pdfPath}`;
+    try {
+      if (navigator.share) await navigator.share({ title: resource.title, text: `Kalinga teacher resource: ${resource.title}`, url });
+      else { await navigator.clipboard.writeText(url); setShareMessage("PDF link copied"); window.setTimeout(() => setShareMessage(""), 1800); }
+    } catch {
+      setShareMessage("");
+    }
+  }
+
+  async function submitComment(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!previewResource || !commentInput.trim()) return;
+    if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setSubmitting(true);
+    const { data, error } = await supabase.from("resource_comments").insert({ resource_id: previewResource.id, teacher_id: teacherAccountId, teacher_name: teacherLabel(teacherName), body: commentInput.trim() }).select("id,resource_id,teacher_id,teacher_name,body,created_at").single();
+    setSubmitting(false);
+    if (error || !data) { setLibraryError("Your comment could not be posted. Please try again."); return; }
+    setComments((current) => [...current, { id: String(data.id), resourceId: String(data.resource_id), teacherId: String(data.teacher_id), teacherName: String(data.teacher_name), body: String(data.body), createdAt: String(data.created_at) }]);
+    setCommentInput(""); setLibraryError("");
   }
 
   return <div className="view-page resource-library-page">
-    <PageIntro eyebrow="TEACHER RESOURCE LIBRARY" title="Find something you can teach with" description="Search shared materials, keep private drafts, and save useful resources to your own account." action={<button className="primary-button" type="button" onClick={() => authenticated ? setShareOpen((open) => !open) : onRequestSignIn()}>＋ Add a resource</button>} />
-    <section className="library-scope-tabs" aria-label="Resource library sections">{[
-      ["class", "For this class", selectedClass ? selectedClass.name : "Set up a class"], ["shared", "Shared library", "Visible to every signed-in teacher"], ["mine", "My resources", "Private and shared items you added"], ["saved", "Saved", `${savedResourceIds.length} saved by this account`],
-    ].map(([value, title, detail]) => <button className={scope === value ? "active" : ""} type="button" onClick={() => setScope(value as typeof scope)} key={value}><b>{title}</b><small>{detail}</small></button>)}</section>
-
-    {shareOpen && <form className="resource-share-form" onSubmit={shareResource}><header><div><p className="eyebrow">ADD TO THE LIBRARY</p><h2>Share something another teacher can use</h2></div><button type="button" aria-label="Close resource form" onClick={() => setShareOpen(false)}>×</button></header><div className="resource-share-fields"><label>Title<input required maxLength={200} value={shareTitle} onChange={(event) => setShareTitle(event.target.value)} placeholder="e.g. Local weather observation sheet" /></label><label>Subject<select value={shareSubject} onChange={(event) => setShareSubject(event.target.value)}>{[...commonSubjects, "General"].map((subject) => <option key={subject}>{subject}</option>)}</select></label><label>Grade levels<input value={shareGrades} onChange={(event) => setShareGrades(event.target.value)} placeholder="e.g. Grades 3–5" /></label><label>Type<select value={shareType} onChange={(event) => setShareType(event.target.value)}><option>Activity sheet</option><option>Lesson plan</option><option>Reading material</option><option>Activity cards</option><option>Teacher guide</option></select></label><label className="wide">What is it for?<textarea required value={shareDescription} onChange={(event) => setShareDescription(event.target.value)} placeholder="Explain what this helps teach and what materials are needed." /></label><label className="wide">Search tags<input value={shareTags} onChange={(event) => setShareTags(event.target.value)} placeholder="multigrade, no printer, local materials" /></label></div><footer><label>Who can see it?<select value={shareVisibility} onChange={(event) => setShareVisibility(event.target.value as "shared" | "private")}><option value="shared">All signed-in teachers</option><option value="private">Only me</option></select></label><button className="primary-button" type="submit" disabled={sharing}>{sharing ? "Adding…" : shareVisibility === "shared" ? "Share with teachers" : "Save privately"}</button></footer></form>}
-
-    <section className="library-search-panel"><div className="library-search-heading"><div><p className="eyebrow">SEARCH THIS LIBRARY</p><h2>What do you need?</h2></div>{scope === "class" && selectedClass ? <label>Match class<select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label> : scope === "class" && <button type="button" onClick={onSetUpClass}>Set up a class →</button>}</div><div className="library-search-row"><label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘Grade 3 fractions’ or ‘no printer science’" /></label><select aria-label="Filter resources by subject" value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)}><option>All subjects</option>{[...commonSubjects, "General"].map((subject) => <option key={subject}>{subject}</option>)}</select></div><p className="library-search-help"><b>Searches:</b> titles, subjects, grade levels, resource types, descriptions, tags, and teacher names. <b>Not yet:</b> words inside uploaded PDF or document files.</p></section>
-
-    <div className="library-summary"><p><strong>{libraryLoading ? "Refreshing the library…" : `${visible.length} ${visible.length === 1 ? "resource" : "resources"}`}</strong><span>{scope === "class" && selectedClass ? `Matched to ${gradeList(selectedClass.grades)} · ${selectedClass.subjects.join(", ")}` : scope === "mine" ? "Only resources added by this account" : scope === "saved" ? "Your saved list is private to this account" : "Catalog resources and materials shared by signed-in teachers"}</span></p></div>
+    <PageIntro eyebrow="TWO READY-TO-USE PDFS" title="Open it. Teach it. Improve it together." description="No empty resource cards: these two complete PDFs can be viewed, saved, shared, approved, and discussed by teachers." />
+    <section className="starter-library-toolbar"><div role="tablist" aria-label="Filter starter resources">{[["all", "Both resources"], ["Mathematics", "Mathematics"], ["Science", "Science"], ["saved", `Saved (${savedResourceIds.filter((id) => starterResources.some((resource) => resource.id === id)).length})`]].map(([value, label]) => <button role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} type="button" onClick={() => setFilter(value as typeof filter)} key={value}>{label}</button>)}</div>{activeClass ? <p><b>Teaching {activeClass.name}</b><span>{gradeList(activeClass.grades)} · {activeClass.subjects.join(", ")}</span></p> : <button type="button" onClick={onSetUpClass}>Set up a class for matching →</button>}</section>
     {libraryError && <p className="library-error" role="status">{libraryError}</p>}
-    <section className="resource-grid">
-      {visible.map((resource) => <article className="library-card" key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.type}</span></div><div className="library-body"><div className="library-badges">{resource.verified && <span className="verified">✓ Curated</span>}<span className={`resource-visibility ${resource.visibility}`}>{resource.visibility === "private" ? "Private · only you" : resource.visibility === "catalog" ? "Kalinga catalog" : "Shared with teachers"}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.subject}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="library-stats"><span>{resource.rating ? `★ ${resource.rating}` : resource.author}</span>{resource.saves !== undefined && <span>{resource.saves} saves</span>}<span>{resource.updatedLabel}</span></div><div className="library-actions"><button className="secondary-button" type="button" onClick={() => setPreviewResource(resource)}>See details</button><button className={savedResourceIds.includes(resource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => authenticated ? onToggleSaved(resource.id) : onRequestSignIn()}>{savedResourceIds.includes(resource.id) ? "✓ Saved" : "Save to my account"}</button></div></div></article>)}
+    {shareMessage && <p className="resource-share-message" role="status">{shareMessage}</p>}
+    <section className="resource-grid starter-resource-grid">
+      {visible.map((resource) => { const resourceApprovals = approvals.filter((approval) => approval.resourceId === resource.id); const resourceComments = comments.filter((comment) => comment.resourceId === resource.id); const approved = resourceApprovals.some((approval) => approval.teacherId === teacherAccountId); return <article className={`library-card starter-resource-card ${resource.subject.toLowerCase()}`} key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.subject}</span></div><div className="library-body"><div className="library-badges"><span className="verified">PDF · {resource.pages} pages</span><span>{resource.type}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.author}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="resource-social-proof"><span><b>{resourceApprovals.length}</b> teacher {resourceApprovals.length === 1 ? "approval" : "approvals"}</span><span><b>{resourceComments.length}</b> {resourceComments.length === 1 ? "comment" : "comments"}</span></div><div className="library-actions starter-resource-actions"><button className="dark-button" type="button" onClick={() => setPreviewResource(resource)}>Open PDF</button><button className={savedResourceIds.includes(resource.id) ? "saved-button" : "secondary-button"} type="button" onClick={() => authenticated ? onToggleSaved(resource.id) : onRequestSignIn()}>{savedResourceIds.includes(resource.id) ? "✓ Saved" : "Save"}</button><button className={approved ? "resource-approved-button" : "secondary-button"} type="button" onClick={() => toggleApproval(resource)}>{approved ? "✓ Approved" : "Approve"}</button><button className="secondary-button" type="button" onClick={() => shareResource(resource)}>Share</button></div></div></article>; })}
     </section>
-    {!libraryLoading && !visible.length && <div className="empty-state"><b>No resources match this view</b><p>{scope === "mine" ? "Add your first private or shared resource." : scope === "saved" ? "Save a resource and it will appear here for this account." : "Try a broader keyword, another subject, or the full shared library."}</p></div>}
-    {previewResource && <div className="resource-preview-backdrop"><article className="resource-preview" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><button type="button" aria-label="Close preview" onClick={() => setPreviewResource(undefined)}>×</button><span className="resource-preview-icon">{previewResource.icon}</span><p className="eyebrow">{previewResource.type} · {previewResource.subject}</p><h2 id="resource-preview-title">{previewResource.title}</h2><p>{previewResource.description}</p><dl><div><dt>For</dt><dd>{previewResource.grades}</dd></div><div><dt>Shared by</dt><dd>{previewResource.author}</dd></div><div><dt>Access</dt><dd>{previewResource.visibility === "private" ? "Only this account" : "All Kalinga teachers"}</dd></div></dl><button className={savedResourceIds.includes(previewResource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => authenticated ? onToggleSaved(previewResource.id) : onRequestSignIn()}>{savedResourceIds.includes(previewResource.id) ? "✓ Saved to my account" : "Save to my account"}</button></article></div>}
+    {!visible.length && <div className="empty-state"><b>No saved starter resources yet</b><p>Open Mathematics or Science, then save the PDF to this account.</p><button type="button" onClick={() => setFilter("all")}>Show both resources</button></div>}
+    <p className="resource-approval-note">Teacher approvals are community endorsements, not official curriculum verification. Review and adapt every resource for your class.</p>
+    {previewResource && <div className="resource-preview-backdrop"><section className="resource-reader" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><header><div><p className="eyebrow">{previewResource.subject} · PDF RESOURCE</p><h2 id="resource-preview-title">{previewResource.title}</h2></div><button type="button" aria-label="Close resource" onClick={() => { setPreviewResource(undefined); setCommentInput(""); }}>×</button></header><div className="resource-reader-layout"><div className="resource-pdf-panel"><iframe src={previewResource.pdfPath} title={`${previewResource.title} PDF`} /><a href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open PDF in a new tab ↗</a></div><aside className="resource-conversation"><div className="resource-reader-actions"><button className={savedResourceIds.includes(previewResource.id) ? "saved-button" : "secondary-button"} type="button" onClick={() => authenticated ? onToggleSaved(previewResource.id) : onRequestSignIn()}>{savedResourceIds.includes(previewResource.id) ? "✓ Saved" : "Save"}</button><button className={teacherApprovedPreview ? "resource-approved-button" : "secondary-button"} type="button" onClick={() => toggleApproval(previewResource)}>{teacherApprovedPreview ? "✓ Approved" : "Approve"} · {previewApprovals.length}</button><button className="secondary-button" type="button" onClick={() => shareResource(previewResource)}>Share</button></div><p className="resource-reader-description">{previewResource.description}</p><div className="resource-comments-heading"><b>Teacher comments</b><span>{previewComments.length}</span></div><div className="resource-comment-list">{previewComments.map((comment) => <article key={comment.id}><span className="avatar">{teacherInitials(comment.teacherName.replace(/^Teacher\s+/i, ""))}</span><p><b>{comment.teacherName} <small>{communityTime(comment.createdAt)}</small></b>{comment.body}</p></article>)}{!previewComments.length && <p>No comments yet. Add what worked, what you changed, or a question for other teachers.</p>}</div>{authenticated ? <form className="resource-comment-form" onSubmit={submitComment}><label className="sr-only" htmlFor="resource-comment">Comment on this resource</label><textarea id="resource-comment" maxLength={1500} value={commentInput} onChange={(event) => setCommentInput(event.target.value)} placeholder="What worked? What would you change?" /><button type="submit" disabled={!commentInput.trim() || submitting}>{submitting ? "Posting…" : "Comment"}</button><small>Do not include learner names or private records.</small></form> : <button className="resource-signin-comment" type="button" onClick={onRequestSignIn}>Sign in to approve, save, and comment</button>}</aside></div></section></div>}
   </div>;
 }
 
