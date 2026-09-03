@@ -993,7 +993,7 @@ export default function Home() {
             <button className="language" type="button">ENG / FIL</button>
             <button className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
             <div className="notification-anchor">
-              <button className={`notification ${unreadNotifications.length ? "has-unread" : ""}`} type="button" aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ""}`} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><span aria-hidden="true">♢</span>{unreadNotifications.length > 0 && <b>{Math.min(unreadNotifications.length, 9)}</b>}</button>
+              <button className={`notification ${unreadNotifications.length ? "has-unread" : ""}`} type="button" aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ""}`} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><BellIcon />{unreadNotifications.length > 0 && <b>{Math.min(unreadNotifications.length, 9)}</b>}</button>
               {notificationsOpen && <NotificationPanel notifications={notifications} readIds={notificationReadIds} authenticated={entryMode === "authenticated"} onOpen={openNotification} onMarkAll={() => markNotificationsRead(unreadNotifications.map((item) => item.id))} />}
             </div>
             <div className="account-anchor mobile-account">
@@ -1167,11 +1167,16 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
   );
 }
 
+function BellIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+    <path d="M10 21h4" />
+  </svg>;
+}
+
 function GabayMascot({ size = "medium", motion = true, speaking = false }: { size?: "small" | "medium" | "large" | "hero" | "companion"; motion?: boolean; speaking?: boolean }) {
   return <span className={`gabay-mascot gabay-mascot-${size} ${motion ? "" : "motion-paused"} ${speaking ? "is-speaking" : ""}`} aria-hidden="true">
     <svg viewBox="0 0 96 96" role="img">
-      <g className="gabay-rays"><path d="M48 5v7M32 10l3 6M64 10l-3 6" /></g>
-      <circle className="gabay-halo" cx="48" cy="31" r="20" />
       <path className="gabay-arm gabay-arm-left" d="M28 57c-8 2-12 8-13 14" />
       <path className="gabay-arm gabay-arm-right" d="M68 57c9-1 13-7 15-13" />
       <path className="gabay-body" d="M22 55c0-17 11-28 26-28s26 11 26 28v18c0 8-7 14-15 14H37c-8 0-15-6-15-14z" />
@@ -1179,7 +1184,6 @@ function GabayMascot({ size = "medium", motion = true, speaking = false }: { siz
       <g className="gabay-eyes"><circle cx="41" cy="49" r="2.4" /><circle cx="55" cy="49" r="2.4" /></g>
       <path className="gabay-smile" d="M41 57c4 4 10 4 14 0" />
       <path className="gabay-cape" d="M31 69c5 4 11 6 17 6s12-2 17-6v9c-5 4-11 6-17 6s-12-2-17-6z" />
-      <circle className="gabay-spark" cx="75" cy="25" r="4" />
     </svg>
   </span>;
 }
