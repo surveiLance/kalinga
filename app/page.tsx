@@ -133,7 +133,7 @@ type RemoteAttendanceRow = {
 type TeacherWorkspace = {
   classes: TeachingClass[];
   plans: SavedPlan[];
-  savedResourceIds: number[];
+  savedResourceIds: string[];
   attendance: Record<string, Record<string, string>>;
   attendanceNotes: Record<string, Record<string, string>>;
 };
@@ -164,6 +164,11 @@ const legacyWorkspaceKeys: Record<WorkspaceStorageKey, string> = {
 
 function workspaceStorageKey(scope: string, key: WorkspaceStorageKey) {
   return `kalinga:${scope}:${key}`;
+}
+
+function normalizeResourceBookmarkId(value: string | number) {
+  const id = String(value);
+  return /^\d+$/.test(id) ? `catalog-${id}` : id;
 }
 
 function migrateLegacyPrototypeWorkspace() {
@@ -382,7 +387,7 @@ async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string)
     attendance[key] = { ...(attendance[key] || {}), [row.learner_id]: row.status };
     if (row.note) attendanceNotes[key] = { ...(attendanceNotes[key] || {}), [row.learner_id]: row.note };
   }
-  const savedResourceIds = (resourceBookmarkResult.data || []).map((bookmark) => Number(bookmark.resource_id)).filter(Number.isFinite);
+  const savedResourceIds = (resourceBookmarkResult.data || []).map((bookmark) => normalizeResourceBookmarkId(bookmark.resource_id)).filter(Boolean);
   return { classes, plans, savedResourceIds, attendance, attendanceNotes };
 }
 
@@ -515,7 +520,7 @@ export default function Home() {
   const [classes, setClasses] = useState<TeachingClass[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
-  const [savedResourceIds, setSavedResourceIds] = useState<number[]>([]);
+  const [savedResourceIds, setSavedResourceIds] = useState<string[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, Record<string, string>>>({});
   const [attendanceNotes, setAttendanceNotes] = useState<Record<string, Record<string, string>>>({});
   const [editingPlanId, setEditingPlanId] = useState("");
@@ -603,7 +608,7 @@ export default function Home() {
           setActiveClassId(storedActiveClass || parsed[0]?.id || "");
         }
         if (storedPlans) setSavedPlans((JSON.parse(storedPlans) as LegacySavedPlan[]).map(normalizeSavedPlan));
-        if (storedResources) setSavedResourceIds(JSON.parse(storedResources) as number[]);
+        if (storedResources) setSavedResourceIds((JSON.parse(storedResources) as Array<string | number>).map(normalizeResourceBookmarkId));
         if (storedAttendance) setAttendanceRecords(JSON.parse(storedAttendance) as Record<string, Record<string, string>>);
         if (storedAttendanceNotes) setAttendanceNotes(JSON.parse(storedAttendanceNotes) as Record<string, Record<string, string>>);
         if (workspaceScope === "prototype" && storedTeacherName) setTeacherName(storedTeacherName);
@@ -812,7 +817,7 @@ export default function Home() {
     }
   }
 
-  function toggleSavedResource(resourceId: number) {
+  function toggleSavedResource(resourceId: string) {
     const willSave = !savedResourceIds.includes(resourceId);
     setSavedResourceIds((current) => current.includes(resourceId) ? current.filter((id) => id !== resourceId) : [...current, resourceId]);
     setGabayEventMessage(willSave ? "Resource saved on this device. Available na ito for your offline preparation." : "Removed na ang resource sa offline saves mo.");
@@ -868,7 +873,7 @@ export default function Home() {
 
         <div className="offline-card">
           <span className="status-dot" />
-          <div><strong>Offline-ready</strong><small>12 resources saved</small></div>
+          <div><strong>Offline-ready</strong><small>{savedResourceIds.length} {savedResourceIds.length === 1 ? "resource" : "resources"} saved</small></div>
         </div>
 
         <div className="account-anchor desktop-account">
@@ -911,7 +916,7 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView onGabayContext={setGabayLiveContext} />}
+          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
@@ -1133,6 +1138,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [connectionIssue, setConnectionIssue] = useState(false);
+  const [conversationDeleteError, setConversationDeleteError] = useState("");
   const [readyContextSignature, setReadyContextSignature] = useState("");
   const chatInputId = useId();
 
@@ -1208,7 +1214,10 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
         setHydratedChatAccountId(teacherAccountId);
       });
       const deletedIds = readStoredStringArray(deletedChatIdsKey);
-      if (deletedIds.length) void supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).in("id", deletedIds);
+      if (deletedIds.length) void (async () => {
+        await supabase.from("gabay_messages").delete().eq("teacher_id", teacherAccountId).in("conversation_id", deletedIds);
+        await supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).in("id", deletedIds);
+      })();
     }
     return () => {
       active = false;
@@ -1310,6 +1319,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     setActiveConversationId("");
     setChatInput("");
     setConnectionIssue(false);
+    setConversationDeleteError("");
     setConversationMenuOpen(false);
   }
 
@@ -1317,25 +1327,48 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     setActiveConversationId(conversationId);
     setConversationMenuOpen(false);
     setConnectionIssue(false);
+    setConversationDeleteError("");
   }
 
-  async function clearCurrentConversation() {
-    if (!activeConversationId) return;
-    const conversationId = activeConversationId;
-    const deletedIds = [...new Set([...readStoredStringArray(deletedChatIdsKey), conversationId])];
+  async function deleteConversations(conversationIds: string[]) {
+    if (!conversationIds.length) return;
+    const deletedIds = [...new Set([...readStoredStringArray(deletedChatIdsKey), ...conversationIds])];
     if (deletedChatIdsKey) window.localStorage.setItem(deletedChatIdsKey, JSON.stringify(deletedIds));
-    const remaining = conversations.filter((conversation) => conversation.id !== conversationId);
+    const remaining = conversations.filter((conversation) => !conversationIds.includes(conversation.id));
     setConversations(remaining);
     setActiveConversationId(remaining[0]?.id || "");
     setConversationMenuOpen(false);
+    setConversationDeleteError("");
     const supabase = getSupabaseBrowserClient();
-    if (supabase && teacherAccountId) await supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).eq("id", conversationId);
+    if (!supabase || !teacherAccountId) return;
+    const messageResult = await supabase.from("gabay_messages").delete().eq("teacher_id", teacherAccountId).in("conversation_id", conversationIds);
+    const conversationResult = await supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).in("id", conversationIds);
+    if (messageResult.error || conversationResult.error) setConversationDeleteError("Removed here, but cloud cleanup is waiting for a connection.");
+  }
+
+  async function clearCurrentConversation() {
+    if (activeConversationId) await deleteConversations([activeConversationId]);
+  }
+
+  async function clearAllConversations() {
+    const conversationIds = conversations.map((conversation) => conversation.id);
+    const deletedIds = [...new Set([...readStoredStringArray(deletedChatIdsKey), ...conversationIds])];
+    if (deletedChatIdsKey) window.localStorage.setItem(deletedChatIdsKey, JSON.stringify(deletedIds));
+    setConversations([]);
+    setActiveConversationId("");
+    setConversationMenuOpen(false);
+    setConversationDeleteError("");
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !teacherAccountId) return;
+    const messageResult = await supabase.from("gabay_messages").delete().eq("teacher_id", teacherAccountId);
+    const conversationResult = await supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId);
+    if (messageResult.error || conversationResult.error) setConversationDeleteError("Removed here, but cloud cleanup is waiting for a connection.");
   }
 
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
     <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? isReplying ? "Thinking with your page context…" : contextReady ? `${gabayPageLabels[view]} context ready` : "Reading this page…" : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
     {authenticated && <div className={`gabay-context-status ${contextReady ? "ready" : "loading"}`} role="status" aria-live="polite"><i />{contextReady ? `Ready to help with ${pageContext.pageStep || gabayPageLabels[view]}` : "Loading the current page context…"}</div>}
-    {conversationMenuOpen && <div className="gabay-conversation-menu"><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 6).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Clear current chat</button>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
+    {conversationMenuOpen && <div className="gabay-conversation-menu"><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 12).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}<div className="gabay-delete-actions">{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Delete this conversation</button>}{conversations.length > 1 && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearAllConversations}>Delete all conversations</button>}</div>{conversationDeleteError && <p className="gabay-delete-error">{conversationDeleteError}</p>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
     <div className="gabay-chat-body">
       {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{isReplying && <div className="gabay"><p>Sandali, teacher…</p></div>}</div>}
     </div>
@@ -1935,45 +1968,160 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   );
 }
 
-const resources = [
-  { id: 1, icon: "½", title: "Fractions using local objects", type: "Activity sheet", grades: "Grades 3–5", subject: "Mathematics", tags: ["Multigrade", "No printer", "Manobo"], rating: "4.8", saves: 132, verified: true },
-  { id: 2, icon: "Aa", title: "Stories from our community", type: "Reading material", grades: "Grades 2–4", subject: "English", tags: ["Low connectivity", "Indigenous context"], rating: "4.7", saves: 98, verified: true },
-  { id: 3, icon: "☘", title: "Plants around our school", type: "Lesson plan", grades: "Grades 4–6", subject: "Science", tags: ["Outdoor", "Multigrade"], rating: "4.6", saves: 76, verified: false },
-  { id: 4, icon: "123", title: "Number drills with bottle caps", type: "Activity cards", grades: "Grades 1–3", subject: "Mathematics", tags: ["No printer", "Limited materials"], rating: "4.9", saves: 164, verified: true },
+type LibraryResource = {
+  id: string;
+  ownerId?: string;
+  icon: string;
+  title: string;
+  type: string;
+  grades: string;
+  subject: string;
+  tags: string[];
+  description: string;
+  author: string;
+  visibility: "catalog" | "private" | "shared";
+  rating?: string;
+  saves?: number;
+  verified?: boolean;
+  updatedLabel: string;
+};
+
+const catalogResources: LibraryResource[] = [
+  { id: "catalog-1", icon: "½", title: "Fractions using local objects", type: "Activity sheet", grades: "Grades 3–5", subject: "Mathematics", tags: ["Multigrade", "No printer", "Local objects"], description: "A hands-on fraction activity using bottle caps, seeds, or other objects already in the classroom.", author: "Kalinga Library", visibility: "catalog", rating: "4.8", saves: 132, verified: true, updatedLabel: "Curated resource" },
+  { id: "catalog-2", icon: "Aa", title: "Stories from our community", type: "Reading material", grades: "Grades 2–4", subject: "English", tags: ["Low connectivity", "Local context"], description: "Short reading prompts that invite learners to connect a text with people and places in their community.", author: "Kalinga Library", visibility: "catalog", rating: "4.7", saves: 98, verified: true, updatedLabel: "Curated resource" },
+  { id: "catalog-3", icon: "☘", title: "Plants around our school", type: "Lesson plan", grades: "Grades 4–6", subject: "Science", tags: ["Outdoor", "Multigrade"], description: "A simple observation walk and comparison activity for classrooms with limited science materials.", author: "Kalinga Library", visibility: "catalog", rating: "4.6", saves: 76, updatedLabel: "Curated resource" },
+  { id: "catalog-4", icon: "123", title: "Number drills with bottle caps", type: "Activity cards", grades: "Grades 1–3", subject: "Mathematics", tags: ["No printer", "Limited materials"], description: "Quick number-sense routines teachers can adjust for several grade groups at once.", author: "Kalinga Library", visibility: "catalog", rating: "4.9", saves: 164, verified: true, updatedLabel: "Curated resource" },
 ];
 
-function LibraryView({ classes, activeClassId, savedResourceIds, onToggleSaved, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; savedResourceIds: number[]; onToggleSaved: (id: number) => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+async function readCloudResources(supabase: SupabaseClient): Promise<LibraryResource[]> {
+  const { data, error } = await supabase.from("resources").select("id,owner_id,title,visibility,metadata,updated_at").order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map((row): LibraryResource => {
+    const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {};
+    return {
+      id: String(row.id), ownerId: String(row.owner_id), title: String(row.title),
+      icon: typeof metadata.icon === "string" ? metadata.icon : "▤",
+      type: typeof metadata.type === "string" ? metadata.type : "Teacher resource",
+      grades: typeof metadata.grades === "string" ? metadata.grades : "Grade levels not set",
+      subject: typeof metadata.subject === "string" ? metadata.subject : "General",
+      tags: Array.isArray(metadata.tags) ? metadata.tags.filter((tag): tag is string => typeof tag === "string") : [],
+      description: typeof metadata.description === "string" ? metadata.description : "Shared by a Kalinga teacher.",
+      author: typeof metadata.authorName === "string" ? metadata.authorName : "Kalinga teacher",
+      visibility: row.visibility === "private" ? "private" : "shared",
+      updatedLabel: `Updated ${new Date(String(row.updated_at)).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}`,
+    };
+  });
+}
+
+function LibraryView({ classes, activeClassId, savedResourceIds, authenticated, teacherAccountId, teacherName, onToggleSaved, onSetUpClass, onRequestSignIn, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; savedResourceIds: string[]; authenticated: boolean; teacherAccountId: string; teacherName: string; onToggleSaved: (id: string) => void; onSetUpClass: () => void; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All resources");
+  const [scope, setScope] = useState<"class" | "shared" | "mine" | "saved">("class");
+  const [subjectFilter, setSubjectFilter] = useState("All subjects");
   const [selectedClassId, setSelectedClassId] = useState(activeClassId || classes[0]?.id || "");
+  const [cloudResources, setCloudResources] = useState<LibraryResource[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(authenticated);
+  const [libraryError, setLibraryError] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareTitle, setShareTitle] = useState("");
+  const [shareSubject, setShareSubject] = useState("Mathematics");
+  const [shareGrades, setShareGrades] = useState("");
+  const [shareType, setShareType] = useState("Activity sheet");
+  const [shareTags, setShareTags] = useState("");
+  const [shareDescription, setShareDescription] = useState("");
+  const [shareVisibility, setShareVisibility] = useState<"shared" | "private">("shared");
+  const [sharing, setSharing] = useState(false);
+  const [previewResource, setPreviewResource] = useState<LibraryResource>();
   const selectedClass = classes.find((item) => item.id === selectedClassId);
-  const visible = resources.filter((resource) => `${resource.title} ${resource.subject} ${resource.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase()) && (filter === "All resources" || filter === "Saved on device" ? filter !== "Saved on device" || savedResourceIds.includes(resource.id) : resource.subject === filter));
-  const visibleResourceSummary = visible.map((resource) => `${resource.title} (${resource.subject}, ${resource.grades})`).join("; ");
+
+  async function loadCloudResources() {
+    if (!authenticated || !teacherAccountId) {
+      setCloudResources([]);
+      setLibraryLoading(false);
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setLibraryLoading(true);
+    try {
+      const mapped = await readCloudResources(supabase);
+      setCloudResources(mapped);
+      setLibraryError("");
+    } catch {
+      setLibraryError("The shared library could not refresh. Your saved catalog is still available.");
+    }
+    setLibraryLoading(false);
+  }
+
+  useEffect(() => {
+    if (!authenticated || !teacherAccountId) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let active = true;
+    void readCloudResources(supabase).then((items) => {
+      if (!active) return;
+      setCloudResources(items); setLibraryError(""); setLibraryLoading(false);
+    }).catch(() => {
+      if (!active) return;
+      setLibraryError("The shared library could not refresh. Your saved catalog is still available."); setLibraryLoading(false);
+    });
+    return () => { active = false; };
+  }, [authenticated, teacherAccountId]);
+
+  const allResources = [...cloudResources, ...catalogResources];
+  const searchableQuery = query.trim().toLowerCase();
+  const visible = allResources.filter((resource) => {
+    const matchesQuery = !searchableQuery || `${resource.title} ${resource.subject} ${resource.grades} ${resource.type} ${resource.description} ${resource.author} ${resource.tags.join(" ")}`.toLowerCase().includes(searchableQuery);
+    const matchesSubject = subjectFilter === "All subjects" || resource.subject === subjectFilter;
+    const matchesScope = scope === "shared" ? resource.visibility !== "private"
+      : scope === "mine" ? resource.ownerId === teacherAccountId
+        : scope === "saved" ? savedResourceIds.includes(resource.id)
+          : !selectedClass || resource.subject === "General" || selectedClass.subjects.includes(resource.subject) || resource.tags.some((tag) => tag.toLowerCase() === "multigrade");
+    return matchesQuery && matchesSubject && matchesScope;
+  });
+  const visibleResourceSummary = visible.slice(0, 5).map((resource) => `${resource.title} (${resource.subject}, ${resource.grades})`).join("; ");
 
   useEffect(() => {
     onGabayContext({
-      view: "library",
-      pageStep: "Browse teacher resources",
-      classId: selectedClass?.id,
-      className: selectedClass?.name,
-      gradeLevels: selectedClass?.grades || [],
-      subjects: selectedClass?.subjects || [],
-      learnerCount: selectedClass?.learners.length || 0,
-      currentSummary: [`Search: ${query || "none"}`, `Filter: ${filter}`, `${savedResourceIds.length} resources saved`, `${visible.length} resources currently shown`, visibleResourceSummary ? `Visible matches: ${visibleResourceSummary}` : "No resources match the current search"],
-      availableActions: ["Search resources", "Filter by subject", "Save a visible resource", "Share a resource"],
+      view: "library", pageStep: "Search the teacher resource library", classId: selectedClass?.id, className: selectedClass?.name,
+      gradeLevels: selectedClass?.grades || [], subjects: selectedClass?.subjects || [], learnerCount: selectedClass?.learners.length || 0,
+      currentSummary: [`Search: ${query || "none"}`, `Library section: ${scope}`, `Subject: ${subjectFilter}`, `${savedResourceIds.length} resources saved by this account`, `${visible.length} resources currently shown`, visibleResourceSummary ? `Visible matches: ${visibleResourceSummary}` : "No resources match the current search"],
+      availableActions: ["Suggest a search phrase", "Explain a visible resource", "Help share a teacher resource", "Match a resource to the active class"],
     });
-  }, [filter, onGabayContext, query, savedResourceIds.length, selectedClass, visible.length, visibleResourceSummary]);
+  }, [onGabayContext, query, savedResourceIds.length, scope, selectedClass, subjectFilter, visible.length, visibleResourceSummary]);
 
-  return <div className="view-page">
-    <PageIntro eyebrow="SHARED LIBRARY" title="Resources made by teachers" description="Find materials that fit your grades, competencies, and classroom context." action={<button className="primary-button" type="button">↑ Share a resource</button>} />
-    <section className="library-context"><div><p className="eyebrow">RECOMMENDATIONS FOR</p>{selectedClass ? <label><select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select><span>{gradeList(selectedClass.grades)} · {selectedClass.subjects.join(", ")}</span></label> : <div className="library-no-class"><span>Add a class to receive relevant recommendations.</span><button type="button" onClick={onSetUpClass}>Set up class →</button></div>}</div><p><b>{savedResourceIds.length}</b><span>saved on this device</span></p></section>
-    <aside className="prototype-disclosure"><span>i</span><p><b>Prototype offline behavior</b> Your saved selection persists on this device. The production app would also cache the actual files so they open without a connection.</p></aside>
-    <section className="library-tools"><label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by lesson, competency, keyword, or author" /></label><div className="filter-row">{["All resources", "Saved on device", "Mathematics", "Science", "English"].map((item) => <button className={filter === item ? "active" : ""} type="button" onClick={() => setFilter(item)} key={item}>{item}</button>)}</div><button className="filter-button" type="button">☷ More filters <span>3</span></button></section>
-    <div className="library-summary"><p><strong>{visible.length} {filter === "Saved on device" ? "saved" : "recommended"} resources</strong><span>{selectedClass ? `Matched to ${gradeList(selectedClass.grades)} · ${selectedClass.subjects.join(", ")} · Agusan del Sur` : "Browse the shared teacher repository"}</span></p><select aria-label="Sort resources"><option>Most relevant</option><option>Highest rated</option><option>Most saved</option></select></div>
+  async function shareResource(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !shareTitle.trim() || !shareDescription.trim()) return;
+    setSharing(true);
+    const { error } = await supabase.from("resources").insert({
+      owner_id: teacherAccountId, title: shareTitle.trim(), visibility: shareVisibility,
+      metadata: { icon: "▤", type: shareType, grades: shareGrades.trim() || "Grade levels not set", subject: shareSubject, tags: shareTags.split(",").map((tag) => tag.trim()).filter(Boolean), description: shareDescription.trim(), authorName: teacherLabel(teacherName) },
+    });
+    setSharing(false);
+    if (error) { setLibraryError("That resource could not be shared yet. Please check your connection and try again."); return; }
+    setShareTitle(""); setShareGrades(""); setShareTags(""); setShareDescription(""); setShareOpen(false); setScope("mine");
+    await loadCloudResources();
+  }
+
+  return <div className="view-page resource-library-page">
+    <PageIntro eyebrow="TEACHER RESOURCE LIBRARY" title="Find something you can teach with" description="Search shared materials, keep private drafts, and save useful resources to your own account." action={<button className="primary-button" type="button" onClick={() => authenticated ? setShareOpen((open) => !open) : onRequestSignIn()}>＋ Add a resource</button>} />
+    <section className="library-scope-tabs" aria-label="Resource library sections">{[
+      ["class", "For this class", selectedClass ? selectedClass.name : "Set up a class"], ["shared", "Shared library", "Visible to every signed-in teacher"], ["mine", "My resources", "Private and shared items you added"], ["saved", "Saved", `${savedResourceIds.length} saved by this account`],
+    ].map(([value, title, detail]) => <button className={scope === value ? "active" : ""} type="button" onClick={() => setScope(value as typeof scope)} key={value}><b>{title}</b><small>{detail}</small></button>)}</section>
+
+    {shareOpen && <form className="resource-share-form" onSubmit={shareResource}><header><div><p className="eyebrow">ADD TO THE LIBRARY</p><h2>Share something another teacher can use</h2></div><button type="button" aria-label="Close resource form" onClick={() => setShareOpen(false)}>×</button></header><div className="resource-share-fields"><label>Title<input required maxLength={200} value={shareTitle} onChange={(event) => setShareTitle(event.target.value)} placeholder="e.g. Local weather observation sheet" /></label><label>Subject<select value={shareSubject} onChange={(event) => setShareSubject(event.target.value)}>{[...commonSubjects, "General"].map((subject) => <option key={subject}>{subject}</option>)}</select></label><label>Grade levels<input value={shareGrades} onChange={(event) => setShareGrades(event.target.value)} placeholder="e.g. Grades 3–5" /></label><label>Type<select value={shareType} onChange={(event) => setShareType(event.target.value)}><option>Activity sheet</option><option>Lesson plan</option><option>Reading material</option><option>Activity cards</option><option>Teacher guide</option></select></label><label className="wide">What is it for?<textarea required value={shareDescription} onChange={(event) => setShareDescription(event.target.value)} placeholder="Explain what this helps teach and what materials are needed." /></label><label className="wide">Search tags<input value={shareTags} onChange={(event) => setShareTags(event.target.value)} placeholder="multigrade, no printer, local materials" /></label></div><footer><label>Who can see it?<select value={shareVisibility} onChange={(event) => setShareVisibility(event.target.value as "shared" | "private")}><option value="shared">All signed-in teachers</option><option value="private">Only me</option></select></label><button className="primary-button" type="submit" disabled={sharing}>{sharing ? "Adding…" : shareVisibility === "shared" ? "Share with teachers" : "Save privately"}</button></footer></form>}
+
+    <section className="library-search-panel"><div className="library-search-heading"><div><p className="eyebrow">SEARCH THIS LIBRARY</p><h2>What do you need?</h2></div>{scope === "class" && selectedClass ? <label>Match class<select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label> : scope === "class" && <button type="button" onClick={onSetUpClass}>Set up a class →</button>}</div><div className="library-search-row"><label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘Grade 3 fractions’ or ‘no printer science’" /></label><select aria-label="Filter resources by subject" value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)}><option>All subjects</option>{[...commonSubjects, "General"].map((subject) => <option key={subject}>{subject}</option>)}</select></div><p className="library-search-help"><b>Searches:</b> titles, subjects, grade levels, resource types, descriptions, tags, and teacher names. <b>Not yet:</b> words inside uploaded PDF or document files.</p></section>
+
+    <div className="library-summary"><p><strong>{libraryLoading ? "Refreshing the library…" : `${visible.length} ${visible.length === 1 ? "resource" : "resources"}`}</strong><span>{scope === "class" && selectedClass ? `Matched to ${gradeList(selectedClass.grades)} · ${selectedClass.subjects.join(", ")}` : scope === "mine" ? "Only resources added by this account" : scope === "saved" ? "Your saved list is private to this account" : "Catalog resources and materials shared by signed-in teachers"}</span></p></div>
+    {libraryError && <p className="library-error" role="status">{libraryError}</p>}
     <section className="resource-grid">
-      {visible.map((resource) => <article className="library-card" key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.type}</span></div><div className="library-body"><div className="library-badges">{resource.verified && <span className="verified">✓ Verified</span>}<span>Shared by Teacher Lina</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.subject}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="library-stats"><span>★ {resource.rating}</span><span>{resource.saves} saves</span><span>Updated 2 days ago</span></div><div className="library-actions"><button className="secondary-button" type="button">Preview</button><button className={savedResourceIds.includes(resource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => onToggleSaved(resource.id)}>{savedResourceIds.includes(resource.id) ? "✓ Saved on device" : "Save to device"}</button></div></div></article>)}
+      {visible.map((resource) => <article className="library-card" key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.type}</span></div><div className="library-body"><div className="library-badges">{resource.verified && <span className="verified">✓ Curated</span>}<span className={`resource-visibility ${resource.visibility}`}>{resource.visibility === "private" ? "Private · only you" : resource.visibility === "catalog" ? "Kalinga catalog" : "Shared with teachers"}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.subject}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="library-stats"><span>{resource.rating ? `★ ${resource.rating}` : resource.author}</span>{resource.saves !== undefined && <span>{resource.saves} saves</span>}<span>{resource.updatedLabel}</span></div><div className="library-actions"><button className="secondary-button" type="button" onClick={() => setPreviewResource(resource)}>See details</button><button className={savedResourceIds.includes(resource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => authenticated ? onToggleSaved(resource.id) : onRequestSignIn()}>{savedResourceIds.includes(resource.id) ? "✓ Saved" : "Save to my account"}</button></div></div></article>)}
     </section>
-    {!visible.length && <div className="empty-state"><b>No matching resources yet</b><p>Try a broader keyword or clear one of your filters.</p></div>}
+    {!libraryLoading && !visible.length && <div className="empty-state"><b>No resources match this view</b><p>{scope === "mine" ? "Add your first private or shared resource." : scope === "saved" ? "Save a resource and it will appear here for this account." : "Try a broader keyword, another subject, or the full shared library."}</p></div>}
+    {previewResource && <div className="resource-preview-backdrop"><article className="resource-preview" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><button type="button" aria-label="Close preview" onClick={() => setPreviewResource(undefined)}>×</button><span className="resource-preview-icon">{previewResource.icon}</span><p className="eyebrow">{previewResource.type} · {previewResource.subject}</p><h2 id="resource-preview-title">{previewResource.title}</h2><p>{previewResource.description}</p><dl><div><dt>For</dt><dd>{previewResource.grades}</dd></div><div><dt>Shared by</dt><dd>{previewResource.author}</dd></div><div><dt>Access</dt><dd>{previewResource.visibility === "private" ? "Only this account" : "All Kalinga teachers"}</dd></div></dl><button className={savedResourceIds.includes(previewResource.id) ? "saved-button" : "dark-button"} type="button" onClick={() => authenticated ? onToggleSaved(previewResource.id) : onRequestSignIn()}>{savedResourceIds.includes(previewResource.id) ? "✓ Saved to my account" : "Save to my account"}</button></article></div>}
   </div>;
 }
 
@@ -2089,22 +2237,101 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
   </div>;
 }
 
-function CommunityView({ onGabayContext }: { onGabayContext: (context: GabayLiveContext) => void }) {
-  const [tab, setTab] = useState("Questions");
+type TeacherDiscussion = { id: string; authorId: string; authorName: string; schoolName: string; title: string; body: string; subject: string; gradeLevels: string[]; createdAt: string };
+type TeacherReply = { id: string; discussionId: string; authorId: string; authorName: string; body: string; createdAt: string };
+
+function communityTime(value: string) {
+  const elapsed = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(0, Math.floor(elapsed / 60_000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+}
+
+function CommunityView({ authenticated, teacherAccountId, teacherName, onRequestSignIn, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+  const [tab, setTab] = useState<"all" | "mine">("all");
+  const [discussions, setDiscussions] = useState<TeacherDiscussion[]>([]);
+  const [replies, setReplies] = useState<TeacherReply[]>([]);
+  const [selectedDiscussionId, setSelectedDiscussionId] = useState("");
+  const [loading, setLoading] = useState(authenticated);
+  const [communityError, setCommunityError] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [questionTitle, setQuestionTitle] = useState("");
+  const [questionBody, setQuestionBody] = useState("");
+  const [questionSubject, setQuestionSubject] = useState("General");
+  const [questionGrades, setQuestionGrades] = useState("");
   const [reply, setReply] = useState("");
-  const [replies, setReplies] = useState(["Try picture cards first, then let Grade 4 explain the written directions to their group."]);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!authenticated || !teacherAccountId) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let active = true;
+    async function refresh() {
+      const [discussionResult, replyResult] = await Promise.all([
+        supabase!.from("teacher_discussions").select("id,author_id,author_name,school_name,title,body,subject,grade_levels,created_at").order("created_at", { ascending: false }).limit(80),
+        supabase!.from("teacher_replies").select("id,discussion_id,author_id,author_name,body,created_at").order("created_at").limit(500),
+      ]);
+      if (!active) return;
+      if (discussionResult.error || replyResult.error) { setCommunityError("The teacher room could not refresh. Please check your connection."); setLoading(false); return; }
+      const nextDiscussions = (discussionResult.data || []).map((row): TeacherDiscussion => ({ id: String(row.id), authorId: String(row.author_id), authorName: String(row.author_name), schoolName: row.school_name ? String(row.school_name) : "", title: String(row.title), body: String(row.body), subject: row.subject ? String(row.subject) : "General", gradeLevels: Array.isArray(row.grade_levels) ? row.grade_levels.map(String) : [], createdAt: String(row.created_at) }));
+      const nextReplies = (replyResult.data || []).map((row): TeacherReply => ({ id: String(row.id), discussionId: String(row.discussion_id), authorId: String(row.author_id), authorName: String(row.author_name), body: String(row.body), createdAt: String(row.created_at) }));
+      setDiscussions(nextDiscussions); setReplies(nextReplies); setSelectedDiscussionId((current) => nextDiscussions.some((item) => item.id === current) ? current : nextDiscussions[0]?.id || ""); setCommunityError(""); setLoading(false);
+    }
+    void refresh();
+    const channel = supabase.channel(`teacher-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "teacher_discussions" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "teacher_replies" }, () => { void refresh(); }).subscribe();
+    return () => { active = false; void supabase.removeChannel(channel); };
+  }, [authenticated, teacherAccountId]);
+
+  const visibleDiscussions = tab === "mine" ? discussions.filter((item) => item.authorId === teacherAccountId) : discussions;
+  const selectedDiscussion = visibleDiscussions.find((item) => item.id === selectedDiscussionId) || visibleDiscussions[0];
+  const selectedReplies = replies.filter((item) => item.discussionId === selectedDiscussion?.id);
+
   useEffect(() => {
     onGabayContext({
-      view: "community",
-      pageStep: `${tab} tab`,
-      gradeLevels: [],
-      currentSummary: [`Viewing the ${tab} community feed`, `${replies.length} replies in the open discussion`, reply.trim() ? "A reply is being drafted" : "No reply is being drafted"],
-      availableActions: ["Start a discussion", "Improve the wording of a question", "Draft a helpful reply", "Review community guidelines"],
+      view: "community", pageStep: selectedDiscussion ? "Read and reply to a teacher discussion" : "Teacher discussion room", gradeLevels: selectedDiscussion?.gradeLevels || [], subjects: selectedDiscussion?.subject ? [selectedDiscussion.subject] : [],
+      currentSummary: [`Viewing ${tab === "mine" ? "questions from this account" : "all teacher questions"}`, `${visibleDiscussions.length} discussions visible`, selectedDiscussion ? `Open discussion: ${selectedDiscussion.title}` : "No discussion is open", `${selectedReplies.length} replies in the open discussion`, reply.trim() ? "A reply is being drafted" : "No reply is being drafted"],
+      availableActions: ["Help write a clear teacher question", "Draft a constructive reply", "Summarize the open discussion", "Suggest useful teaching context to include"],
     });
-  }, [onGabayContext, replies.length, reply, tab]);
-  function submitReply() { if (reply.trim()) { setReplies((items) => [...items, reply.trim()]); setReply(""); } }
-  return <div className="view-page"><PageIntro eyebrow="TEACHER COMMUNITY" title="Ask, review, and improve together" description="Conversations stay connected to the resources teachers are using." action={<button className="primary-button" type="button">＋ Start a discussion</button>} />
-    <div className="community-tabs">{["Questions", "Reviews", "My division"].map((item) => <button className={tab === item ? "active" : ""} type="button" onClick={() => setTab(item)} key={item}>{item}</button>)}</div>
-    <section className="discussion-layout"><article className="discussion-card"><header><span className="avatar">TL</span><div><strong>Teacher Lina</strong><small>Agusan del Sur · 2h</small></div><span className="pill orange">MULTIGRADE</span></header><h2>How can I adapt this activity for Grades 2–3?</h2><p>My Grade 2 learners are still developing reading confidence. Has anyone used a visual version of the fractions activity?</p><div className="attached-resource"><span>½</span><div><strong>Fractions using local objects</strong><small>Activity sheet · Grades 3–5</small></div><button type="button">View</button></div><div className="reply-list">{replies.map((item, index) => <div className="reply-item" key={`${item}-${index}`}><span className="avatar">TM</span><p><b>{index ? "You" : "Teacher Marites"}</b>{item}</p></div>)}</div><div className="reply-box"><input value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submitReply(); }} placeholder="Share an adaptation or suggestion…" /><button type="button" onClick={submitReply}>Reply</button></div></article><aside className="community-side"><p className="eyebrow">COMMUNITY PRINCIPLES</p><h3>Useful knowledge, not another noisy feed</h3><p>Discussions are attached to specific lessons and resources so teachers can find advice when they need it.</p><ul><li>Respect local teaching knowledge</li><li>Credit original authors</li><li>Explain what worked in your context</li></ul><button className="secondary-button" type="button">View community guidelines</button></aside></section>
+  }, [onGabayContext, reply, selectedDiscussion, selectedReplies.length, tab, visibleDiscussions.length]);
+
+  async function submitQuestion(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || questionTitle.trim().length < 4 || questionBody.trim().length < 4) return;
+    setSubmitting(true);
+    const { data, error } = await supabase.from("teacher_discussions").insert({ author_id: teacherAccountId, author_name: teacherLabel(teacherName), title: questionTitle.trim(), body: questionBody.trim(), subject: questionSubject === "General" ? null : questionSubject, grade_levels: questionGrades.split(",").map((grade) => grade.trim()).filter(Boolean) }).select("id,author_id,author_name,school_name,title,body,subject,grade_levels,created_at").single();
+    setSubmitting(false);
+    if (error || !data) { setCommunityError("Your question could not be posted. Please check your connection and try again."); return; }
+    const item: TeacherDiscussion = { id: String(data.id), authorId: String(data.author_id), authorName: String(data.author_name), schoolName: data.school_name ? String(data.school_name) : "", title: String(data.title), body: String(data.body), subject: data.subject ? String(data.subject) : "General", gradeLevels: Array.isArray(data.grade_levels) ? data.grade_levels.map(String) : [], createdAt: String(data.created_at) };
+    setDiscussions((current) => [item, ...current.filter((discussion) => discussion.id !== item.id)]); setSelectedDiscussionId(item.id); setQuestionTitle(""); setQuestionBody(""); setQuestionGrades(""); setComposerOpen(false); setTab("all"); setCommunityError("");
+  }
+
+  async function submitReply() {
+    if (!selectedDiscussion || !reply.trim()) return;
+    if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setSubmitting(true);
+    const { data, error } = await supabase.from("teacher_replies").insert({ discussion_id: selectedDiscussion.id, author_id: teacherAccountId, author_name: teacherLabel(teacherName), body: reply.trim() }).select("id,discussion_id,author_id,author_name,body,created_at").single();
+    setSubmitting(false);
+    if (error || !data) { setCommunityError("Your reply could not be sent. Please try again."); return; }
+    const item: TeacherReply = { id: String(data.id), discussionId: String(data.discussion_id), authorId: String(data.author_id), authorName: String(data.author_name), body: String(data.body), createdAt: String(data.created_at) };
+    setReplies((current) => [...current.filter((entry) => entry.id !== item.id), item]); setReply(""); setCommunityError("");
+  }
+
+  if (!authenticated) return <div className="view-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
+
+  return <div className="view-page community-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="A focused discussion space for real classroom questions—not another noisy social feed." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
+    {composerOpen && <form className="community-composer" onSubmit={submitQuestion}><header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header><div><label>Question<input required minLength={4} maxLength={180} value={questionTitle} onChange={(event) => setQuestionTitle(event.target.value)} placeholder="What are you trying to solve?" /></label><label>Subject<select value={questionSubject} onChange={(event) => setQuestionSubject(event.target.value)}><option>General</option>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}</select></label><label>Grade levels<input value={questionGrades} onChange={(event) => setQuestionGrades(event.target.value)} placeholder="e.g. Grade 2, Grade 3" /></label><label className="wide">Classroom context<textarea required minLength={4} maxLength={3000} value={questionBody} onChange={(event) => setQuestionBody(event.target.value)} placeholder="What have you tried? Mention available materials or constraints, but do not include learner names." /></label></div><footer><small>Shared with signed-in Kalinga teachers. Do not include learner names or private records.</small><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Posting…" : "Post question"}</button></footer></form>}
+    <div className="community-toolbar"><div className="community-tabs"><button className={tab === "all" ? "active" : ""} type="button" onClick={() => setTab("all")}>All questions <span>{discussions.length}</span></button><button className={tab === "mine" ? "active" : ""} type="button" onClick={() => setTab("mine")}>My questions <span>{discussions.filter((item) => item.authorId === teacherAccountId).length}</span></button></div><small><i /> Live room · new replies appear automatically</small></div>
+    {communityError && <p className="community-error" role="status">{communityError}</p>}
+    {loading ? <div className="community-loading">Opening the teacher room…</div> : <section className="teacher-room-layout"><aside className="discussion-index" aria-label="Teacher discussions">{visibleDiscussions.map((discussion) => { const replyCount = replies.filter((item) => item.discussionId === discussion.id).length; return <button className={selectedDiscussion?.id === discussion.id ? "active" : ""} type="button" onClick={() => setSelectedDiscussionId(discussion.id)} key={discussion.id}><span><b>{discussion.title}</b><small>{discussion.subject || "General"} · {discussion.authorName}</small></span><em>{replyCount} {replyCount === 1 ? "reply" : "replies"}</em></button>; })}{!visibleDiscussions.length && <div className="discussion-index-empty"><b>{tab === "mine" ? "You have not asked anything yet" : "No questions yet"}</b><p>Start the first focused teacher discussion.</p><button type="button" onClick={() => setComposerOpen(true)}>Ask a question</button></div>}</aside>
+      <article className="discussion-thread">{selectedDiscussion ? <><header><div><span className="avatar">{teacherInitials(selectedDiscussion.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{selectedDiscussion.authorName}</b><small>{selectedDiscussion.schoolName || "Kalinga teacher"} · {communityTime(selectedDiscussion.createdAt)}</small></p></div><div><span className="pill orange">{selectedDiscussion.subject || "GENERAL"}</span>{selectedDiscussion.gradeLevels.map((grade) => <span className="pill" key={grade}>{grade}</span>)}</div></header><h2>{selectedDiscussion.title}</h2><p className="discussion-body">{selectedDiscussion.body}</p><div className="discussion-replies-heading"><b>{selectedReplies.length} {selectedReplies.length === 1 ? "reply" : "replies"}</b><small>Be specific about what worked in your context.</small></div><div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{item.body}</p></div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div></> : <div className="discussion-empty"><span>♧</span><b>Choose a question</b><p>Open a teacher discussion to read its replies.</p></div>}</article>
+    </section>}
   </div>;
 }
