@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { askConnectedGabay, isSupabaseConfigured, type GabayPageContext } from "@/lib/gabay-ai";
+import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
@@ -1354,6 +1354,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   const [meetings, setMeetings] = useState<ClassMeeting[]>([{ id: "meeting-draft-1", days: "Monday to Friday", startTime: "8:00 AM", durationMinutes: 60, label: "" }]);
   const [learners, setLearners] = useState<ClassLearner[]>([]);
   const [classStep, setClassStep] = useState<1 | 2 | 3>(1);
+  const [workspaceTab, setWorkspaceTab] = useState<"overview" | "learners" | "schedule" | "lessons">("overview");
   const selectedClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const selectedPlans = savedPlans.filter((plan) => plan.classId === selectedClass?.id);
   const currentPlan = selectedPlans[0];
@@ -1365,7 +1366,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   useEffect(() => {
     onGabayContext({
       view: "classes",
-      pageStep: formOpen ? `Class setup step ${classStep} of 3` : "Class workspace",
+      pageStep: formOpen ? `Class setup step ${classStep} of 3` : `Class workspace · ${workspaceTab}`,
       classId: selectedClass?.id,
       className: selectedClass?.name,
       gradeLevels: formOpen ? grades : selectedClass?.grades || [],
@@ -1376,7 +1377,13 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
       currentSummary: selectedClass ? [`${selectedPlans.length} saved lesson plans`, `${attendanceCount} attendance statuses recorded`, `${selectedClass.learners.length} learners enrolled`] : ["No class has been created yet"],
       availableActions: formOpen ? ["Continue class setup", "Go back one setup step", "Save the class"] : ["Manage learners", "Edit meeting times", "Create a lesson", "Take attendance"],
     });
-  }, [attendanceCount, classStep, formOpen, grades, learners, meetings, name, namedLearnerCount, onGabayContext, selectedClass, selectedPlans.length, subjects]);
+  }, [attendanceCount, classStep, formOpen, grades, learners, meetings, name, namedLearnerCount, onGabayContext, selectedClass, selectedPlans.length, subjects, workspaceTab]);
+
+  function selectWorkspaceClass(classId: string) {
+    onSelectClass(classId);
+    setWorkspaceTab("overview");
+    setFormOpen(false);
+  }
 
   function resetForm() {
     setEditingId("");
@@ -1461,36 +1468,36 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
 
   return (
     <div className="view-page classes-page">
-      {!!classes.length && <PageIntro eyebrow="CLASSES & LEARNERS" title="Choose a class" description="Manage the learners, meeting times, attendance, and lesson plans belonging to each class." />}
-      {!!classes.length && selectedClass && <section className="class-hub">
-        <nav className="class-switcher" aria-label="Saved classes">
-          <p className="eyebrow">YOUR CLASSES</p>
-          {classes.map((item) => <button className={item.id === selectedClass.id ? "active" : ""} type="button" key={item.id} onClick={() => onSelectClass(item.id)}><span><b>{item.name}</b><small>{gradeList(item.grades)} · {item.learners.length} learners</small><small>{learnerRosterSummary(item.learners, true)}</small></span><span>→</span></button>)}
+      {!!classes.length && <PageIntro eyebrow="CLASSES & LEARNERS" title="Your classes" description="Choose a class, then open only the information you need." />}
+      {!!classes.length && selectedClass && <>
+        <nav className="class-picker-bar" aria-label="Choose a class">
+          <span className="eyebrow">CLASS</span>
+          <div>{classes.map((item) => <button className={item.id === selectedClass.id ? "active" : ""} type="button" key={item.id} onClick={() => selectWorkspaceClass(item.id)}><b>{item.name}</b><small>{gradeList(item.grades)} · {item.learners.length} learners</small></button>)}</div>
+          <button className="class-picker-add" type="button" onClick={openNewClassForm}>＋ Add class</button>
         </nav>
-        <div className="class-workspace">
+        <section className="class-hub class-hub-tabbed">
+          <div className="class-workspace">
           <header className="class-workspace-head">
             <div><p className="eyebrow">{selectedClass.meetings.length} SAVED CLASS {selectedClass.meetings.length === 1 ? "BLOCK" : "BLOCKS"}</p><h2>{selectedClass.name}</h2><p>{gradeList(selectedClass.grades)} · {selectedClass.subjects.join(" · ")}</p><p className="class-roster-line"><b>{selectedClass.learners.length} learners</b><span>{learnerRosterSummary(selectedClass.learners)}</span></p></div>
             <div className="class-header-actions"><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button><details className="class-more-menu"><summary aria-label={`More options for ${selectedClass.name}`}>•••</summary><div role="menu"><button type="button" role="menuitem" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); editClass(selectedClass, "details"); }}><span>✎</span><span><b>Edit class details</b><small>Change grades or subjects</small></span></button><button className="delete-menu-item" type="button" role="menuitem" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); setDeleteCandidateId(selectedClass.id); }}><span>×</span><span><b>Delete class</b><small>Remove this class and its records</small></span></button></div></details></div>
           </header>
           {deleteCandidateId === selectedClass.id && <div className="delete-confirm prominent-delete" role="alert"><div><b>Delete {selectedClass.name} permanently?</b><span>This removes the class, its lesson plans, learner attendance, and saved timetable from this device.</span></div><div><button type="button" onClick={() => setDeleteCandidateId("")}>Keep class</button><button type="button" onClick={() => { onDelete(selectedClass.id); setDeleteCandidateId(""); }}>Yes, delete class</button></div></div>}
-          <div className="class-action-strip">
-            <button type="button" onClick={onAttendance}><span>✓</span><p><b>Take attendance</b><small>{attendanceCount ? `${attendanceCount} records saved` : `${selectedClass.learners.length} learners ready`}</small></p><b>→</b></button>
-            <button type="button" onClick={() => editClass(selectedClass, "schedule")}><span>▦</span><p><b>Class meeting times</b><small>{selectedClass.meetings.map((meeting) => `${meeting.days} ${meeting.startTime}`).join(" · ")}</small></p><b>→</b></button>
-            <button type="button" onClick={() => editClass(selectedClass, "learners")}><span>◎</span><p><b>Manage learners</b><small>Add, remove, or change learner grade levels</small></p><b>→</b></button>
-          </div>
-          <div className="class-detail-grid">
-            <article className="class-schedule-panel">
-              <div className="section-title inline"><div><p className="eyebrow">CLASS SCHEDULE</p><h3>{currentPlan?.title || "No lesson scheduled yet"}</h3></div>{currentPlan && <button className="text-button" type="button" onClick={() => onPlan(currentPlan.id)}>Edit schedule →</button>}</div>
-              {currentPlan ? <div className="timeline compact-timeline">{currentPlan.slots.map((slot, index) => <div className="timeline-row" key={slot.id}><time>{slot.time}</time><div className={`timeline-event ${index ? `grade${index}` : "shared"}`}><strong>{slot.teacherFocus}</strong><small>{Object.values(slot.gradeTasks).filter(Boolean).join(" · ") || "Activities not added yet"}</small></div></div>)}</div> : <div className="class-panel-empty"><span>○</span><p><b>Nothing to follow yet</b><small>Create a lesson and its editable timetable will appear here.</small></p><button className="secondary-button" type="button" onClick={() => onPlan()}>Create lesson</button></div>}
-            </article>
-            <aside className="class-plans-panel">
-              <div className="section-title inline"><div><p className="eyebrow">LESSON PLANS</p><h3>{selectedPlans.length} saved</h3></div></div>
-              {selectedPlans.length ? <div className="class-plan-links">{selectedPlans.map((plan) => <button type="button" key={plan.id} onClick={() => onPlan(plan.id)}><span><b>{plan.title}</b><small>{plan.subject} · {plan.quarter}</small></span><span>→</span></button>)}</div> : <p className="class-plan-empty">Saved plans for this class will stay together here.</p>}
-              <div className="class-roster-summary"><span>{selectedClass.learners.length}</span><p><b>Named learners</b><small>{selectedRosterCounts.female} female · {selectedRosterCounts.male} male{selectedRosterCounts.unspecified ? ` · ${selectedRosterCounts.unspecified} not specified` : ""}</small></p><button type="button" onClick={onAttendance}>Open attendance →</button></div>
-            </aside>
-          </div>
+          <nav className="class-workspace-tabs" aria-label={`${selectedClass.name} sections`}>{([['overview', 'Overview'], ['learners', 'Learners'], ['schedule', 'Schedule'], ['lessons', 'Lesson plans']] as const).map(([value, label]) => <button className={workspaceTab === value ? "active" : ""} type="button" aria-current={workspaceTab === value ? "page" : undefined} onClick={() => setWorkspaceTab(value)} key={value}>{label}{value === "learners" ? <small>{selectedClass.learners.length}</small> : value === "lessons" ? <small>{selectedPlans.length}</small> : null}</button>)}</nav>
+
+          {workspaceTab === "overview" && <div className="class-overview-panel">
+            <button type="button" onClick={() => setWorkspaceTab("learners")}><span>◎</span><p><b>{selectedClass.learners.length} learners</b><small>{selectedClass.learners.length ? learnerRosterSummary(selectedClass.learners) : "Add learners when you are ready"}</small></p><b>View roster →</b></button>
+            <button type="button" onClick={() => setWorkspaceTab("schedule")}><span>▦</span><p><b>{selectedClass.meetings.length} meeting {selectedClass.meetings.length === 1 ? "time" : "times"}</b><small>{selectedClass.meetings[0] ? `${selectedClass.meetings[0].days} · ${selectedClass.meetings[0].startTime}` : "No schedule yet"}</small></p><b>View schedule →</b></button>
+            <button type="button" onClick={() => setWorkspaceTab("lessons")}><span>＋</span><p><b>{selectedPlans.length} lesson {selectedPlans.length === 1 ? "plan" : "plans"}</b><small>{currentPlan ? `Latest: ${currentPlan.title}` : "Start the first plan for this class"}</small></p><b>View plans →</b></button>
+            <aside><p className="eyebrow">NEXT USEFUL ACTION</p><h3>{!selectedClass.learners.length ? "Add your learners" : !selectedPlans.length ? "Plan the first lesson" : "Take attendance"}</h3><p>{!selectedClass.learners.length ? "A saved roster makes attendance ready in one tap." : !selectedPlans.length ? "Gabay can help you draft an editable ILAW plan." : `${selectedClass.learners.length} learners are ready for this class.`}</p><button className="primary-button" type="button" onClick={!selectedClass.learners.length ? () => editClass(selectedClass, "learners") : !selectedPlans.length ? () => onPlan() : onAttendance}>{!selectedClass.learners.length ? "Manage learners" : !selectedPlans.length ? "Plan a lesson" : "Take attendance"} →</button></aside>
+          </div>}
+
+          {workspaceTab === "learners" && <section className="class-tab-panel"><header><div><p className="eyebrow">LEARNERS</p><h3>{selectedClass.learners.length ? `${selectedClass.learners.length} enrolled` : "No learners added yet"}</h3><p>{selectedRosterCounts.female} female · {selectedRosterCounts.male} male{selectedRosterCounts.unspecified ? ` · ${selectedRosterCounts.unspecified} not specified` : ""}</p></div><button className="secondary-button" type="button" onClick={() => editClass(selectedClass, "learners")}>{selectedClass.learners.length ? "Edit learners" : "＋ Add learners"}</button></header>{selectedClass.learners.length ? <div className="class-roster-table">{selectedClass.learners.map((learner, index) => <div key={learner.id}><span>{index + 1}</span><b>{learner.name}</b><small>{gradeLabel(learner.grade)}</small><small>{learner.sex}</small></div>)}</div> : <div className="class-tab-empty"><span>◎</span><b>Build this class roster once</b><p>Kalinga will reuse it for attendance and class counts.</p></div>}</section>}
+
+          {workspaceTab === "schedule" && <section className="class-tab-panel"><header><div><p className="eyebrow">SCHEDULE</p><h3>Class meeting times</h3><p>{selectedClass.meetings.length} saved {selectedClass.meetings.length === 1 ? "block" : "blocks"}</p></div><button className="secondary-button" type="button" onClick={() => editClass(selectedClass, "schedule")}>Edit schedule</button></header><div className="class-meeting-list">{selectedClass.meetings.map((meeting) => <article key={meeting.id}><time>{meeting.startTime}</time><div><b>{meeting.label || "Regular class"}</b><small>{meeting.days} · {meeting.durationMinutes} minutes</small></div></article>)}</div>{currentPlan && <details className="class-plan-preview"><summary>Preview the latest lesson timetable <span>⌄</span></summary><div className="timeline compact-timeline">{currentPlan.slots.map((slot, index) => <div className="timeline-row" key={slot.id}><time>{slot.time}</time><div className={`timeline-event ${index ? `grade${index}` : "shared"}`}><strong>{slot.teacherFocus}</strong><small>{Object.values(slot.gradeTasks).filter(Boolean).join(" · ") || "Activities not added yet"}</small></div></div>)}</div></details>}</section>}
+
+          {workspaceTab === "lessons" && <section className="class-tab-panel"><header><div><p className="eyebrow">LESSON PLANS</p><h3>{selectedPlans.length ? `${selectedPlans.length} saved` : "No saved lessons yet"}</h3><p>Every plan for {selectedClass.name} stays together here.</p></div><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button></header>{selectedPlans.length ? <div className="class-plan-links class-plan-grid">{selectedPlans.map((plan) => <button type="button" key={plan.id} onClick={() => onPlan(plan.id)}><span><b>{plan.title}</b><small>{plan.subject} · {plan.quarter} · {plan.duration}</small></span><span>Open →</span></button>)}</div> : <div className="class-tab-empty"><span>＋</span><b>Start with one lesson</b><p>Choose a subject and let Gabay help with editable starting points.</p></div>}</section>}
         </div>
-      </section>}
+      </section></>}
       {!!classes.length && !formOpen && <section className="add-class-bottom"><div><p className="eyebrow">NEW SCHOOL TERM OR TEACHING LOAD?</p><h2>Need another class?</h2><p>Add another class only when you begin managing a new group of learners.</p></div><button className="secondary-button" type="button" onClick={openNewClassForm}>＋ Add another class</button></section>}
       {(formOpen || !classes.length) && <form className={`class-setup-card class-form-drawer ${!classes.length ? "first-class-form" : ""}`} onSubmit={submitClass}>
         <nav className="class-wizard-progress" aria-label="Class setup progress">
@@ -1623,6 +1630,10 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [draftingIntentionGrade, setDraftingIntentionGrade] = useState<GradeLevel>("");
   const [intentionSuggestions, setIntentionSuggestions] = useState<Record<GradeLevel, { competency: string; objective: string }>>({});
   const [intentionDraftErrors, setIntentionDraftErrors] = useState<Record<GradeLevel, string>>({});
+  const [activeAssessmentGrade, setActiveAssessmentGrade] = useState<GradeLevel>((initialPlan?.grades || selectedClass?.grades || [])[0] || "");
+  const [draftingAssessmentGrade, setDraftingAssessmentGrade] = useState<GradeLevel>("");
+  const [assessmentSuggestions, setAssessmentSuggestions] = useState<Record<GradeLevel, { formativeAssessment: string; exitTask: string; successCriteria: string }>>({});
+  const [assessmentDraftErrors, setAssessmentDraftErrors] = useState<Record<GradeLevel, string>>({});
   const planRosterCounts = learnerSexCounts(selectedClass?.learners || []);
   const incompletePlanSections = useMemo(() => [
     !subject.trim() && "lesson subject",
@@ -1634,7 +1645,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   useEffect(() => {
     onGabayContext({
       view: "plan",
-      pageStep: step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : activeIntentionGrade ? `ILAW plan · ${gradeLabel(activeIntentionGrade)} intentions` : "ILAW plan",
+      pageStep: step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : activeAssessmentGrade ? `ILAW plan · ${gradeLabel(activeAssessmentGrade)} assessment` : activeIntentionGrade ? `ILAW plan · ${gradeLabel(activeIntentionGrade)} intentions` : "ILAW plan",
       classId: selectedClass?.id,
       className: selectedClass?.name,
       gradeLevels: grades,
@@ -1647,7 +1658,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
       currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`), saved ? "Draft is saved" : "Draft has unsaved changes"],
       availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Continue to the ILAW plan"] : ["Complete intentions", "Build the learning experience", "Add assessment", "Save the lesson"],
     });
-  }, [activeIntentionGrade, competencies, duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, saved, selectedClass, sharedTheme, startTime, step, subject]);
+  }, [activeAssessmentGrade, activeIntentionGrade, competencies, duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, saved, selectedClass, sharedTheme, startTime, step, subject]);
 
   function canOpenPlanStep(nextStep: 1 | 2 | 3) {
     if (nextStep === 1) return true;
@@ -1670,6 +1681,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     setFormativeAssessments((items) => Object.fromEntries(next.map((item) => [item, items[item] || ""])));
     setExitTasks((items) => Object.fromEntries(next.map((item) => [item, items[item] || ""])));
     setSuccessCriteria((items) => Object.fromEntries(next.map((item) => [item, items[item] || ""])));
+    setActiveAssessmentGrade((current) => next.includes(current) ? current : next[0] || "");
   }
 
   function chooseClass(classId: string) {
@@ -1725,9 +1737,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     setDraftingIntentionGrade(grade);
     setIntentionDraftErrors((current) => ({ ...current, [grade]: "" }));
     const topic = lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`;
-    const result = await askConnectedGabay(
-      `Create one editable draft learning competency and one measurable learning objective for ${gradeLabel(grade)} in ${subject}, about "${topic}". Keep them realistic for a ${durationMinutes(duration)}-minute multigrade class. These are suggestions, not official DepEd competencies. Return exactly two plain lines: COMPETENCY: [draft] and OBJECTIVE: [draft].`,
-      {
+    const result = await requestGabayDraft("intentions", {
         view: "plan",
         pageStep: `ILAW plan · ${gradeLabel(grade)} intentions`,
         classId: selectedClass.id,
@@ -1742,21 +1752,16 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
         currentSummary: [`Drafting only for ${gradeLabel(grade)}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered"],
         availableActions: ["Review the AI draft", "Apply the draft", "Edit every field"],
         offline: typeof navigator !== "undefined" && !navigator.onLine,
-      },
-    );
+      }, gradeLabel(grade));
     setDraftingIntentionGrade("");
     if (!result.connected) {
-      setIntentionDraftErrors((current) => ({ ...current, [grade]: "Gabay could not create a draft right now. Check the connection and try again." }));
+      const message = result.reason === "not-signed-in" ? "Sign in to let Gabay create an editable draft." : result.reason === "busy" ? "Gabay is helping a lot of teachers right now. Please try again in a moment." : "Gabay could not create a draft right now. Please try again.";
+      setIntentionDraftErrors((current) => ({ ...current, [grade]: message }));
       return;
     }
-    const cleanReply = result.reply.replace(/\*\*/g, "").trim();
-    const competency = cleanReply.match(/COMPETENCY\s*:\s*([\s\S]*?)(?=\n\s*OBJECTIVE\s*:)/i)?.[1]?.trim();
-    const objective = cleanReply.match(/OBJECTIVE\s*:\s*([\s\S]*)$/i)?.[1]?.trim();
-    if (!competency || !objective) {
-      setIntentionDraftErrors((current) => ({ ...current, [grade]: "Gabay’s draft was not in the expected format. Please try once more." }));
-      return;
-    }
-    setIntentionSuggestions((current) => ({ ...current, [grade]: { competency, objective } }));
+    if (result.draft.type !== "intentions") return;
+    const draft = result.draft;
+    setIntentionSuggestions((current) => ({ ...current, [grade]: { competency: draft.competency, objective: draft.objective } }));
   }
 
   function applyGradeIntention(grade: GradeLevel) {
@@ -1765,6 +1770,49 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     setCompetencies((current) => ({ ...current, [grade]: suggestion.competency }));
     setObjectives((current) => ({ ...current, [grade]: suggestion.objective }));
     setIntentionSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)));
+    setSaved(false);
+  }
+
+  async function draftGradeAssessment(grade: GradeLevel) {
+    if (!selectedClass || draftingAssessmentGrade) return;
+    setActiveAssessmentGrade(grade);
+    setDraftingAssessmentGrade(grade);
+    setAssessmentDraftErrors((current) => ({ ...current, [grade]: "" }));
+    const topic = lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`;
+    const result = await requestGabayDraft("assessment", {
+      view: "plan",
+      pageStep: `ILAW plan · ${gradeLabel(grade)} assessment`,
+      classId: selectedClass.id,
+      className: selectedClass.name,
+      gradeLevels: grades,
+      subjects: selectedClass.subjects,
+      learnerCount: selectedClass.learners.length,
+      subject,
+      lessonTopic: topic,
+      lessonDuration: `${durationMinutes(duration)} minutes starting at ${startTime}`,
+      incompleteSections: incompletePlanSections,
+      currentSummary: [`Drafting only for ${gradeLabel(grade)}`, `Competency: ${competencies[grade]?.trim() || "not entered"}`, `Objective: ${objectives[grade]?.trim() || "not entered"}`],
+      availableActions: ["Review the assessment draft", "Apply the draft", "Edit every field"],
+      offline: typeof navigator !== "undefined" && !navigator.onLine,
+    }, gradeLabel(grade));
+    setDraftingAssessmentGrade("");
+    if (!result.connected) {
+      const message = result.reason === "not-signed-in" ? "Sign in to let Gabay create an editable assessment." : result.reason === "busy" ? "Gabay is helping a lot of teachers right now. Please try again in a moment." : "Gabay could not create an assessment right now. Please try again.";
+      setAssessmentDraftErrors((current) => ({ ...current, [grade]: message }));
+      return;
+    }
+    if (result.draft.type !== "assessment") return;
+    const draft = result.draft;
+    setAssessmentSuggestions((current) => ({ ...current, [grade]: draft }));
+  }
+
+  function applyGradeAssessment(grade: GradeLevel) {
+    const suggestion = assessmentSuggestions[grade];
+    if (!suggestion) return;
+    setFormativeAssessments((current) => ({ ...current, [grade]: suggestion.formativeAssessment }));
+    setExitTasks((current) => ({ ...current, [grade]: suggestion.exitTask }));
+    setSuccessCriteria((current) => ({ ...current, [grade]: suggestion.successCriteria }));
+    setAssessmentSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)));
     setSaved(false);
   }
 
@@ -1865,7 +1913,15 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
 
           <details className="ilaw-disclosure assessment-section">
             <summary><span className="ilaw-letter">A</span><span><small>ASSESSMENT</small><b>Check learning by grade</b><em>Open when you are ready to add checks</em></span></summary>
-            <div className="ilaw-disclosure-body"><div className="ilaw-grade-grid">{grades.map((grade) => <article key={grade}><h3>{gradeLabel(grade)}</h3><label>How will you check learning?<textarea value={formativeAssessments[grade] || ""} onChange={(event) => { setFormativeAssessments((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="A question, performance, observation, or short activity" /></label><details className="assessment-more"><summary>Add exit task or success criteria <span>Optional</span></summary><label>Exit task<textarea value={exitTasks[grade] || ""} onChange={(event) => { setExitTasks((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What will the learner do before the lesson ends?" /></label><label>Success criteria<textarea value={successCriteria[grade] || ""} onChange={(event) => { setSuccessCriteria((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What counts as successful learning?" /></label></details></article>)}</div></div>
+            <div className="ilaw-disclosure-body assessment-workspace">
+              <nav className="assessment-grade-tabs" aria-label="Assessment grade group">{grades.map((grade) => <button className={grade === (activeAssessmentGrade || grades[0]) ? "active" : ""} type="button" onClick={() => setActiveAssessmentGrade(grade)} key={grade}><span>{gradeLabel(grade)}</span><small>{formativeAssessments[grade]?.trim() ? "Started" : "Not started"}</small></button>)}</nav>
+              {grades.filter((grade) => grade === (activeAssessmentGrade || grades[0])).map((grade) => <article className="assessment-grade-panel" key={grade}>
+                <header><div><p className="eyebrow">EDITING ASSESSMENT</p><h3>{gradeLabel(grade)}</h3><p>Draft one clear check, then review it before saving.</p></div><button className="gabay-draft-button" type="button" disabled={Boolean(draftingAssessmentGrade)} onClick={() => draftGradeAssessment(grade)}><GabayMascot size="small" motion />{draftingAssessmentGrade === grade ? "Drafting…" : assessmentSuggestions[grade] ? "Try another draft" : "Draft with Gabay"}</button></header>
+                {assessmentDraftErrors[grade] && <p className="gabay-draft-error" role="alert">{assessmentDraftErrors[grade]}</p>}
+                {assessmentSuggestions[grade] && <aside className="gabay-intention-review gabay-assessment-review"><p className="eyebrow">GABAY’S DRAFT · REVIEW FIRST</p><div><p><b>Formative check</b><span>{assessmentSuggestions[grade].formativeAssessment}</span></p><p><b>Exit task</b><span>{assessmentSuggestions[grade].exitTask}</span></p><p><b>Success criteria</b><span>{assessmentSuggestions[grade].successCriteria}</span></p></div><footer><button className="secondary-button" type="button" onClick={() => setAssessmentSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)))}>Dismiss</button><button className="primary-button" type="button" onClick={() => applyGradeAssessment(grade)}>Use and edit this draft</button></footer></aside>}
+                <div className="assessment-fields"><label>How will you check learning?<textarea value={formativeAssessments[grade] || ""} onChange={(event) => { setFormativeAssessments((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="A question, performance, observation, or short activity" /></label><label>Exit task <small>Optional</small><textarea value={exitTasks[grade] || ""} onChange={(event) => { setExitTasks((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What will the learner do before the lesson ends?" /></label><label>Success criteria <small>Optional</small><textarea value={successCriteria[grade] || ""} onChange={(event) => { setSuccessCriteria((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What counts as successful learning?" /></label></div>
+              </article>)}
+            </div>
           </details>
 
           <details className="ilaw-disclosure ways-forward-section">

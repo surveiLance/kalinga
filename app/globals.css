@@ -575,6 +575,49 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
   to { transform: scaleX(1); }
 }
 
+/* Focused class workspace */
+.class-picker-bar { margin-top: 22px; padding: 12px; border: 1px solid var(--line); border-radius: 15px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 13px; background: rgba(255, 253, 249, .82); }
+.class-picker-bar > .eyebrow { margin: 0 2px; }
+.class-picker-bar > div { min-width: 0; display: flex; gap: 7px; overflow-x: auto; scrollbar-width: thin; }
+.class-picker-bar > div button { min-width: 165px; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; color: var(--ink); background: #f7f3ec; text-align: left; cursor: pointer; }
+.class-picker-bar > div button.active { border-color: #8fcac0; color: var(--teal-ink); background: #e7f4f1; box-shadow: inset 0 -2px 0 var(--teal-ink); }
+.class-picker-bar b, .class-picker-bar small { display: block; }.class-picker-bar b { font-size: 13px; }.class-picker-bar small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.class-picker-add { min-height: 42px; padding: 9px 13px; border: 1px solid #d9d2c7; border-radius: 10px; color: var(--ink); background: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
+.class-hub.class-hub-tabbed { margin-top: 12px; display: block; }
+.class-hub-tabbed .class-workspace { padding: 22px; }
+.class-workspace-tabs { margin: 20px -22px 0; padding: 0 22px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; gap: 5px; overflow-x: auto; }
+.class-workspace-tabs button { min-height: 50px; padding: 10px 14px; position: relative; border: 0; display: flex; align-items: center; gap: 7px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.class-workspace-tabs button::after { content: ""; position: absolute; right: 10px; bottom: -1px; left: 10px; height: 3px; border-radius: 999px 999px 0 0; background: transparent; }
+.class-workspace-tabs button.active { color: var(--teal-ink); }.class-workspace-tabs button.active::after { background: var(--teal-ink); }
+.class-workspace-tabs small { min-width: 21px; padding: 3px 6px; border-radius: 999px; color: inherit; background: #edf1ee; font-size: 10px; }
+.class-overview-panel { padding-top: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.class-overview-panel > button { min-height: 108px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; display: grid; grid-template-columns: 36px 1fr; gap: 10px; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }
+.class-overview-panel > button > span { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--teal-ink); background: #dff1ed; font-size: 17px; }
+.class-overview-panel > button p { margin: 0; }.class-overview-panel > button p b, .class-overview-panel > button p small { display: block; }.class-overview-panel > button p b { font-size: 14px; }.class-overview-panel > button p small { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.4; }.class-overview-panel > button > b { grid-column: 2; color: var(--teal-ink); font-size: 11px; }
+.class-overview-panel > aside { grid-column: 1 / -1; padding: 18px 20px; border-radius: 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 20px; background: #e7f4f1; }
+.class-overview-panel > aside .eyebrow, .class-overview-panel > aside h3, .class-overview-panel > aside p { grid-column: 1; }.class-overview-panel > aside h3 { margin: 3px 0; font-size: 21px; }.class-overview-panel > aside p:not(.eyebrow) { margin: 0; color: #56706c; font-size: 12px; }.class-overview-panel > aside button { grid-column: 2; grid-row: 1 / span 3; }
+.class-tab-panel { padding-top: 18px; }.class-tab-panel > header { padding-bottom: 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 18px; }.class-tab-panel > header h3 { margin: 3px 0; font-size: 22px; }.class-tab-panel > header p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 12px; }
+.class-roster-table { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }.class-roster-table > div { min-height: 52px; padding: 10px 13px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 120px 120px; align-items: center; gap: 10px; background: #fff; }.class-roster-table > div + div { border-top: 1px solid var(--line); }.class-roster-table span { width: 25px; height: 25px; border-radius: 50%; display: grid; place-items: center; color: var(--teal-ink); background: #e7f4f1; font-size: 10px; font-weight: 800; }.class-roster-table b { font-size: 13px; }.class-roster-table small { color: var(--muted); font-size: 11px; }
+.class-meeting-list { margin-top: 12px; display: grid; gap: 8px; }.class-meeting-list article { padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: 100px 1fr; align-items: center; background: #fff; }.class-meeting-list time { color: var(--orange-dark); font-size: 14px; font-weight: 850; }.class-meeting-list b, .class-meeting-list small { display: block; }.class-meeting-list b { font-size: 13px; }.class-meeting-list small { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.class-plan-preview { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }.class-plan-preview > summary { min-height: 48px; padding: 12px 15px; display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; cursor: pointer; list-style: none; }.class-plan-preview .compact-timeline { margin: 0; padding: 14px; border-top: 1px solid var(--line); }
+.class-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.class-plan-grid button { min-height: 78px; padding: 14px; }.class-tab-empty { min-height: 190px; display: grid; place-content: center; justify-items: center; text-align: center; }.class-tab-empty > span { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: var(--teal-ink); background: #e7f4f1; font-size: 20px; }.class-tab-empty b { margin-top: 10px; font-size: 15px; }.class-tab-empty p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+
+/* One-grade-at-a-time assessment drafting */
+.assessment-workspace { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; }
+.assessment-grade-tabs { display: grid; align-content: start; gap: 7px; }.assessment-grade-tabs button { min-height: 55px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #fbf8f2; text-align: left; cursor: pointer; }.assessment-grade-tabs span, .assessment-grade-tabs small { display: block; }.assessment-grade-tabs span { font-size: 13px; font-weight: 850; }.assessment-grade-tabs small { margin-top: 3px; color: var(--muted); font-size: 10px; }.assessment-grade-tabs button.active { border-color: #b9874a; background: #fff7ea; box-shadow: inset 3px 0 0 #95601e; }
+.assessment-grade-panel { min-width: 0; }.assessment-grade-panel > header { padding-bottom: 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 16px; }.assessment-grade-panel > header h3 { margin: 3px 0; font-size: 22px; }.assessment-grade-panel > header p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; }
+.gabay-draft-button { min-height: 42px; padding: 8px 12px; border: 0; border-radius: 10px; display: flex; align-items: center; gap: 7px; color: #fff; background: var(--teal-ink); font-size: 11px; font-weight: 850; white-space: nowrap; cursor: pointer; }.gabay-draft-button .gabay-mascot { width: 29px; height: 29px; filter: none; }.gabay-draft-button:disabled { opacity: .55; cursor: wait; }
+.assessment-fields { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }.assessment-fields label:first-child { grid-column: 1 / -1; }.assessment-fields label small { color: var(--muted); font-weight: 600; }.assessment-fields textarea { background: #fff; }
+.gabay-assessment-review { margin-top: 14px; }.gabay-assessment-review > div { grid-template-columns: repeat(3, 1fr); }
+
+@media (max-width: 900px) {
+  .class-picker-bar { grid-template-columns: 1fr auto; }.class-picker-bar > .eyebrow { display: none; }.class-picker-bar > div { grid-column: 1; }.class-overview-panel { grid-template-columns: 1fr; }.class-overview-panel > aside { grid-column: 1; }.assessment-workspace { grid-template-columns: 1fr; }.assessment-grade-tabs { display: flex; overflow-x: auto; }.assessment-grade-tabs button { min-width: 145px; }.gabay-assessment-review > div { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .class-picker-bar { grid-template-columns: 1fr; }.class-picker-add { width: 100%; }.class-workspace-tabs { margin-right: -18px; margin-left: -18px; padding: 0 18px; }.class-tab-panel > header, .assessment-grade-panel > header { align-items: stretch; flex-direction: column; }.class-tab-panel > header button, .assessment-grade-panel > header button { width: 100%; justify-content: center; }.class-overview-panel > aside { display: block; }.class-overview-panel > aside button { width: 100%; margin-top: 13px; }.class-roster-table > div { grid-template-columns: 28px 1fr; }.class-roster-table small { grid-column: 2; }.class-plan-grid, .assessment-fields { grid-template-columns: 1fr; }.assessment-fields label:first-child { grid-column: 1; }
+}
+
 @keyframes kalinga-fade {
   from { opacity: 0; }
   to { opacity: 1; }

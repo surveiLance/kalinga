@@ -24,6 +24,11 @@ type SafeHistoryMessage = {
   content: string;
 };
 
+type DraftTask = {
+  type: "intentions" | "assessment";
+  grade: string;
+};
+
 const MAX_MESSAGE_LENGTH = 2_000;
 
 function allowedOrigin(request: Request) {
@@ -94,6 +99,32 @@ function safeHistory(value: unknown): SafeHistoryMessage[] {
     const content = cleanText(input.text, 1_000);
     return role && content ? [{ role, content }] : [];
   });
+}
+
+function safeDraftTask(value: unknown): DraftTask | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  if (input.type !== "intentions" && input.type !== "assessment") return null;
+  const grade = cleanText(input.grade, 40);
+  return grade ? { type: input.type, grade } : null;
+}
+
+function parseJsonObject(value: string) {
+  const normalized = value.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    const parsed = JSON.parse(normalized);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    const start = normalized.indexOf("{");
+    const end = normalized.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+      const parsed = JSON.parse(normalized.slice(start, end + 1));
+      return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 Deno.serve(async (request) => {
@@ -174,6 +205,7 @@ Deno.serve(async (request) => {
     }
   }
   const history = safeHistory(payload.history);
+  const draftTask = safeDraftTask(payload.task);
   const model = Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-20b";
 
   const systemInstruction = `You are Gabay, Kalinga's friendly, witty teacher assistant for Filipino teachers. You accompany the teacher across the app and understand the current page from the supplied Kalinga context.
@@ -206,6 +238,12 @@ What the app currently reports: ${(pageContext.currentSummary ?? []).join(" | ")
 Actions available on this page: ${(pageContext.availableActions ?? []).join(", ") || "not supplied"}
 App reports offline: ${pageContext.offline ? "yes" : "no"}`;
 
+  const draftInstruction = draftTask?.type === "intentions"
+    ? `Create a practical, editable starting point for ${draftTask.grade}. Return only a JSON object with exactly these string keys: competency, objective. The competency must be a suggested classroom competency, never described as an official DepEd competency. The objective must be measurable and realistic for the stated lesson duration.`
+    : draftTask?.type === "assessment"
+      ? `Create a practical, editable assessment set for ${draftTask.grade}. Return only a JSON object with exactly these string keys: formativeAssessment, exitTask, successCriteria. Each item must align with the supplied competency or objective, remain grade-appropriate, and be realistic in the stated lesson duration.`
+      : "";
+
   const groqResponse = await fetch(
     "https://api.groq.com/openai/v1/chat/completions",
     {
@@ -217,13 +255,14 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: systemInstruction },
+          { role: "system", content: draftTask ? `${systemInstruction}\n${draftInstruction}` : systemInstruction },
           { role: "system", content: `Current Kalinga context:\n${contextText}` },
-          ...history,
+          ...(draftTask ? [] : history),
           { role: "user", content: message },
         ],
-        temperature: 0.55,
-        max_completion_tokens: 240,
+        ...(draftTask ? { response_format: { type: "json_object" } } : {}),
+        temperature: draftTask ? 0.35 : 0.55,
+        max_completion_tokens: draftTask ? 420 : 240,
       }),
     },
   );
@@ -240,5 +279,20 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
     : "";
 
   if (!reply) return json({ error: "Gabay returned an empty response" }, 502, origin);
+  if (draftTask) {
+    const parsed = parseJsonObject(reply);
+    if (!parsed) return json({ error: "Gabay returned an invalid draft" }, 502, origin);
+    if (draftTask.type === "intentions") {
+      const competency = cleanText(parsed.competency, 1_000);
+      const objective = cleanText(parsed.objective, 1_000);
+      if (!competency || !objective) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
+      return json({ draft: { type: "intentions", competency, objective }, connected: true }, 200, origin);
+    }
+    const formativeAssessment = cleanText(parsed.formativeAssessment, 1_000);
+    const exitTask = cleanText(parsed.exitTask, 1_000);
+    const successCriteria = cleanText(parsed.successCriteria, 1_000);
+    if (!formativeAssessment || !exitTask || !successCriteria) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
+    return json({ draft: { type: "assessment", formativeAssessment, exitTask, successCriteria }, connected: true }, 200, origin);
+  }
   return json({ reply, connected: true }, 200, origin);
 });
