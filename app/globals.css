@@ -299,7 +299,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .classes-page .meeting-row > span, .classes-page .meeting-time-field .period-toggle button, .classes-page .meeting-row .duration-input span { font-size: 12px; }
 .classes-page .primary-button, .classes-page .secondary-button, .classes-page .danger-outline-button { font-size: 13px; }
 .classes-page .delete-confirm b { font-size: 13px; }.classes-page .delete-confirm span, .classes-page .delete-confirm button { font-size: 12px; }
-.classes-page h1, .classes-page h2, .classes-page h3 { font-family: var(--font-display); }
+.classes-page h1, .classes-page h2, .classes-page h3 { font-family: var(--font-ui); letter-spacing: -.02em; }
 .classes-page .class-more-menu b { font-size: 13px; }.classes-page .class-more-menu small { font-size: 12px !important; }
 .classes-page .text-button, .classes-page .cancel-edit { font-size: 13px; }
 .classes-page .roster-row > span { font-size: 12px; }
@@ -839,7 +839,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .starter-resource-card .library-description { min-height: 58px; }
 .resource-social-proof { margin-top: auto; padding: 12px 0; border-top: 1px solid #ece7df; display: flex; gap: 18px; color: var(--muted); font-size: 9px; }
 .resource-social-proof b { color: var(--ink); font-size: 11px; }
-.starter-resource-actions { display: grid; grid-template-columns: 1.35fr repeat(3, 1fr); }
+.starter-resource-actions { display: grid; grid-template-columns: 1.35fr 1fr 1fr; }
 .starter-resource-actions button { min-width: 0; min-height: 40px; padding: 8px; }
 .resource-approved-button { border: 1px solid #79b9ad; border-radius: 8px; color: var(--teal-ink); background: #dff2ee; font-size: 9px; font-weight: 800; cursor: pointer; }
 .resource-approval-note { margin: 14px 0 0; color: var(--muted); font-size: 9px; text-align: center; }
@@ -853,8 +853,9 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .resource-pdf-panel iframe { width: 100%; height: 100%; min-height: 500px; border: 0; border-radius: 8px; background: #fff; }
 .resource-pdf-panel > a { color: var(--teal-ink); font-size: 9px; font-weight: 800; text-align: center; }
 .resource-conversation { min-width: 0; min-height: 0; padding: 16px; display: flex; flex-direction: column; overflow: hidden; }
-.resource-reader-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.resource-reader-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .resource-reader-actions button { min-height: 38px; padding: 7px; justify-content: center; }
+.resource-reader-actions a { min-height: 38px; padding: 7px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .resource-reader-description { margin: 14px 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .resource-comments-heading { padding: 12px 0 9px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
 .resource-comments-heading b { font-size: 12px; }
@@ -928,6 +929,58 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .discussion-empty b { margin-top: 12px; font-size: 14px; }
 .discussion-empty p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
 
+/* Focused lesson planning */
+.home-page { animation: kalinga-rise .42s .06s cubic-bezier(.22, 1, .36, 1) both; }
+.planner-paths { margin-top: 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.planner-paths > button { min-height: 220px; padding: 28px; border: 1px solid var(--line); border-radius: 18px; display: flex; flex-direction: column; align-items: flex-start; color: var(--ink); background: var(--paper); text-align: left; cursor: pointer; box-shadow: var(--shadow); transition: transform .18s ease, border-color .18s ease; }
+.planner-paths > button:hover { border-color: #78b8ad; transform: translateY(-2px); }
+.planner-paths > button.recommended { border-color: #8cc7bd; background: linear-gradient(145deg, #f8fffd, #e3f3f0); }
+.planner-paths span { color: var(--orange-dark); font-size: 9px; font-weight: 850; letter-spacing: .08em; }
+.planner-paths strong { margin-top: 13px; font: 700 25px/1.15 var(--font-ui); }
+.planner-paths p { max-width: 500px; margin: 10px 0 24px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.planner-paths b { margin-top: auto; color: var(--teal-ink); font-size: 11px; }
+.quick-plan-setup { margin-top: 24px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--paper); box-shadow: var(--shadow); }
+.quick-plan-setup > header { padding: 24px 26px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #eef8f5; }
+.quick-plan-setup h2 { margin: 4px 0 7px; font-family: var(--font-ui); font-size: 25px; }
+.quick-plan-setup header p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; }
+.quick-plan-fields { padding: 24px 26px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.quick-plan-fields label { color: var(--ink); font-size: 11px; font-weight: 800; }
+.quick-plan-fields label > input, .quick-plan-fields label > select { width: 100%; min-height: 46px; margin-top: 7px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #fff; }
+.quick-plan-fields .wide { grid-column: 1 / -1; }
+.quick-plan-setup > footer { padding: 16px 26px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plan-task-nav { margin: 0 20px 18px; padding: 6px; border: 1px solid var(--line); border-radius: 13px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; background: #f5f1ea; }
+.plan-task-nav button { min-height: 57px; padding: 8px 10px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
+.plan-task-nav button.active { color: var(--ink); background: #fff; box-shadow: 0 4px 14px rgba(40, 34, 26, .07); }
+.plan-task-nav b, .plan-task-nav small { display: block; }
+.plan-task-nav b { font-size: 10px; }.plan-task-nav small { margin-top: 4px; font-size: 8px; }
+.plan-task-overview { margin: 0 20px 22px; padding: 24px; border: 1px solid #badbd5; border-radius: 15px; background: #f3fbf9; }
+.plan-task-overview > header h2 { margin: 5px 0 7px; font-family: var(--font-ui); font-size: 23px; }
+.plan-task-overview > header > p:last-child { margin: 0; color: var(--muted); font-size: 11px; }
+.plan-task-overview > div { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.plan-task-overview button { min-height: 82px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }
+.plan-task-overview button > span { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; color: var(--teal-ink); background: var(--teal); font-weight: 850; }
+.plan-task-overview button p { margin: 0; }.plan-task-overview button b, .plan-task-overview button small { display: block; }.plan-task-overview button b { font-size: 11px; }.plan-task-overview button small { margin-top: 4px; color: var(--muted); font-size: 8px; line-height: 1.4; }.plan-task-overview button strong { color: var(--teal-ink); font-size: 9px; white-space: nowrap; }
+.focused-plan-task > summary { cursor: default; pointer-events: none; }
+.class-plan-grid > button > span:last-child small { margin-bottom: 5px; color: var(--teal-ink); font-size: 8px; }
+
+/* Teacher mentions and shared materials */
+.community-explainer { margin-top: 16px; padding: 12px 15px; border: 1px solid #b9d8d2; border-radius: 13px; display: flex; align-items: center; gap: 12px; background: #edf8f5; }
+.community-explainer > span { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: #fff; background: var(--teal-ink); font-weight: 850; }
+.community-explainer p { margin: 0; }.community-explainer b, .community-explainer small { display: block; }.community-explainer b { font-size: 11px; }.community-explainer small { margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.community-compose-tools { display: grid; grid-template-columns: minmax(240px, .7fr) 1fr; gap: 14px; align-items: end; }
+.community-compose-tools > div > small { display: block; margin-bottom: 6px; color: var(--muted); font-size: 8px; font-weight: 800; }
+.community-compose-tools button, .community-compose-tools > div > span, .reply-tools button { margin: 0 5px 5px 0; padding: 6px 8px; border: 1px solid #b9d8d2; border-radius: 999px; color: var(--teal-ink); background: #fff; font-size: 8px; font-weight: 800; cursor: pointer; }
+.community-compose-tools > div > span { display: inline-block; color: var(--muted); cursor: default; }
+.teacher-mention { padding: 1px 4px; border-radius: 4px; color: var(--teal-ink); background: #dff2ee; font-weight: 800; }
+.community-material-card { max-width: 620px; margin-top: 12px; padding: 10px; border: 1px solid #b9d8d2; border-radius: 11px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; color: var(--ink); background: #f0f8f6; text-decoration: none; }
+.community-material-card > span { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; color: var(--teal-ink); background: #fff; font: 700 18px var(--font-display); }
+.community-material-card p { margin: 0 !important; }.community-material-card b, .community-material-card small { display: block; }.community-material-card b { color: var(--ink); font-size: 9px; }.community-material-card small { margin-top: 3px; color: var(--muted); font-size: 8px; }.community-material-card > strong { color: var(--teal-ink); font-size: 8px; }
+.reply-item > div { min-width: 0; flex: 1; }
+.reply-composer { margin-top: 16px; }
+.reply-tools { margin-top: 7px; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.reply-tools select { min-height: 31px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fff; font-size: 8px; font-weight: 750; }
+.reply-tools button { margin: 0; }
+
 @media (max-width: 980px) {
   .home-essential-actions { grid-template-columns: 1fr; }
   .library-scope-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -935,6 +988,12 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 }
 
 @media (max-width: 760px) {
+  .planner-paths, .quick-plan-fields, .plan-task-overview > div, .community-compose-tools { grid-template-columns: 1fr; }
+  .quick-plan-fields .wide { grid-column: 1; }
+  .quick-plan-setup > footer { align-items: stretch; flex-direction: column; }
+  .plan-task-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow-x: auto; }
+  .plan-task-overview button { grid-template-columns: 40px minmax(0, 1fr); }
+  .plan-task-overview button > strong { grid-column: 2; }
   .library-scope-tabs, .resource-share-fields, .community-composer > div { grid-template-columns: 1fr; }
   .resource-share-fields label.wide, .community-composer label.wide { grid-column: 1; }
   .library-search-heading, .resource-share-form footer, .community-composer footer, .community-toolbar { align-items: stretch; flex-direction: column; }

@@ -10,7 +10,7 @@ type View = "home" | "classes" | "plan" | "library" | "attendance" | "community"
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
-type AppNotification = { id: string; kind: "reply" | "resource"; title: string; body: string; createdAt?: string; view: View };
+type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string };
 
 type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion";
 
@@ -236,6 +236,17 @@ function learnerRosterSummary(learners: ClassLearner[], compact = false) {
 function teacherLabel(name: string) {
   const cleaned = name.trim();
   return cleaned ? `Teacher ${cleaned}` : "Teacher";
+}
+
+function teacherMention(name: string, accountId = "") {
+  const cleaned = name.replace(/^Teacher\s+/i, "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const suffix = accountId.replace(/[^a-z0-9]/gi, "").slice(0, 4).toLowerCase();
+  return `@${cleaned || "teacher"}${suffix ? `_${suffix}` : ""}`;
+}
+
+function hasTeacherMention(message: string, tag: string) {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`${escaped}(?=\\s|[.,!?;:]|$)`, "i").test(message);
 }
 
 function teacherInitials(name: string) {
@@ -542,6 +553,7 @@ export default function Home() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [replyNotifications, setReplyNotifications] = useState<AppNotification[]>([]);
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
+  const [communityTargetId, setCommunityTargetId] = useState("");
   const workspaceScope = entryMode === "authenticated" && teacherAccountId
     ? `teacher-${teacherAccountId}`
     : entryMode === "prototype"
@@ -683,43 +695,47 @@ export default function Home() {
     let active = true;
 
     async function refreshNotifications() {
-      const [discussionResult, readResult] = await Promise.all([
-        supabase!.from("teacher_discussions").select("id,title").eq("author_id", teacherAccountId),
+      const [discussionResult, replyResult, readResult] = await Promise.all([
+        supabase!.from("teacher_discussions").select("id,title,body,author_id,author_name,created_at").order("created_at", { ascending: false }).limit(100),
+        supabase!.from("teacher_replies").select("id,discussion_id,author_id,author_name,body,created_at").order("created_at", { ascending: false }).limit(500),
         supabase!.from("notification_reads").select("notification_id").eq("teacher_id", teacherAccountId),
       ]);
       if (!active) return;
       if (!readResult.error) setNotificationReadIds((readResult.data || []).map((row) => String(row.notification_id)));
-      if (discussionResult.error || !discussionResult.data?.length) {
+      if (discussionResult.error || replyResult.error) {
         setReplyNotifications([]);
         return;
       }
-      const discussionTitles = new Map(discussionResult.data.map((row) => [String(row.id), String(row.title)]));
-      const { data, error } = await supabase!.from("teacher_replies")
-        .select("id,discussion_id,author_id,author_name,created_at")
-        .in("discussion_id", [...discussionTitles.keys()])
-        .neq("author_id", teacherAccountId)
-        .order("created_at", { ascending: false })
-        .limit(30);
-      if (!active || error) return;
-      setReplyNotifications((data || []).map((row) => ({
-        id: `reply:${String(row.id)}`,
-        kind: "reply",
-        title: `${String(row.author_name)} replied`,
-        body: discussionTitles.get(String(row.discussion_id)) || "Your teacher question",
-        createdAt: String(row.created_at),
-        view: "community",
-      })));
+      const discussions = discussionResult.data || [];
+      const replies = replyResult.data || [];
+      const myTag = teacherMention(teacherName, teacherAccountId);
+      const discussionTitles = new Map(discussions.map((row) => [String(row.id), String(row.title)]));
+      const myDiscussionIds = new Set(discussions.filter((row) => String(row.author_id) === teacherAccountId).map((row) => String(row.id)));
+      const directReplies: AppNotification[] = replies
+        .filter((row) => myDiscussionIds.has(String(row.discussion_id)) && String(row.author_id) !== teacherAccountId && !hasTeacherMention(String(row.body || ""), myTag))
+        .slice(0, 30)
+        .map((row) => ({ id: `reply:${String(row.id)}`, kind: "reply", title: `${String(row.author_name)} replied`, body: discussionTitles.get(String(row.discussion_id)) || "Your teacher question", createdAt: String(row.created_at), view: "community", targetId: String(row.discussion_id) }));
+      const mentionedDiscussions: AppNotification[] = discussions
+        .filter((row) => String(row.author_id) !== teacherAccountId && hasTeacherMention(String(row.body || ""), myTag))
+        .map((row) => ({ id: `mention:discussion:${String(row.id)}`, kind: "mention", title: `${String(row.author_name)} mentioned you`, body: String(row.title), createdAt: String(row.created_at), view: "community", targetId: String(row.id) }));
+      const mentionedReplies: AppNotification[] = replies
+        .filter((row) => String(row.author_id) !== teacherAccountId && hasTeacherMention(String(row.body || ""), myTag))
+        .map((row) => ({ id: `mention:reply:${String(row.id)}`, kind: "mention", title: `${String(row.author_name)} mentioned you`, body: discussionTitles.get(String(row.discussion_id)) || "Teacher discussion", createdAt: String(row.created_at), view: "community", targetId: String(row.discussion_id) }));
+      setReplyNotifications([...mentionedDiscussions, ...mentionedReplies, ...directReplies]
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 40));
     }
 
     void refreshNotifications();
     const channel = supabase.channel(`notifications-${teacherAccountId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_replies" }, () => { void refreshNotifications(); })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_discussions" }, () => { void refreshNotifications(); })
       .subscribe();
     return () => {
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [entryMode, teacherAccountId]);
+  }, [entryMode, teacherAccountId, teacherName]);
 
   useEffect(() => {
     if (!gabayOpen) return;
@@ -765,7 +781,7 @@ export default function Home() {
     home: activeClass ? ["Open today’s class", "Plan a lesson", "Take attendance", "Find a resource"] : ["Set up the first class", "Preview sample data"],
     classes: activeClass ? ["Manage learners", "Edit meeting times", "Create a lesson", "Take attendance"] : ["Set up the first class"],
     plan: ["Choose a class", "Continue the lesson plan", "Review incomplete ILAW sections", "Save the lesson"],
-    library: ["Search resources", "Filter by subject", "Save a resource for offline use", "Share a resource"],
+    library: ["Open a ready-to-use PDF", "Filter by subject", "Discuss a resource with teachers", "Share a resource"],
     attendance: ["Change the attendance date", "Filter by grade", "Mark learners present", "Save attendance"],
     community: ["Start a discussion", "Ask a clearer question", "Reply to another teacher"],
   };
@@ -792,7 +808,7 @@ export default function Home() {
     ...livePageContext,
   };
   gabayPageContext.currentSummary = [
-    `Teacher account has ${classes.length} classes, ${savedPlans.length} saved lesson plans, and ${savedResourceIds.length} saved resources`,
+    `Teacher account has ${classes.length} classes and ${savedPlans.length} saved lesson plans; 2 starter PDF resources are available`,
     ...classes.slice(0, 12).map((item) => `${item.name}: ${gradeList(item.grades)}; ${item.subjects.join(", ")}; ${item.learners.length} learners`),
     ...(gabayPageContext.currentSummary || []),
   ];
@@ -817,6 +833,7 @@ export default function Home() {
   function openNotification(item: AppNotification) {
     markNotificationsRead([item.id]);
     setNotificationsOpen(false);
+    if (item.view === "community") setCommunityTargetId(item.targetId || "");
     setView(item.view);
   }
 
@@ -967,12 +984,12 @@ export default function Home() {
           <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}><span className="nav-icon">▦</span> Classes &amp; learners</button>
           <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => beginPlan()}><span className="nav-icon">＋</span> Plan lessons</button>
           <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}><span className="nav-icon">▱</span> Find resources</button>
-          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => setView("community")}><span className="nav-icon">♧</span> Ask teachers</button>
+          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setView("community"); }}><span className="nav-icon">♧</span> Ask teachers</button>
         </nav>
 
         <div className="offline-card">
           <span className="status-dot" />
-          <div><strong>Offline-ready</strong><small>{savedResourceIds.length} {savedResourceIds.length === 1 ? "resource" : "resources"} saved</small></div>
+          <div><strong>Teaching kit</strong><small>2 starter PDFs ready</small></div>
         </div>
 
         <div className="account-anchor desktop-account">
@@ -1004,7 +1021,7 @@ export default function Home() {
         </header>
 
         <div className="content">
-          {view === "home" ? <>
+          {view === "home" ? <div className="view-page home-page">
             <GabayTodayBriefing teacherName={teacherName} activeClass={activeClass} blocks={todayTeachingBlocks} nextBlock={nextTeachingBlock} missingPlanCount={missingPlanCount} attendanceSavedCount={attendanceSavedCount} latestUpdate={gabayEventMessage} motion={gabayMotion} onOpen={() => setGabayOpen(true)} onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} />
             {(authWelcomeMessage || notice) && <p className="notice" role="status">{authWelcomeMessage || notice}</p>}
             {activeClass && <section className="home-essentials-grid">
@@ -1012,19 +1029,19 @@ export default function Home() {
               <article className="home-action-card">
                 <div className="home-action-heading"><div><p className="eyebrow">WORKING WITH</p><h2>{activeClass.name}</h2><p>{gradeList(activeClass.grades)} · {activeClass.learners.length} learners</p></div>{classes.length > 1 && <select aria-label="Choose active class" value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>}</div>
                 <div className="home-essential-actions">
-                  <button type="button" onClick={() => beginPlan(latestPlan?.id)}><span>＋</span><p><b>{latestPlan ? "Review lesson" : "Plan a lesson"}</b><small>{latestPlan ? `${latestPlan.title} is ready to edit.` : "Build a step-by-step ILAW lesson for this class."}</small></p><b>→</b></button>
+                  <button type="button" onClick={() => beginPlan(latestPlan?.id)}><span>＋</span><p><b>{latestPlan ? "Continue lesson" : "Plan a lesson"}</b><small>{latestPlan ? `${latestPlan.title} · ${corePlanTasksReady(latestPlan)}/3 core tasks ready.` : "Start with the essentials, then edit one task at a time."}</small></p><b>→</b></button>
                   <button type="button" onClick={() => setView("attendance")}><span>✓</span><p><b>Take attendance</b><small>{activeAttendance.length ? `${activeAttendance.length} records saved. Open to review them.` : `Mark the status of ${activeClass.learners.length} learners.`}</small></p><b>→</b></button>
                   <button type="button" onClick={() => setView("library")}><span>▤</span><p><b>Find a resource</b><small>Browse materials matched to these grade levels.</small></p><b>→</b></button>
                 </div>
               </article>
             </section>}
-          </> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} savedResourceIds={savedResourceIds} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onToggleSaved={toggleSavedResource} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => setView("community")}><span>♧</span>Ask</button>
+          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setView("community"); }}><span>♧</span>Ask</button>
         </nav>
       </section>
     </main>
@@ -1153,7 +1170,7 @@ function NotificationPanel({ notifications, readIds, authenticated, onOpen, onMa
   const unreadCount = notifications.filter((item) => !readIds.includes(item.id)).length;
   return <section className="notification-panel" role="dialog" aria-label="Notifications">
     <header><div><p className="eyebrow">WHAT NEEDS YOU</p><h2>Notifications</h2></div>{unreadCount > 0 && <button type="button" onClick={onMarkAll}>Mark all read</button>}</header>
-    {!authenticated ? <div className="notification-empty"><b>Sign in for personal notifications</b><p>Replies and class-matched resources belong to a teacher account.</p></div> : notifications.length ? <div className="notification-list">{notifications.map((item) => { const read = readIds.includes(item.id); return <button className={read ? "read" : ""} type="button" onClick={() => onOpen(item)} key={item.id}><span>{item.kind === "reply" ? "♧" : "▱"}</span><p><b>{item.title}</b><small>{item.body}</small>{item.createdAt && <em>{communityTime(item.createdAt)}</em>}</p>{!read && <i aria-label="Unread" />}</button>; })}</div> : <div className="notification-empty"><b>You’re caught up</b><p>New replies and useful class matches will appear here.</p></div>}
+    {!authenticated ? <div className="notification-empty"><b>Sign in for personal notifications</b><p>Replies, mentions, and class-matched resources belong to a teacher account.</p></div> : notifications.length ? <div className="notification-list">{notifications.map((item) => { const read = readIds.includes(item.id); return <button className={read ? "read" : ""} type="button" onClick={() => onOpen(item)} key={item.id}><span>{item.kind === "mention" ? "@" : item.kind === "reply" ? "↩" : "▱"}</span><p><b>{item.title}</b><small>{item.body}</small>{item.createdAt && <em>{communityTime(item.createdAt)}</em>}</p>{!read && <i aria-label="Unread" />}</button>; })}</div> : <div className="notification-empty"><b>You’re caught up</b><p>New replies, mentions, and useful class matches will appear here.</p></div>}
     <footer>Only useful signals—no noisy activity feed.</footer>
   </section>;
 }
@@ -1643,10 +1660,9 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
 
           {workspaceTab === "schedule" && <section className="class-tab-panel"><header><div><p className="eyebrow">SCHEDULE</p><h3>Class meeting times</h3><p>{selectedClass.meetings.length} saved {selectedClass.meetings.length === 1 ? "block" : "blocks"}</p></div><button className="secondary-button" type="button" onClick={() => editClass(selectedClass, "schedule")}>Edit schedule</button></header><div className="class-meeting-list">{selectedClass.meetings.map((meeting) => <article key={meeting.id}><time>{meeting.startTime}</time><div><b>{meeting.label || "Regular class"}</b><small>{meeting.days} · {meeting.durationMinutes} minutes</small></div></article>)}</div>{currentPlan && <details className="class-plan-preview"><summary>Preview the latest lesson timetable <span>⌄</span></summary><div className="timeline compact-timeline">{currentPlan.slots.map((slot, index) => <div className="timeline-row" key={slot.id}><time>{slot.time}</time><div className={`timeline-event ${index ? `grade${index}` : "shared"}`}><strong>{slot.teacherFocus}</strong><small>{Object.values(slot.gradeTasks).filter(Boolean).join(" · ") || "Activities not added yet"}</small></div></div>)}</div></details>}</section>}
 
-          {workspaceTab === "lessons" && <section className="class-tab-panel"><header><div><p className="eyebrow">LESSON PLANS</p><h3>{selectedPlans.length ? `${selectedPlans.length} saved` : "No saved lessons yet"}</h3><p>Every plan for {selectedClass.name} stays together here.</p></div><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button></header>{selectedPlans.length ? <div className="class-plan-links class-plan-grid">{selectedPlans.map((plan) => <button type="button" key={plan.id} onClick={() => onPlan(plan.id)}><span><b>{plan.title}</b><small>{plan.subject} · {plan.quarter} · {plan.duration}</small></span><span>Open →</span></button>)}</div> : <div className="class-tab-empty"><span>＋</span><b>Start with one lesson</b><p>Choose a subject and let Gabay help with editable starting points.</p></div>}</section>}
+          {workspaceTab === "lessons" && <section className="class-tab-panel"><header><div><p className="eyebrow">LESSON PLANS</p><h3>{selectedPlans.length ? `${selectedPlans.length} saved` : "No saved lessons yet"}</h3><p>Every plan for {selectedClass.name} stays together here.</p></div><button className="primary-button" type="button" onClick={() => onPlan()}>＋ New lesson</button></header>{selectedPlans.length ? <div className="class-plan-links class-plan-grid">{selectedPlans.map((plan) => { const readyTasks = corePlanTasksReady(plan); return <button type="button" key={plan.id} onClick={() => onPlan(plan.id)}><span><b>{plan.title}</b><small>{plan.subject} · {plan.quarter} · {plan.duration}</small></span><span><small>{readyTasks}/3 core tasks ready</small>Continue →</span></button>; })}</div> : <div className="class-tab-empty"><span>＋</span><b>Start with one lesson</b><p>Choose a subject and let Gabay help with editable starting points.</p></div>}</section>}
         </div>
       </section></>}
-      {!!classes.length && !formOpen && <section className="add-class-bottom"><div><p className="eyebrow">NEW SCHOOL TERM OR TEACHING LOAD?</p><h2>Need another class?</h2><p>Add another class only when you begin managing a new group of learners.</p></div><button className="secondary-button" type="button" onClick={openNewClassForm}>＋ Add another class</button></section>}
       {(formOpen || !classes.length) && <form className={`class-setup-card class-form-drawer ${!classes.length ? "first-class-form" : ""}`} onSubmit={submitClass}>
         <nav className="class-wizard-progress" aria-label="Class setup progress">
           {[{ number: 1, title: "Class details", detail: "Grades and subjects" }, { number: 2, title: "Schedule", detail: "Days and times" }, { number: 3, title: "Learners", detail: "Optional" }].map((step) => <div className={`${classStep === step.number ? "current" : ""} ${classStep > step.number ? "complete" : ""}`} aria-current={classStep === step.number ? "step" : undefined} key={step.number}><span>{classStep > step.number ? "✓" : step.number}</span><p><b>{step.title}</b><small>{step.detail}</small></p></div>)}
@@ -1748,8 +1764,18 @@ function createSchedule(grades: GradeLevel[], startTime = "8:00 AM", duration: s
   return [{ id: "slot-shared", time: startTime, teacherFocus: "All grades together", gradeTasks: sharedTasks }, ...guidedSlots];
 }
 
+function corePlanTasksReady(plan: SavedPlan) {
+  return [
+    plan.grades.every((grade) => plan.competencies?.[grade]?.trim() || plan.objectives?.[grade]?.trim()),
+    plan.slots.some((slot) => slot.teacherFocus.trim() || Object.values(slot.gradeTasks).some((task) => task.trim())),
+    plan.grades.every((grade) => plan.formativeAssessments?.[grade]?.trim()),
+  ].filter(Boolean).length;
+}
+
 function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(initialPlan ? 3 : 1);
+  const [plannerEntry, setPlannerEntry] = useState<"choose" | "quick" | "full">(initialPlan ? "full" : "choose");
+  const [activePlanTask, setActivePlanTask] = useState<"overview" | "intentions" | "experience" | "assessment" | "after">("overview");
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const [grades, setGrades] = useState(initialPlan?.grades || selectedClass?.grades || []);
@@ -1789,11 +1815,15 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     step === 3 && !slots.some((slot) => Object.values(slot.gradeTasks).some((task) => task.trim())) && "learning experience",
     step === 3 && !grades.every((grade) => formativeAssessments[grade]?.trim()) && "assessment",
   ].filter(Boolean) as string[], [competencies, formativeAssessments, grades, objectives, slots, step, subject]);
+  const intentionDone = grades.length > 0 && grades.every((grade) => competencies[grade]?.trim() || objectives[grade]?.trim());
+  const experienceDone = slots.some((slot) => slot.teacherFocus.trim() || Object.values(slot.gradeTasks).some((task) => task.trim()));
+  const assessmentDone = grades.length > 0 && grades.every((grade) => formativeAssessments[grade]?.trim());
+  const afterLessonDone = Boolean(reflection.trim() || remediation.trim() || enrichment.trim() || nextSessionNotes.trim());
 
   useEffect(() => {
     onGabayContext({
       view: "plan",
-      pageStep: step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : activeAssessmentGrade ? `ILAW plan · ${gradeLabel(activeAssessmentGrade)} assessment` : activeIntentionGrade ? `ILAW plan · ${gradeLabel(activeIntentionGrade)} intentions` : "ILAW plan",
+      pageStep: plannerEntry === "choose" ? "Choose a planning path" : plannerEntry === "quick" ? "Quick lesson setup" : step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : `Lesson task · ${activePlanTask}`,
       classId: selectedClass?.id,
       className: selectedClass?.name,
       gradeLevels: grades,
@@ -1806,7 +1836,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
       currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`), saved ? "Draft is saved" : "Draft has unsaved changes"],
       availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Continue to the ILAW plan"] : ["Complete intentions", "Build the learning experience", "Add assessment", "Save the lesson"],
     });
-  }, [activeAssessmentGrade, activeIntentionGrade, competencies, duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, saved, selectedClass, sharedTheme, startTime, step, subject]);
+  }, [activePlanTask, competencies, duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, plannerEntry, saved, selectedClass, sharedTheme, startTime, step, subject]);
 
   function canOpenPlanStep(nextStep: 1 | 2 | 3) {
     if (nextStep === 1) return true;
@@ -1979,11 +2009,23 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
     <div className="view-page plan-page">
       <PageIntro
         eyebrow="CREATE · MULTIGRADE LESSON"
-        title={step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : "Complete your ILAW lesson"}
-        description={step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : "Open one ILAW section at a time, then save whenever the plan is ready."}
+        title={plannerEntry === "choose" ? "How do you want to begin?" : plannerEntry === "quick" ? "Start with the essentials" : step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : lessonTitle || "Your editable lesson plan"}
+        description={plannerEntry === "choose" ? "Pick the amount of structure you need today. You can always open the detailed ILAW fields later." : plannerEntry === "quick" ? "One compact setup, then edit only the part of the lesson you need." : step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : "Choose one task below. The rest stays out of the way."}
         action={<button className="secondary-button" type="button" onClick={onBack}>← Back home</button>}
       />
 
+      {plannerEntry === "choose" && <section className="planner-paths">
+        <button className="recommended" type="button" onClick={() => setPlannerEntry("quick")}><span>QUICK START · RECOMMENDED</span><strong>Get to an editable plan fast</strong><p>Confirm the class, subject, title, and time on one screen. Then work on only one lesson task at a time.</p><b>Start a focused plan →</b></button>
+        <button type="button" onClick={() => setPlannerEntry("full")}><span>FULL SETUP</span><strong>Build it section by section</strong><p>Use the guided class and lesson-detail steps when you need to change grades, language, or the teaching window.</p><b>Use the full setup →</b></button>
+      </section>}
+
+      {plannerEntry === "quick" && <section className="quick-plan-setup">
+        <header><div><p className="eyebrow">ONLY THE ESSENTIALS</p><h2>What are you teaching?</h2><p>Your saved class already supplies the grades and learners. Gabay can help inside Intentions and Assessment after this.</p></div><GabayMascot size="medium" motion /></header>
+        <div className="quick-plan-fields"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Subject<input list="quick-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type a subject" /><datalist id="quick-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist></label><label className="wide">Lesson title <small>Optional</small><input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="e.g. Comparing fractions with bottle caps" /></label><label>Starts at<TimePicker value={startTime} onChange={setStartTime} /></label><label>Class time<div className="duration-input"><input aria-label="Class time in minutes" type="number" min="5" max="600" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} /><span>minutes</span></div></label></div>
+        <footer><button className="secondary-button" type="button" onClick={() => setPlannerEntry("choose")}>← Other ways to start</button><button className="primary-button" type="button" disabled={!selectedClassId || !subject.trim()} onClick={() => { setSlots(createSchedule(grades, startTime, duration)); setStep(3); setActivePlanTask("overview"); setPlannerEntry("full"); }}>Open my lesson workspace →</button></footer>
+      </section>}
+
+      {plannerEntry === "full" && <>
       <div className="stepper" aria-label={`Step ${step} of 3`}>
         {(["Class & lesson", "Lesson details", "ILAW plan"] as const).map((label, index) => { const targetStep = (index + 1) as 1 | 2 | 3; return <button type="button" key={label} disabled={!canOpenPlanStep(targetStep)} onClick={() => goToPlanStep(targetStep)} aria-current={step === targetStep ? "step" : undefined} className={step === targetStep ? "current" : step > targetStep ? "complete" : ""}><span>{step > targetStep ? "✓" : targetStep}</span><strong>{label}</strong></button>; })}
       </div>
@@ -2041,25 +2083,40 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
           <div className="plan-title"><div><p className="eyebrow">{quarter} · MULTIGRADE LESSON PLAN</p><input className="plan-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); setSaved(false); }} /><p>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} · {durationMinutes(duration)} minutes total · {language}</p></div><button className="icon-button" type="button" aria-label="More lesson actions">···</button></div>
           <div className="ilaw-plan-summary"><div><span>Class</span><b>{selectedClass?.name}</b></div><div><span>Grade levels</span><b>{gradeList(grades)}</b></div><div><span>Enrolled learners</span><b>{selectedClass?.learners.length || 0} total · {planRosterCounts.female}F · {planRosterCounts.male}M{planRosterCounts.unspecified ? ` · ${planRosterCounts.unspecified} not set` : ""}</b></div><div><span>Multigrade model</span><b>{multigradeModel}</b></div>{sharedTheme && <div className="wide"><span>Shared theme</span><b>{sharedTheme}</b></div>}</div>
 
-          <details className="ilaw-disclosure intentions-section">
+          <nav className="plan-task-nav" aria-label="Lesson plan tasks">{([
+            ["overview", "Overview", "See what needs attention"],
+            ["intentions", "Intentions", intentionDone ? "Ready" : "Needs work"],
+            ["experience", "Teaching flow", experienceDone ? "Ready" : "Needs work"],
+            ["assessment", "Assessment", assessmentDone ? "Ready" : "Needs work"],
+            ["after", "After lesson", afterLessonDone ? "Started" : "Optional"],
+          ] as const).map(([value, label, status]) => <button className={activePlanTask === value ? "active" : ""} type="button" onClick={() => setActivePlanTask(value)} key={value}><b>{label}</b><small>{status}</small></button>)}</nav>
+
+          {activePlanTask === "overview" && <section className="plan-task-overview"><header><p className="eyebrow">CHOOSE WHAT TO WORK ON</p><h2>You do not have to finish everything now.</h2><p>Open one task, save your progress, and return when the next detail is useful.</p></header><div>
+            <button type="button" onClick={() => setActivePlanTask("intentions")}><span>I</span><p><b>Set learning intentions</b><small>Competency and objective for each grade</small></p><strong>{intentionDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("experience")}><span>L</span><p><b>Shape the teaching flow</b><small>Activities, rotations, materials, and timing</small></p><strong>{experienceDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("assessment")}><span>A</span><p><b>Add a learning check</b><small>Gabay can draft an editable check per grade</small></p><strong>{assessmentDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("after")}><span>W</span><p><b>Reflect after class</b><small>Optional notes for support and the next session</small></p><strong>{afterLessonDone ? "Continue →" : "Later"}</strong></button>
+          </div></section>}
+
+          {activePlanTask === "intentions" && <details open className="ilaw-disclosure intentions-section focused-plan-task">
             <summary><span className="ilaw-letter">I</span><span><small>INTENTIONS</small><b>Set what each group should learn</b><em>{grades.length} grade {grades.length === 1 ? "group" : "groups"} · open one at a time</em></span></summary>
             <div className="ilaw-disclosure-body intentions-body">
               <p className="competency-guidance">Nothing is generated without a verified source. Enter only what you know, or leave a field blank and return later.</p>
               <details className="ilaw-optional-disclosure"><summary><span>Shared theme and multigrade approach</span><small>Optional lesson setup</small></summary><div className="ilaw-intention-grid"><label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label><label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label></div></details>
               <div className="intention-grade-list">{grades.map((grade) => <details className={`competency-card competency-disclosure grade-${grade}`} onToggle={(event) => { if (event.currentTarget.open) setActiveIntentionGrade(grade); }} key={grade}><summary><span><b>{gradeLabel(grade)}</b><small>{subject || "Subject not entered"} · {quarter}</small></span><span>{competencies[grade] || objectives[grade] ? "Started" : "Not started"}</span></summary><div className="competency-fields"><div className="gabay-draft-intention"><div><GabayMascot size="small" motion /><p><b>Need a starting point?</b><span>Gabay can suggest an editable—not official—draft for this grade.</span></p></div><button type="button" disabled={Boolean(draftingIntentionGrade)} onClick={() => draftGradeIntention(grade)}>{draftingIntentionGrade === grade ? "Drafting…" : intentionSuggestions[grade] ? "Try another draft" : "Draft with Gabay"}</button></div>{intentionDraftErrors[grade] && <p className="gabay-draft-error" role="alert">{intentionDraftErrors[grade]}</p>}{intentionSuggestions[grade] && <aside className="gabay-intention-review"><p className="eyebrow">GABAY’S DRAFT · REVIEW FIRST</p><div><p><b>Possible competency</b><span>{intentionSuggestions[grade].competency}</span></p><p><b>Possible objective</b><span>{intentionSuggestions[grade].objective}</span></p></div><footer><button className="secondary-button" type="button" onClick={() => setIntentionSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)))}>Dismiss</button><button className="primary-button" type="button" onClick={() => applyGradeIntention(grade)}>Use and edit this draft</button></footer></aside>}<label>Learning competency<textarea value={competencies[grade] || ""} onFocus={() => setActiveIntentionGrade(grade)} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onFocus={() => setActiveIntentionGrade(grade)} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label><p className="competency-helper">Saved offline and editable at any time.</p></div></details>)}</div>
             </div>
-          </details>
+          </details>}
 
-          <details className="ilaw-disclosure learning-experience-disclosure">
+          {activePlanTask === "experience" && <details open className="ilaw-disclosure learning-experience-disclosure focused-plan-task">
             <summary><span className="ilaw-letter">L</span><span><small>LEARNING EXPERIENCE</small><b>Build the teaching flow</b><em>{slots.length} editable blocks · {durationMinutes(duration)} minutes</em></span></summary>
             <div className="ilaw-disclosure-body">
               <details className="ilaw-optional-disclosure"><summary><span>Learner context and materials</span><small>Optional details</small></summary><div className="ilaw-two-column"><label>Learner context<textarea value={learnerContext} onChange={(event) => { setLearnerContext(event.target.value); setSaved(false); }} placeholder="What do these learners already know, experience, or need?" /></label><label>Materials and references<textarea value={materials} onChange={(event) => { setMaterials(event.target.value); setSaved(false); }} placeholder="Local objects, activity sheets, curriculum references…" /></label></div></details>
               <div className="schedule-window-summary"><span>◎</span><p><b>Your teaching window</b><small>The blocks begin at {startTime}. Change a time only when the suggested flow does not fit your class.</small></p></div>
               <details className="schedule-editor-disclosure"><summary><span>Review or adjust the timetable</span><small>{slots.map((slot) => slot.time).join(" · ")}</small></summary><div className="rotation-table"><div className="rotation-head" style={{ "--grade-count": grades.length } as React.CSSProperties}><span>Start time</span><span>Teacher focus</span>{grades.map((grade) => <span key={grade}>{gradeLabel(grade)}</span>)}</div>{slots.map((slot) => <div className="rotation-row editable-row" style={{ "--grade-count": grades.length } as React.CSSProperties} key={slot.id}><div className="slot-time-editor"><TimePicker value={slot.time} onChange={(value) => updateSlotTime(slot.id, value)} /></div><input aria-label={`Teacher focus at ${slot.time}`} value={slot.teacherFocus} placeholder="Who has teacher support?" onChange={(event) => updateSlot(slot.id, "teacherFocus", event.target.value)} />{grades.map((grade) => <textarea aria-label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`${gradeLabel(grade)} activity`} onChange={(event) => updateGradeTask(slot.id, grade, event.target.value)} key={grade} />)}</div>)}</div><div className="schedule-actions"><button className="secondary-button" type="button" onClick={addSlot}>＋ Add schedule block</button><span>Changing one time shifts every later block. Activities remain independently editable.</span></div></details>
             </div>
-          </details>
+          </details>}
 
-          <details className="ilaw-disclosure assessment-section">
+          {activePlanTask === "assessment" && <details open className="ilaw-disclosure assessment-section focused-plan-task">
             <summary><span className="ilaw-letter">A</span><span><small>ASSESSMENT</small><b>Check learning by grade</b><em>Open when you are ready to add checks</em></span></summary>
             <div className="ilaw-disclosure-body assessment-workspace">
               <nav className="assessment-grade-tabs" aria-label="Assessment grade group">{grades.map((grade) => <button className={grade === (activeAssessmentGrade || grades[0]) ? "active" : ""} type="button" onClick={() => setActiveAssessmentGrade(grade)} key={grade}><span>{gradeLabel(grade)}</span><small>{formativeAssessments[grade]?.trim() ? "Started" : "Not started"}</small></button>)}</nav>
@@ -2070,15 +2127,16 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
                 <div className="assessment-fields"><label>How will you check learning?<textarea value={formativeAssessments[grade] || ""} onChange={(event) => { setFormativeAssessments((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="A question, performance, observation, or short activity" /></label><label>Exit task <small>Optional</small><textarea value={exitTasks[grade] || ""} onChange={(event) => { setExitTasks((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What will the learner do before the lesson ends?" /></label><label>Success criteria <small>Optional</small><textarea value={successCriteria[grade] || ""} onChange={(event) => { setSuccessCriteria((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder="What counts as successful learning?" /></label></div>
               </article>)}
             </div>
-          </details>
+          </details>}
 
-          <details className="ilaw-disclosure ways-forward-section">
+          {activePlanTask === "after" && <details open className="ilaw-disclosure ways-forward-section focused-plan-task">
             <summary><span className="ilaw-letter">W</span><span><small>WAYS FORWARD</small><b>Complete after the lesson</b><em>Reflection, remediation, enrichment, and next steps</em></span></summary>
             <div className="ilaw-disclosure-body"><p className="after-lesson-note">This section is intentionally optional during planning. Return after teaching while the lesson is still fresh.</p><div className="ilaw-two-column"><label>Reflection<textarea value={reflection} onChange={(event) => { setReflection(event.target.value); setSaved(false); }} placeholder="What worked, and who still needs support?" /></label><label>Remediation<textarea value={remediation} onChange={(event) => { setRemediation(event.target.value); setSaved(false); }} placeholder="What support will learners receive?" /></label><label>Enrichment<textarea value={enrichment} onChange={(event) => { setEnrichment(event.target.value); setSaved(false); }} placeholder="What extension can ready learners do?" /></label><label>Notes for the next session<textarea value={nextSessionNotes} onChange={(event) => { setNextSessionNotes(event.target.value); setSaved(false); }} placeholder="What should continue or change next time?" /></label></div></div>
-          </details>
-          <div className="plan-notes"><article><span>✦</span><div><b>You control the timetable</b><p>The generated blocks are only a starting point based on the lesson window you entered.</p></div></article><button className="text-button" type="button" onClick={() => setSlots(createSchedule(grades, startTime, duration))}>Reset from {startTime}</button></div>
+          </details>}
+          {activePlanTask === "experience" && <div className="plan-notes"><article><span>✦</span><div><b>You control the timetable</b><p>The generated blocks are only a starting point based on the lesson window you entered.</p></div></article><button className="text-button" type="button" onClick={() => setSlots(createSchedule(grades, startTime, duration))}>Reset from {startTime}</button></div>}
         </section>
       )}
+      </>}
     </div>
   );
 }
@@ -2098,19 +2156,17 @@ type LibraryResource = {
 };
 
 type ResourceComment = { id: string; resourceId: string; teacherId: string; teacherName: string; body: string; createdAt: string };
-type ResourceApproval = { resourceId: string; teacherId: string };
 
 const starterResources: LibraryResource[] = [
   { id: "starter-math", icon: "½", title: "Fraction Market with Bottle Caps", type: "Teacher guide + learner sheet", grades: "Grades 3-5", subject: "Mathematics", tags: ["Multigrade", "No printer", "Local objects"], description: "A ready-to-teach fraction activity with differentiated grade guidance, a learner record sheet, and an exit check.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/fraction-market-bottle-cap-math.pdf" },
   { id: "starter-science", icon: "☘", title: "Schoolyard Plant Detectives", type: "Investigation guide + field notes", grades: "Grades 3-5", subject: "Science", tags: ["Outdoor", "Low-cost", "Evidence-based"], description: "A safe local-plant investigation with multigrade prompts, an observation table, and an evidence-based claim activity.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/schoolyard-plant-detectives-science.pdf" },
 ];
 
-function LibraryView({ classes, activeClassId, savedResourceIds, authenticated, teacherAccountId, teacherName, onToggleSaved, onSetUpClass, onRequestSignIn, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; savedResourceIds: string[]; authenticated: boolean; teacherAccountId: string; teacherName: string; onToggleSaved: (id: string) => void; onSetUpClass: () => void; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
-  const [filter, setFilter] = useState<"all" | "Mathematics" | "Science" | "saved">("all");
+function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, teacherName, onSetUpClass, onRequestSignIn, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; authenticated: boolean; teacherAccountId: string; teacherName: string; onSetUpClass: () => void; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+  const [filter, setFilter] = useState<"all" | "Mathematics" | "Science">("all");
   const [libraryError, setLibraryError] = useState("");
   const [previewResource, setPreviewResource] = useState<LibraryResource>();
   const [comments, setComments] = useState<ResourceComment[]>([]);
-  const [approvals, setApprovals] = useState<ResourceApproval[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
@@ -2122,46 +2178,28 @@ function LibraryView({ classes, activeClassId, savedResourceIds, authenticated, 
     if (!supabase) return;
     let active = true;
     async function refresh() {
-      const [commentResult, approvalResult] = await Promise.all([
-        supabase!.from("resource_comments").select("id,resource_id,teacher_id,teacher_name,body,created_at").in("resource_id", starterResources.map((item) => item.id)).order("created_at"),
-        supabase!.from("resource_approvals").select("resource_id,teacher_id").in("resource_id", starterResources.map((item) => item.id)),
-      ]);
+      const commentResult = await supabase!.from("resource_comments").select("id,resource_id,teacher_id,teacher_name,body,created_at").in("resource_id", starterResources.map((item) => item.id)).order("created_at");
       if (!active) return;
-      if (commentResult.error || approvalResult.error) { setLibraryError("Teacher comments and approvals could not refresh. The PDFs are still available."); return; }
+      if (commentResult.error) { setLibraryError("Teacher comments could not refresh. The PDFs are still available."); return; }
       setComments((commentResult.data || []).map((row) => ({ id: String(row.id), resourceId: String(row.resource_id), teacherId: String(row.teacher_id), teacherName: String(row.teacher_name), body: String(row.body), createdAt: String(row.created_at) })));
-      setApprovals((approvalResult.data || []).map((row) => ({ resourceId: String(row.resource_id), teacherId: String(row.teacher_id) })));
       setLibraryError("");
     }
     void refresh();
-    const channel = supabase.channel(`resource-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "resource_comments" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "resource_approvals" }, () => { void refresh(); }).subscribe();
+    const channel = supabase.channel(`resource-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "resource_comments" }, () => { void refresh(); }).subscribe();
     return () => { active = false; void supabase.removeChannel(channel); };
   }, [authenticated, teacherAccountId]);
 
-  const visible = starterResources.filter((resource) => filter === "all" || filter === "saved" ? filter !== "saved" || savedResourceIds.includes(resource.id) : resource.subject === filter);
+  const visible = starterResources.filter((resource) => filter === "all" || resource.subject === filter);
   const previewComments = comments.filter((comment) => comment.resourceId === previewResource?.id);
-  const previewApprovals = approvals.filter((approval) => approval.resourceId === previewResource?.id);
-  const teacherApprovedPreview = previewApprovals.some((approval) => approval.teacherId === teacherAccountId);
 
   useEffect(() => {
     onGabayContext({
       view: "library", pageStep: previewResource ? `Review ${previewResource.title}` : "Choose a ready-to-use PDF resource", classId: activeClass?.id, className: activeClass?.name,
       gradeLevels: activeClass?.grades || [], subjects: activeClass?.subjects || [], learnerCount: activeClass?.learners.length || 0,
-      currentSummary: [`Filter: ${filter}`, `${visible.length} of 2 starter resources shown`, `${savedResourceIds.filter((id) => starterResources.some((resource) => resource.id === id)).length} starter resources saved by this account`, previewResource ? `${previewComments.length} comments and ${previewApprovals.length} teacher approvals on the open resource` : "No resource is currently open"],
+      currentSummary: [`Filter: ${filter}`, `${visible.length} of 2 starter resources shown`, previewResource ? `${previewComments.length} teacher comments on the open resource` : "No resource is currently open"],
       availableActions: ["Help adapt the Mathematics activity", "Help adapt the Science investigation", "Summarize the open PDF", "Draft a useful teacher comment"],
     });
-  }, [activeClass, filter, onGabayContext, previewApprovals.length, previewComments.length, previewResource, savedResourceIds, visible.length]);
-
-  async function toggleApproval(resource: LibraryResource) {
-    if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const approved = approvals.some((approval) => approval.resourceId === resource.id && approval.teacherId === teacherAccountId);
-    setApprovals((current) => approved ? current.filter((approval) => !(approval.resourceId === resource.id && approval.teacherId === teacherAccountId)) : [...current, { resourceId: resource.id, teacherId: teacherAccountId }]);
-    const { error } = approved
-      ? await supabase.from("resource_approvals").delete().eq("resource_id", resource.id).eq("teacher_id", teacherAccountId)
-      : await supabase.from("resource_approvals").insert({ resource_id: resource.id, teacher_id: teacherAccountId });
-    if (error) setLibraryError("That approval could not be saved. Please try again.");
-  }
+  }, [activeClass, filter, onGabayContext, previewComments.length, previewResource, visible.length]);
 
   async function shareResource(resource: LibraryResource) {
     const url = `${window.location.origin}${resource.pdfPath}`;
@@ -2188,16 +2226,14 @@ function LibraryView({ classes, activeClassId, savedResourceIds, authenticated, 
   }
 
   return <div className="view-page resource-library-page">
-    <PageIntro eyebrow="TWO READY-TO-USE PDFS" title="Open it. Teach it. Improve it together." description="No empty resource cards: these two complete PDFs can be viewed, saved, shared, approved, and discussed by teachers." />
-    <section className="starter-library-toolbar"><div role="tablist" aria-label="Filter starter resources">{[["all", "Both resources"], ["Mathematics", "Mathematics"], ["Science", "Science"], ["saved", `Saved (${savedResourceIds.filter((id) => starterResources.some((resource) => resource.id === id)).length})`]].map(([value, label]) => <button role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} type="button" onClick={() => setFilter(value as typeof filter)} key={value}>{label}</button>)}</div>{activeClass ? <p><b>Teaching {activeClass.name}</b><span>{gradeList(activeClass.grades)} · {activeClass.subjects.join(", ")}</span></p> : <button type="button" onClick={onSetUpClass}>Set up a class for matching →</button>}</section>
+    <PageIntro eyebrow="TWO READY-TO-USE PDFS" title="Open it. Teach it. Improve it together." description="Every card opens a real PDF. Share the file, then leave a useful note for the next teacher." />
+    <section className="starter-library-toolbar"><div role="tablist" aria-label="Filter starter resources">{[["all", "Both resources"], ["Mathematics", "Mathematics"], ["Science", "Science"]].map(([value, label]) => <button role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} type="button" onClick={() => setFilter(value as typeof filter)} key={value}>{label}</button>)}</div>{activeClass ? <p><b>Matched to {activeClass.name}</b><span>{gradeList(activeClass.grades)} · {activeClass.subjects.join(", ")}</span></p> : <button type="button" onClick={onSetUpClass}>Set up a class for matching →</button>}</section>
     {libraryError && <p className="library-error" role="status">{libraryError}</p>}
     {shareMessage && <p className="resource-share-message" role="status">{shareMessage}</p>}
     <section className="resource-grid starter-resource-grid">
-      {visible.map((resource) => { const resourceApprovals = approvals.filter((approval) => approval.resourceId === resource.id); const resourceComments = comments.filter((comment) => comment.resourceId === resource.id); const approved = resourceApprovals.some((approval) => approval.teacherId === teacherAccountId); return <article className={`library-card starter-resource-card ${resource.subject.toLowerCase()}`} key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.subject}</span></div><div className="library-body"><div className="library-badges"><span className="verified">PDF · {resource.pages} pages</span><span>{resource.type}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.author}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="resource-social-proof"><span><b>{resourceApprovals.length}</b> teacher {resourceApprovals.length === 1 ? "approval" : "approvals"}</span><span><b>{resourceComments.length}</b> {resourceComments.length === 1 ? "comment" : "comments"}</span></div><div className="library-actions starter-resource-actions"><button className="dark-button" type="button" onClick={() => setPreviewResource(resource)}>Open PDF</button><button className={savedResourceIds.includes(resource.id) ? "saved-button" : "secondary-button"} type="button" onClick={() => authenticated ? onToggleSaved(resource.id) : onRequestSignIn()}>{savedResourceIds.includes(resource.id) ? "✓ Saved" : "Save"}</button><button className={approved ? "resource-approved-button" : "secondary-button"} type="button" onClick={() => toggleApproval(resource)}>{approved ? "✓ Approved" : "Approve"}</button><button className="secondary-button" type="button" onClick={() => shareResource(resource)}>Share</button></div></div></article>; })}
+      {visible.map((resource) => { const resourceComments = comments.filter((comment) => comment.resourceId === resource.id); return <article className={`library-card starter-resource-card ${resource.subject.toLowerCase()}`} key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.subject}</span></div><div className="library-body"><div className="library-badges"><span className="verified">PDF · {resource.pages} pages</span><span>{resource.type}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.author}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="resource-social-proof"><span><b>{resourceComments.length}</b> teacher {resourceComments.length === 1 ? "note" : "notes"}</span><span>Notes are practical feedback, not official approval</span></div><div className="library-actions starter-resource-actions"><button className="dark-button" type="button" onClick={() => setPreviewResource(resource)}>View PDF</button><button className="secondary-button" type="button" onClick={() => setPreviewResource(resource)}>Discuss</button><button className="secondary-button" type="button" onClick={() => shareResource(resource)}>Share</button></div></div></article>; })}
     </section>
-    {!visible.length && <div className="empty-state"><b>No saved starter resources yet</b><p>Open Mathematics or Science, then save the PDF to this account.</p><button type="button" onClick={() => setFilter("all")}>Show both resources</button></div>}
-    <p className="resource-approval-note">Teacher approvals are community endorsements, not official curriculum verification. Review and adapt every resource for your class.</p>
-    {previewResource && <div className="resource-preview-backdrop"><section className="resource-reader" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><header><div><p className="eyebrow">{previewResource.subject} · PDF RESOURCE</p><h2 id="resource-preview-title">{previewResource.title}</h2></div><button type="button" aria-label="Close resource" onClick={() => { setPreviewResource(undefined); setCommentInput(""); }}>×</button></header><div className="resource-reader-layout"><div className="resource-pdf-panel"><iframe src={previewResource.pdfPath} title={`${previewResource.title} PDF`} /><a href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open PDF in a new tab ↗</a></div><aside className="resource-conversation"><div className="resource-reader-actions"><button className={savedResourceIds.includes(previewResource.id) ? "saved-button" : "secondary-button"} type="button" onClick={() => authenticated ? onToggleSaved(previewResource.id) : onRequestSignIn()}>{savedResourceIds.includes(previewResource.id) ? "✓ Saved" : "Save"}</button><button className={teacherApprovedPreview ? "resource-approved-button" : "secondary-button"} type="button" onClick={() => toggleApproval(previewResource)}>{teacherApprovedPreview ? "✓ Approved" : "Approve"} · {previewApprovals.length}</button><button className="secondary-button" type="button" onClick={() => shareResource(previewResource)}>Share</button></div><p className="resource-reader-description">{previewResource.description}</p><div className="resource-comments-heading"><b>Teacher comments</b><span>{previewComments.length}</span></div><div className="resource-comment-list">{previewComments.map((comment) => <article key={comment.id}><span className="avatar">{teacherInitials(comment.teacherName.replace(/^Teacher\s+/i, ""))}</span><p><b>{comment.teacherName} <small>{communityTime(comment.createdAt)}</small></b>{comment.body}</p></article>)}{!previewComments.length && <p>No comments yet. Add what worked, what you changed, or a question for other teachers.</p>}</div>{authenticated ? <form className="resource-comment-form" onSubmit={submitComment}><label className="sr-only" htmlFor="resource-comment">Comment on this resource</label><textarea id="resource-comment" maxLength={1500} value={commentInput} onChange={(event) => setCommentInput(event.target.value)} placeholder="What worked? What would you change?" /><button type="submit" disabled={!commentInput.trim() || submitting}>{submitting ? "Posting…" : "Comment"}</button><small>Do not include learner names or private records.</small></form> : <button className="resource-signin-comment" type="button" onClick={onRequestSignIn}>Sign in to approve, save, and comment</button>}</aside></div></section></div>}
+    {previewResource && <div className="resource-preview-backdrop"><section className="resource-reader" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><header><div><p className="eyebrow">{previewResource.subject} · PDF RESOURCE</p><h2 id="resource-preview-title">{previewResource.title}</h2></div><button type="button" aria-label="Close resource" onClick={() => { setPreviewResource(undefined); setCommentInput(""); }}>×</button></header><div className="resource-reader-layout"><div className="resource-pdf-panel"><iframe src={previewResource.pdfPath} title={`${previewResource.title} PDF`} /><a href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open PDF in a new tab ↗</a></div><aside className="resource-conversation"><div className="resource-reader-actions"><a className="secondary-button" href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open full PDF</a><button className="secondary-button" type="button" onClick={() => shareResource(previewResource)}>Share link</button></div><p className="resource-reader-description">{previewResource.description}</p><div className="resource-comments-heading"><b>Teacher notes</b><span>{previewComments.length}</span></div><div className="resource-comment-list">{previewComments.map((comment) => <article key={comment.id}><span className="avatar">{teacherInitials(comment.teacherName.replace(/^Teacher\s+/i, ""))}</span><p><b>{comment.teacherName} <small>{communityTime(comment.createdAt)}</small></b>{comment.body}</p></article>)}{!previewComments.length && <p>No notes yet. Add what worked, what you changed, or a question for teachers using this material.</p>}</div>{authenticated ? <form className="resource-comment-form" onSubmit={submitComment}><label className="sr-only" htmlFor="resource-comment">Comment on this resource</label><textarea id="resource-comment" maxLength={1500} value={commentInput} onChange={(event) => setCommentInput(event.target.value)} placeholder="What worked? What would you change?" /><button type="submit" disabled={!commentInput.trim() || submitting}>{submitting ? "Posting…" : "Add note"}</button><small>Keep this thread about the material. Ask broader questions in Ask Teachers.</small></form> : <button className="resource-signin-comment" type="button" onClick={onRequestSignIn}>Sign in to join the material discussion</button>}</aside></div></section></div>}
   </div>;
 }
 
@@ -2313,8 +2349,28 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
   </div>;
 }
 
-type TeacherDiscussion = { id: string; authorId: string; authorName: string; schoolName: string; title: string; body: string; subject: string; gradeLevels: string[]; createdAt: string };
-type TeacherReply = { id: string; discussionId: string; authorId: string; authorName: string; body: string; createdAt: string };
+type TeacherDiscussion = { id: string; authorId: string; authorName: string; schoolName: string; title: string; body: string; resourceId: string; subject: string; gradeLevels: string[]; createdAt: string };
+type TeacherReply = { id: string; discussionId: string; authorId: string; authorName: string; body: string; resourceId: string; createdAt: string };
+
+const sharedResourceMarker = /\n?\[\[kalinga-resource:(starter-(?:math|science))\]\]\s*$/i;
+
+function encodeCommunityMessage(body: string, resourceId: string) {
+  return resourceId ? `${body.trim()}\n[[kalinga-resource:${resourceId}]]` : body.trim();
+}
+
+function decodeCommunityMessage(body: string) {
+  return { body: body.replace(sharedResourceMarker, "").trim(), resourceId: body.match(sharedResourceMarker)?.[1] || "" };
+}
+
+function renderCommunityMessage(body: string) {
+  return body.split(/(@[a-z0-9_]+)/gi).map((part, index) => part.startsWith("@") ? <strong className="teacher-mention" key={`${part}-${index}`}>{part}</strong> : <Fragment key={`${index}-${part.slice(0, 8)}`}>{part}</Fragment>);
+}
+
+function SharedMaterialCard({ resourceId }: { resourceId: string }) {
+  const resource = starterResources.find((item) => item.id === resourceId);
+  if (!resource) return null;
+  return <a className="community-material-card" href={resource.pdfPath} target="_blank" rel="noreferrer"><span>{resource.icon}</span><p><b>{resource.title}</b><small>{resource.subject} · PDF · {resource.pages} pages</small></p><strong>Open ↗</strong></a>;
+}
 
 function communityTime(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -2326,7 +2382,7 @@ function communityTime(value: string) {
   return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 }
 
-function CommunityView({ authenticated, teacherAccountId, teacherName, onRequestSignIn, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscussionId, onRequestSignIn, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; openDiscussionId: string; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [tab, setTab] = useState<"all" | "mine">("all");
   const [discussions, setDiscussions] = useState<TeacherDiscussion[]>([]);
   const [replies, setReplies] = useState<TeacherReply[]>([]);
@@ -2338,7 +2394,9 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, onRequest
   const [questionBody, setQuestionBody] = useState("");
   const [questionSubject, setQuestionSubject] = useState("General");
   const [questionGrades, setQuestionGrades] = useState("");
+  const [questionResourceId, setQuestionResourceId] = useState("");
   const [reply, setReply] = useState("");
+  const [replyResourceId, setReplyResourceId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -2353,8 +2411,8 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, onRequest
       ]);
       if (!active) return;
       if (discussionResult.error || replyResult.error) { setCommunityError("The teacher room could not refresh. Please check your connection."); setLoading(false); return; }
-      const nextDiscussions = (discussionResult.data || []).map((row): TeacherDiscussion => ({ id: String(row.id), authorId: String(row.author_id), authorName: String(row.author_name), schoolName: row.school_name ? String(row.school_name) : "", title: String(row.title), body: String(row.body), subject: row.subject ? String(row.subject) : "General", gradeLevels: Array.isArray(row.grade_levels) ? row.grade_levels.map(String) : [], createdAt: String(row.created_at) }));
-      const nextReplies = (replyResult.data || []).map((row): TeacherReply => ({ id: String(row.id), discussionId: String(row.discussion_id), authorId: String(row.author_id), authorName: String(row.author_name), body: String(row.body), createdAt: String(row.created_at) }));
+      const nextDiscussions = (discussionResult.data || []).map((row): TeacherDiscussion => { const message = decodeCommunityMessage(String(row.body)); return { id: String(row.id), authorId: String(row.author_id), authorName: String(row.author_name), schoolName: row.school_name ? String(row.school_name) : "", title: String(row.title), body: message.body, resourceId: message.resourceId, subject: row.subject ? String(row.subject) : "General", gradeLevels: Array.isArray(row.grade_levels) ? row.grade_levels.map(String) : [], createdAt: String(row.created_at) }; });
+      const nextReplies = (replyResult.data || []).map((row): TeacherReply => { const message = decodeCommunityMessage(String(row.body)); return { id: String(row.id), discussionId: String(row.discussion_id), authorId: String(row.author_id), authorName: String(row.author_name), body: message.body, resourceId: message.resourceId, createdAt: String(row.created_at) }; });
       setDiscussions(nextDiscussions); setReplies(nextReplies); setSelectedDiscussionId((current) => nextDiscussions.some((item) => item.id === current) ? current : nextDiscussions[0]?.id || ""); setCommunityError(""); setLoading(false);
     }
     void refresh();
@@ -2362,9 +2420,20 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, onRequest
     return () => { active = false; void supabase.removeChannel(channel); };
   }, [authenticated, teacherAccountId]);
 
+  useEffect(() => {
+    if (openDiscussionId && discussions.some((item) => item.id === openDiscussionId)) {
+      setTab("all");
+      setSelectedDiscussionId(openDiscussionId);
+    }
+  }, [discussions, openDiscussionId]);
+
   const visibleDiscussions = tab === "mine" ? discussions.filter((item) => item.authorId === teacherAccountId) : discussions;
   const selectedDiscussion = visibleDiscussions.find((item) => item.id === selectedDiscussionId) || visibleDiscussions[0];
   const selectedReplies = replies.filter((item) => item.discussionId === selectedDiscussion?.id);
+  const teacherTags = [...new Map([...discussions.map((item) => ({ name: item.authorName, id: item.authorId })), ...replies.map((item) => ({ name: item.authorName, id: item.authorId }))].map((item) => [item.id, teacherMention(item.name, item.id)])).entries()]
+    .filter(([id]) => id !== teacherAccountId)
+    .map(([, tag]) => tag)
+    .slice(0, 8);
 
   useEffect(() => {
     onGabayContext({
@@ -2380,11 +2449,12 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, onRequest
     const supabase = getSupabaseBrowserClient();
     if (!supabase || questionTitle.trim().length < 4 || questionBody.trim().length < 4) return;
     setSubmitting(true);
-    const { data, error } = await supabase.from("teacher_discussions").insert({ author_id: teacherAccountId, author_name: teacherLabel(teacherName), title: questionTitle.trim(), body: questionBody.trim(), subject: questionSubject === "General" ? null : questionSubject, grade_levels: questionGrades.split(",").map((grade) => grade.trim()).filter(Boolean) }).select("id,author_id,author_name,school_name,title,body,subject,grade_levels,created_at").single();
+    const { data, error } = await supabase.from("teacher_discussions").insert({ author_id: teacherAccountId, author_name: teacherLabel(teacherName), title: questionTitle.trim(), body: encodeCommunityMessage(questionBody, questionResourceId), subject: questionSubject === "General" ? null : questionSubject, grade_levels: questionGrades.split(",").map((grade) => grade.trim()).filter(Boolean) }).select("id,author_id,author_name,school_name,title,body,subject,grade_levels,created_at").single();
     setSubmitting(false);
     if (error || !data) { setCommunityError("Your question could not be posted. Please check your connection and try again."); return; }
-    const item: TeacherDiscussion = { id: String(data.id), authorId: String(data.author_id), authorName: String(data.author_name), schoolName: data.school_name ? String(data.school_name) : "", title: String(data.title), body: String(data.body), subject: data.subject ? String(data.subject) : "General", gradeLevels: Array.isArray(data.grade_levels) ? data.grade_levels.map(String) : [], createdAt: String(data.created_at) };
-    setDiscussions((current) => [item, ...current.filter((discussion) => discussion.id !== item.id)]); setSelectedDiscussionId(item.id); setQuestionTitle(""); setQuestionBody(""); setQuestionGrades(""); setComposerOpen(false); setTab("all"); setCommunityError("");
+    const message = decodeCommunityMessage(String(data.body));
+    const item: TeacherDiscussion = { id: String(data.id), authorId: String(data.author_id), authorName: String(data.author_name), schoolName: data.school_name ? String(data.school_name) : "", title: String(data.title), body: message.body, resourceId: message.resourceId, subject: data.subject ? String(data.subject) : "General", gradeLevels: Array.isArray(data.grade_levels) ? data.grade_levels.map(String) : [], createdAt: String(data.created_at) };
+    setDiscussions((current) => [item, ...current.filter((discussion) => discussion.id !== item.id)]); setSelectedDiscussionId(item.id); setQuestionTitle(""); setQuestionBody(""); setQuestionGrades(""); setQuestionResourceId(""); setComposerOpen(false); setTab("all"); setCommunityError("");
   }
 
   async function submitReply() {
@@ -2393,21 +2463,39 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, onRequest
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setSubmitting(true);
-    const { data, error } = await supabase.from("teacher_replies").insert({ discussion_id: selectedDiscussion.id, author_id: teacherAccountId, author_name: teacherLabel(teacherName), body: reply.trim() }).select("id,discussion_id,author_id,author_name,body,created_at").single();
+    const { data, error } = await supabase.from("teacher_replies").insert({ discussion_id: selectedDiscussion.id, author_id: teacherAccountId, author_name: teacherLabel(teacherName), body: encodeCommunityMessage(reply, replyResourceId) }).select("id,discussion_id,author_id,author_name,body,created_at").single();
     setSubmitting(false);
     if (error || !data) { setCommunityError("Your reply could not be sent. Please try again."); return; }
-    const item: TeacherReply = { id: String(data.id), discussionId: String(data.discussion_id), authorId: String(data.author_id), authorName: String(data.author_name), body: String(data.body), createdAt: String(data.created_at) };
-    setReplies((current) => [...current.filter((entry) => entry.id !== item.id), item]); setReply(""); setCommunityError("");
+    const message = decodeCommunityMessage(String(data.body));
+    const item: TeacherReply = { id: String(data.id), discussionId: String(data.discussion_id), authorId: String(data.author_id), authorName: String(data.author_name), body: message.body, resourceId: message.resourceId, createdAt: String(data.created_at) };
+    setReplies((current) => [...current.filter((entry) => entry.id !== item.id), item]); setReply(""); setReplyResourceId(""); setCommunityError("");
   }
 
   if (!authenticated) return <div className="view-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
-  return <div className="view-page community-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="A focused discussion space for real classroom questions—not another noisy social feed." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
-    {composerOpen && <form className="community-composer" onSubmit={submitQuestion}><header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header><div><label>Question<input required minLength={4} maxLength={180} value={questionTitle} onChange={(event) => setQuestionTitle(event.target.value)} placeholder="What are you trying to solve?" /></label><label>Subject<select value={questionSubject} onChange={(event) => setQuestionSubject(event.target.value)}><option>General</option>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}</select></label><label>Grade levels<input value={questionGrades} onChange={(event) => setQuestionGrades(event.target.value)} placeholder="e.g. Grade 2, Grade 3" /></label><label className="wide">Classroom context<textarea required minLength={4} maxLength={3000} value={questionBody} onChange={(event) => setQuestionBody(event.target.value)} placeholder="What have you tried? Mention available materials or constraints, but do not include learner names." /></label></div><footer><small>Shared with signed-in Kalinga teachers. Do not include learner names or private records.</small><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Posting…" : "Post question"}</button></footer></form>}
+  return <div className="view-page community-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
+    <aside className="community-explainer"><span>@</span><p><b>Your tag is {teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach a starter PDF when it helps explain the idea.</small></p></aside>
+    {composerOpen && <form className="community-composer" onSubmit={submitQuestion}>
+      <header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header>
+      <div>
+        <label>Question<input required minLength={4} maxLength={180} value={questionTitle} onChange={(event) => setQuestionTitle(event.target.value)} placeholder="What are you trying to solve?" /></label>
+        <label>Subject<select value={questionSubject} onChange={(event) => setQuestionSubject(event.target.value)}><option>General</option>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}</select></label>
+        <label>Grade levels<input value={questionGrades} onChange={(event) => setQuestionGrades(event.target.value)} placeholder="e.g. Grade 2, Grade 3" /></label>
+        <label className="wide">Classroom context<textarea required minLength={4} maxLength={3000} value={questionBody} onChange={(event) => setQuestionBody(event.target.value)} placeholder="What have you tried? Add a teacher tag if you want their attention." /></label>
+        <div className="community-compose-tools wide"><label>Attach a teaching material<select value={questionResourceId} onChange={(event) => setQuestionResourceId(event.target.value)}><option value="">No attachment</option>{starterResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.subject} · {resource.title}</option>)}</select></label><div><small>Tag a teacher</small>{teacherTags.length ? teacherTags.map((tag) => <button type="button" onClick={() => setQuestionBody((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>) : <span>Teacher tags appear after another account posts.</span>}</div></div>
+      </div>
+      <footer><small>Shared with signed-in Kalinga teachers. Keep learner names and private records out.</small><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Posting…" : "Post question"}</button></footer>
+    </form>}
     <div className="community-toolbar"><div className="community-tabs"><button className={tab === "all" ? "active" : ""} type="button" onClick={() => setTab("all")}>All questions <span>{discussions.length}</span></button><button className={tab === "mine" ? "active" : ""} type="button" onClick={() => setTab("mine")}>My questions <span>{discussions.filter((item) => item.authorId === teacherAccountId).length}</span></button></div><small><i /> Live room · new replies appear automatically</small></div>
     {communityError && <p className="community-error" role="status">{communityError}</p>}
     {loading ? <div className="community-loading">Opening the teacher room…</div> : <section className="teacher-room-layout"><aside className="discussion-index" aria-label="Teacher discussions">{visibleDiscussions.map((discussion) => { const replyCount = replies.filter((item) => item.discussionId === discussion.id).length; return <button className={selectedDiscussion?.id === discussion.id ? "active" : ""} type="button" onClick={() => setSelectedDiscussionId(discussion.id)} key={discussion.id}><span><b>{discussion.title}</b><small>{discussion.subject || "General"} · {discussion.authorName}</small></span><em>{replyCount} {replyCount === 1 ? "reply" : "replies"}</em></button>; })}{!visibleDiscussions.length && <div className="discussion-index-empty"><b>{tab === "mine" ? "You have not asked anything yet" : "No questions yet"}</b><p>Start the first focused teacher discussion.</p><button type="button" onClick={() => setComposerOpen(true)}>Ask a question</button></div>}</aside>
-      <article className="discussion-thread">{selectedDiscussion ? <><header><div><span className="avatar">{teacherInitials(selectedDiscussion.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{selectedDiscussion.authorName}</b><small>{selectedDiscussion.schoolName || "Kalinga teacher"} · {communityTime(selectedDiscussion.createdAt)}</small></p></div><div><span className="pill orange">{selectedDiscussion.subject || "GENERAL"}</span>{selectedDiscussion.gradeLevels.map((grade) => <span className="pill" key={grade}>{grade}</span>)}</div></header><h2>{selectedDiscussion.title}</h2><p className="discussion-body">{selectedDiscussion.body}</p><div className="discussion-replies-heading"><b>{selectedReplies.length} {selectedReplies.length === 1 ? "reply" : "replies"}</b><small>Be specific about what worked in your context.</small></div><div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{item.body}</p></div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div></> : <div className="discussion-empty"><span>♧</span><b>Choose a question</b><p>Open a teacher discussion to read its replies.</p></div>}</article>
+      <article className="discussion-thread">{selectedDiscussion ? <>
+        <header><div><span className="avatar">{teacherInitials(selectedDiscussion.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{selectedDiscussion.authorName}</b><small>{selectedDiscussion.schoolName || "Kalinga teacher"} · {communityTime(selectedDiscussion.createdAt)}</small></p></div><div><span className="pill orange">{selectedDiscussion.subject || "GENERAL"}</span>{selectedDiscussion.gradeLevels.map((grade) => <span className="pill" key={grade}>{grade}</span>)}</div></header>
+        <h2>{selectedDiscussion.title}</h2><p className="discussion-body">{renderCommunityMessage(selectedDiscussion.body)}</p><SharedMaterialCard resourceId={selectedDiscussion.resourceId} />
+        <div className="discussion-replies-heading"><b>{selectedReplies.length} {selectedReplies.length === 1 ? "reply" : "replies"}</b><small>Replying automatically notifies the teacher who asked.</small></div>
+        <div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><div><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{renderCommunityMessage(item.body)}</p><SharedMaterialCard resourceId={item.resourceId} /></div></div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div>
+        <div className="reply-composer"><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion or tag a teacher…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div><div className="reply-tools"><select aria-label="Attach a teaching material" value={replyResourceId} onChange={(event) => setReplyResourceId(event.target.value)}><option value="">＋ Attach material</option>{starterResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.subject} · {resource.title}</option>)}</select>{teacherTags.map((tag) => <button type="button" onClick={() => setReply((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>)}</div></div>
+      </> : <div className="discussion-empty"><span>♧</span><b>Choose a question</b><p>Open a teacher discussion to read its replies.</p></div>}</article>
     </section>}
   </div>;
 }
