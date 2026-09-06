@@ -554,6 +554,7 @@ export default function Home() {
   const [replyNotifications, setReplyNotifications] = useState<AppNotification[]>([]);
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
   const [communityTargetId, setCommunityTargetId] = useState("");
+  const [communityResourceId, setCommunityResourceId] = useState("");
   const workspaceScope = entryMode === "authenticated" && teacherAccountId
     ? `teacher-${teacherAccountId}`
     : entryMode === "prototype"
@@ -933,21 +934,6 @@ export default function Home() {
     }
   }
 
-  function toggleSavedResource(resourceId: string) {
-    const willSave = !savedResourceIds.includes(resourceId);
-    setSavedResourceIds((current) => current.includes(resourceId) ? current.filter((id) => id !== resourceId) : [...current, resourceId]);
-    setGabayEventMessage(willSave ? "Resource saved on this device. Available na ito for your offline preparation." : "Removed na ang resource sa offline saves mo.");
-    const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      const request = willSave
-        ? supabase.from("resource_bookmarks").upsert({ teacher_id: teacherAccountId, resource_id: resourceId })
-        : supabase.from("resource_bookmarks").delete().eq("teacher_id", teacherAccountId).eq("resource_id", resourceId);
-      void request.then(({ error }) => {
-        if (error) setNotice("Your resource choice is saved offline and will need to sync later.");
-      });
-    }
-  }
-
   function saveAttendance(updates: Record<string, Record<string, string>>, noteUpdates: Record<string, Record<string, string>>) {
     setAttendanceRecords((current) => ({ ...current, ...updates }));
     setAttendanceNotes((current) => ({ ...current, ...noteUpdates }));
@@ -984,7 +970,7 @@ export default function Home() {
           <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}><span className="nav-icon">▦</span> Classes &amp; learners</button>
           <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => beginPlan()}><span className="nav-icon">＋</span> Plan lessons</button>
           <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}><span className="nav-icon">▱</span> Find resources</button>
-          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setView("community"); }}><span className="nav-icon">♧</span> Ask teachers</button>
+          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span className="nav-icon">♧</span> Ask teachers</button>
         </nav>
 
         <div className="offline-card">
@@ -1035,13 +1021,13 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setView("community"); }}><span>♧</span>Ask</button>
+          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button>
         </nav>
       </section>
     </main>
@@ -1800,7 +1786,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
   const [nextSessionNotes, setNextSessionNotes] = useState(initialPlan?.nextSessionNotes || "");
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [saved, setSaved] = useState(false);
-  const [activeIntentionGrade, setActiveIntentionGrade] = useState<GradeLevel>("");
+  const [, setActiveIntentionGrade] = useState<GradeLevel>("");
   const [draftingIntentionGrade, setDraftingIntentionGrade] = useState<GradeLevel>("");
   const [intentionSuggestions, setIntentionSuggestions] = useState<Record<GradeLevel, { competency: string; objective: string }>>({});
   const [intentionDraftErrors, setIntentionDraftErrors] = useState<Record<GradeLevel, string>>({});
@@ -2021,7 +2007,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onBack, onSetUp
 
       {plannerEntry === "quick" && <section className="quick-plan-setup">
         <header><div><p className="eyebrow">ONLY THE ESSENTIALS</p><h2>What are you teaching?</h2><p>Your saved class already supplies the grades and learners. Gabay can help inside Intentions and Assessment after this.</p></div><GabayMascot size="medium" motion /></header>
-        <div className="quick-plan-fields"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Subject<input list="quick-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type a subject" /><datalist id="quick-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist></label><label className="wide">Lesson title <small>Optional</small><input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="e.g. Comparing fractions with bottle caps" /></label><label>Starts at<TimePicker value={startTime} onChange={setStartTime} /></label><label>Class time<div className="duration-input"><input aria-label="Class time in minutes" type="number" min="5" max="600" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} /><span>minutes</span></div></label></div>
+        <div className="quick-plan-fields"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Subject<input list="quick-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type a subject" /><datalist id="quick-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist></label><label className="wide">Lesson title <small>Optional</small><input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="e.g. Comparing fractions with bottle caps" /></label><div className="field-label"><span>Starts at</span><TimePicker value={startTime} onChange={setStartTime} /></div><label>Class time<div className="duration-input"><input aria-label="Class time in minutes" type="number" min="5" max="600" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} /><span>minutes</span></div></label></div>
         <footer><button className="secondary-button" type="button" onClick={() => setPlannerEntry("choose")}>← Other ways to start</button><button className="primary-button" type="button" disabled={!selectedClassId || !subject.trim()} onClick={() => { setSlots(createSchedule(grades, startTime, duration)); setStep(3); setActivePlanTask("overview"); setPlannerEntry("full"); }}>Open my lesson workspace →</button></footer>
       </section>}
 
@@ -2153,23 +2139,67 @@ type LibraryResource = {
   author: string;
   pages: number;
   pdfPath: string;
+  source: "starter" | "teacher";
+  ownerId?: string;
+  visibility?: "private" | "shared";
+  reviewStatus?: string;
 };
 
 type ResourceComment = { id: string; resourceId: string; teacherId: string; teacherName: string; body: string; createdAt: string };
 
 const starterResources: LibraryResource[] = [
-  { id: "starter-math", icon: "½", title: "Fraction Market with Bottle Caps", type: "Teacher guide + learner sheet", grades: "Grades 3-5", subject: "Mathematics", tags: ["Multigrade", "No printer", "Local objects"], description: "A ready-to-teach fraction activity with differentiated grade guidance, a learner record sheet, and an exit check.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/fraction-market-bottle-cap-math.pdf" },
-  { id: "starter-science", icon: "☘", title: "Schoolyard Plant Detectives", type: "Investigation guide + field notes", grades: "Grades 3-5", subject: "Science", tags: ["Outdoor", "Low-cost", "Evidence-based"], description: "A safe local-plant investigation with multigrade prompts, an observation table, and an evidence-based claim activity.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/schoolyard-plant-detectives-science.pdf" },
+  { id: "starter-math", icon: "½", title: "Fraction Market with Bottle Caps", type: "Teacher guide + learner sheet", grades: "Grades 3-5", subject: "Mathematics", tags: ["Multigrade", "No printer", "Local objects"], description: "A ready-to-teach fraction activity with differentiated grade guidance, a learner record sheet, and an exit check.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/fraction-market-bottle-cap-math.pdf", source: "starter", reviewStatus: "Kalinga starter" },
+  { id: "starter-science", icon: "☘", title: "Schoolyard Plant Detectives", type: "Investigation guide + field notes", grades: "Grades 3-5", subject: "Science", tags: ["Outdoor", "Low-cost", "Evidence-based"], description: "A safe local-plant investigation with multigrade prompts, an observation table, and an evidence-based claim activity.", author: "Kalinga starter library", pages: 3, pdfPath: "/resources/schoolyard-plant-detectives-science.pdf", source: "starter", reviewStatus: "Kalinga starter" },
 ];
 
-function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, teacherName, onSetUpClass, onRequestSignIn, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; authenticated: boolean; teacherAccountId: string; teacherName: string; onSetUpClass: () => void; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+type ResourceSubmission = {
+  title: string;
+  subject: string;
+  grades: string;
+  type: string;
+  description: string;
+  tags: string;
+  visibility: "private" | "shared";
+};
+
+const emptyResourceSubmission: ResourceSubmission = { title: "", subject: "Mathematics", grades: "", type: "Activity sheet", description: "", tags: "", visibility: "shared" };
+
+function resourceIcon(subject: string) {
+  if (/math/i.test(subject)) return "½";
+  if (/science/i.test(subject)) return "☘";
+  return "▤";
+}
+
+async function loadTeacherResources(supabase: SupabaseClient) {
+  const { data, error } = await supabase.from("resources").select("id,owner_id,title,storage_path,visibility,metadata,created_at").order("created_at", { ascending: false }).limit(100);
+  if (error) throw error;
+  return Promise.all((data || []).filter((row) => Boolean(row.storage_path)).map(async (row): Promise<LibraryResource> => {
+    const metadata = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) ? row.metadata as Record<string, unknown> : {};
+    const { data: signed } = await supabase.storage.from("teacher-resources").createSignedUrl(String(row.storage_path), 60 * 60);
+    const subject = String(metadata.subject || "General");
+    return {
+      id: String(row.id), ownerId: String(row.owner_id), title: String(row.title), icon: resourceIcon(subject), subject,
+      grades: String(metadata.grades || "Grade levels not specified"), type: String(metadata.type || "Teacher resource"),
+      description: String(metadata.description || "No description was provided."), tags: Array.isArray(metadata.tags) ? metadata.tags.map(String) : [],
+      author: String(metadata.author || "Kalinga teacher"), pages: Number(metadata.pages || 0), pdfPath: signed?.signedUrl || "",
+      source: "teacher", visibility: row.visibility === "shared" ? "shared" : "private", reviewStatus: String(metadata.reviewStatus || "Community upload · not reviewed"),
+    };
+  }));
+}
+
+function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, teacherName, onSetUpClass, onRequestSignIn, onOpenCommunity, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; authenticated: boolean; teacherAccountId: string; teacherName: string; onSetUpClass: () => void; onRequestSignIn: () => void; onOpenCommunity: (resourceId: string) => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [filter, setFilter] = useState<"all" | "Mathematics" | "Science">("all");
   const [libraryError, setLibraryError] = useState("");
   const [previewResource, setPreviewResource] = useState<LibraryResource>();
+  const [teacherResources, setTeacherResources] = useState<LibraryResource[]>([]);
   const [comments, setComments] = useState<ResourceComment[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [submissionOpen, setSubmissionOpen] = useState(false);
+  const [submission, setSubmission] = useState<ResourceSubmission>(emptyResourceSubmission);
+  const [submissionFile, setSubmissionFile] = useState<File>();
+  const [sharingRightsConfirmed, setSharingRightsConfirmed] = useState(false);
   const activeClass = classes.find((item) => item.id === activeClassId);
 
   useEffect(() => {
@@ -2178,37 +2208,90 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     if (!supabase) return;
     let active = true;
     async function refresh() {
-      const commentResult = await supabase!.from("resource_comments").select("id,resource_id,teacher_id,teacher_name,body,created_at").in("resource_id", starterResources.map((item) => item.id)).order("created_at");
+      let uploaded: LibraryResource[] = [];
+      try { uploaded = await loadTeacherResources(supabase!); } catch { if (active) setLibraryError("Teacher uploads could not refresh. The starter PDFs are still available."); }
+      const resourceIds = [...starterResources, ...uploaded].map((item) => item.id);
+      const commentResult = await supabase!.from("resource_comments").select("id,resource_id,teacher_id,teacher_name,body,created_at").in("resource_id", resourceIds).order("created_at");
       if (!active) return;
+      setTeacherResources(uploaded);
       if (commentResult.error) { setLibraryError("Teacher comments could not refresh. The PDFs are still available."); return; }
       setComments((commentResult.data || []).map((row) => ({ id: String(row.id), resourceId: String(row.resource_id), teacherId: String(row.teacher_id), teacherName: String(row.teacher_name), body: String(row.body), createdAt: String(row.created_at) })));
       setLibraryError("");
     }
     void refresh();
-    const channel = supabase.channel(`resource-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "resource_comments" }, () => { void refresh(); }).subscribe();
+    const channel = supabase.channel(`resource-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "resource_comments" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "resources" }, () => { void refresh(); }).subscribe();
     return () => { active = false; void supabase.removeChannel(channel); };
   }, [authenticated, teacherAccountId]);
 
-  const visible = starterResources.filter((resource) => filter === "all" || resource.subject === filter);
+  const allResources = [...teacherResources, ...starterResources];
+  const visible = allResources.filter((resource) => filter === "all" || resource.subject === filter);
   const previewComments = comments.filter((comment) => comment.resourceId === previewResource?.id);
 
   useEffect(() => {
     onGabayContext({
       view: "library", pageStep: previewResource ? `Review ${previewResource.title}` : "Choose a ready-to-use PDF resource", classId: activeClass?.id, className: activeClass?.name,
       gradeLevels: activeClass?.grades || [], subjects: activeClass?.subjects || [], learnerCount: activeClass?.learners.length || 0,
-      currentSummary: [`Filter: ${filter}`, `${visible.length} of 2 starter resources shown`, previewResource ? `${previewComments.length} teacher comments on the open resource` : "No resource is currently open"],
-      availableActions: ["Help adapt the Mathematics activity", "Help adapt the Science investigation", "Summarize the open PDF", "Draft a useful teacher comment"],
+      currentSummary: [`Filter: ${filter}`, `${visible.length} resources shown`, `${teacherResources.length} teacher uploads available`, previewResource ? `${previewComments.length} teacher comments on the open resource` : "No resource is currently open"],
+      availableActions: ["Help prepare a transparent resource submission", "Help adapt the Mathematics activity", "Help adapt the Science investigation", "Summarize the open PDF", "Draft a useful teacher comment"],
     });
-  }, [activeClass, filter, onGabayContext, previewComments.length, previewResource, visible.length]);
+  }, [activeClass, filter, onGabayContext, previewComments.length, previewResource, teacherResources.length, visible.length]);
+
+  async function submitResource(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
+    if (!submissionFile || submissionFile.type !== "application/pdf") { setLibraryError("Choose a PDF file to submit."); return; }
+    if (submissionFile.size > 20 * 1024 * 1024) { setLibraryError("The PDF must be 20 MB or smaller."); return; }
+    if (submission.visibility === "shared" && !sharingRightsConfirmed) { setLibraryError("Confirm that you have permission to share this material."); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setSubmitting(true); setLibraryError("");
+    const safeName = submissionFile.name.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "") || "teacher-resource.pdf";
+    const storagePath = `${teacherAccountId}/${crypto.randomUUID()}-${safeName}`;
+    const upload = await supabase.storage.from("teacher-resources").upload(storagePath, submissionFile, { contentType: "application/pdf", upsert: false });
+    if (upload.error) { setSubmitting(false); setLibraryError("The PDF could not be uploaded. Apply the latest Supabase migration, then try again."); return; }
+    const metadata = {
+      subject: submission.subject.trim() || "General", grades: submission.grades.trim() || "Grade levels not specified",
+      type: submission.type.trim() || "Teacher resource", description: submission.description.trim(),
+      tags: submission.tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 8), author: teacherLabel(teacherName),
+      reviewStatus: "Community upload · not reviewed", originalFileName: submissionFile.name, mimeType: submissionFile.type,
+    };
+    const result = await supabase.from("resources").insert({ owner_id: teacherAccountId, title: submission.title.trim(), storage_path: storagePath, visibility: submission.visibility, metadata }).select("id,owner_id,title,storage_path,visibility,metadata,created_at").single();
+    if (result.error || !result.data) {
+      await supabase.storage.from("teacher-resources").remove([storagePath]);
+      setSubmitting(false); setLibraryError("The resource details could not be saved. The unfinished upload was removed; please try again."); return;
+    }
+    const { data: signed } = await supabase.storage.from("teacher-resources").createSignedUrl(storagePath, 60 * 60);
+    const uploadedResource: LibraryResource = {
+      id: String(result.data.id), ownerId: teacherAccountId, title: submission.title.trim(), icon: resourceIcon(metadata.subject), subject: metadata.subject,
+      grades: metadata.grades, type: metadata.type, description: metadata.description || "No description was provided.", tags: metadata.tags,
+      author: metadata.author, pages: 0, pdfPath: signed?.signedUrl || "", source: "teacher", visibility: submission.visibility, reviewStatus: metadata.reviewStatus,
+    };
+    setTeacherResources((current) => [uploadedResource, ...current.filter((item) => item.id !== uploadedResource.id)]);
+    setSubmission(emptyResourceSubmission); setSubmissionFile(undefined); setSharingRightsConfirmed(false); setSubmissionOpen(false); setSubmitting(false);
+    setShareMessage(submission.visibility === "shared" ? "Resource published for signed-in teachers" : "Private resource uploaded");
+    window.setTimeout(() => setShareMessage(""), 2400);
+  }
 
   async function shareResource(resource: LibraryResource) {
-    const url = `${window.location.origin}${resource.pdfPath}`;
+    const url = /^https?:\/\//i.test(resource.pdfPath) ? resource.pdfPath : `${window.location.origin}${resource.pdfPath}`;
     try {
       if (navigator.share) await navigator.share({ title: resource.title, text: `Kalinga teacher resource: ${resource.title}`, url });
       else { await navigator.clipboard.writeText(url); setShareMessage("PDF link copied"); window.setTimeout(() => setShareMessage(""), 1800); }
     } catch {
       setShareMessage("");
     }
+  }
+
+  async function makeResourceShared(resource: LibraryResource) {
+    if (!authenticated || resource.ownerId !== teacherAccountId) return;
+    if (!window.confirm("Share this PDF with all signed-in Kalinga teachers? Confirm that you made it or have permission to share it.")) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("resources").update({ visibility: "shared" }).eq("id", resource.id).eq("owner_id", teacherAccountId);
+    if (error) { setLibraryError("This resource could not be shared yet. Please try again."); return; }
+    setTeacherResources((current) => current.map((item) => item.id === resource.id ? { ...item, visibility: "shared" } : item));
+    setLibraryError(""); setShareMessage("Resource is now available to signed-in teachers");
+    window.setTimeout(() => setShareMessage(""), 2400);
   }
 
   async function submitComment(event: React.FormEvent<HTMLFormElement>) {
@@ -2226,12 +2309,21 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
   }
 
   return <div className="view-page resource-library-page">
-    <PageIntro eyebrow="TWO READY-TO-USE PDFS" title="Open it. Teach it. Improve it together." description="Every card opens a real PDF. Share the file, then leave a useful note for the next teacher." />
-    <section className="starter-library-toolbar"><div role="tablist" aria-label="Filter starter resources">{[["all", "Both resources"], ["Mathematics", "Mathematics"], ["Science", "Science"]].map(([value, label]) => <button role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} type="button" onClick={() => setFilter(value as typeof filter)} key={value}>{label}</button>)}</div>{activeClass ? <p><b>Matched to {activeClass.name}</b><span>{gradeList(activeClass.grades)} · {activeClass.subjects.join(", ")}</span></p> : <button type="button" onClick={onSetUpClass}>Set up a class for matching →</button>}</section>
+    <PageIntro eyebrow="TEACHER RESOURCE LIBRARY" title="Open it. Teach it. Improve it together." description="Use the two Kalinga starters or submit a PDF of your own with clear classroom details." action={<button className="primary-button" type="button" onClick={() => authenticated ? setSubmissionOpen((open) => !open) : onRequestSignIn()}>＋ Upload a resource</button>} />
+    {submissionOpen && <form className="resource-submission" onSubmit={submitResource}>
+      <header><div><p className="eyebrow">RESOURCE SUBMISSION</p><h2>Tell teachers exactly what they are opening</h2><p>Your name, classroom fit, and sharing status stay visible. Uploading does not mean Kalinga has reviewed or approved the material.</p></div><button type="button" aria-label="Close resource submission" onClick={() => setSubmissionOpen(false)}>×</button></header>
+      <div className="resource-submission-sections">
+        <fieldset><legend><span>1</span> PDF and title</legend><label>PDF file <small>Required · PDF only · up to 20 MB</small><input required type="file" accept=".pdf,application/pdf" onChange={(event) => setSubmissionFile(event.target.files?.[0])} /></label><label>Resource title<input required minLength={4} maxLength={200} value={submission.title} onChange={(event) => setSubmission((current) => ({ ...current, title: event.target.value }))} placeholder="A clear, specific title" /></label></fieldset>
+        <fieldset><legend><span>2</span> Classroom fit</legend><div className="resource-submission-grid"><label>Subject<select value={submission.subject} onChange={(event) => setSubmission((current) => ({ ...current, subject: event.target.value }))}>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}<option>General</option></select></label><label>Grade levels<input required value={submission.grades} onChange={(event) => setSubmission((current) => ({ ...current, grades: event.target.value }))} placeholder="e.g. Grades 3–5" /></label><label>Material type<select value={submission.type} onChange={(event) => setSubmission((current) => ({ ...current, type: event.target.value }))}><option>Activity sheet</option><option>Teacher guide</option><option>Lesson exemplar</option><option>Assessment</option><option>Reading material</option><option>Presentation</option><option>Other</option></select></label><label>Tags <small>Comma-separated</small><input value={submission.tags} onChange={(event) => setSubmission((current) => ({ ...current, tags: event.target.value }))} placeholder="Low-cost, multigrade, offline" /></label><label className="wide">What is this and how should it be used?<textarea required minLength={20} maxLength={1200} value={submission.description} onChange={(event) => setSubmission((current) => ({ ...current, description: event.target.value }))} placeholder="Briefly explain the activity, materials needed, and anything another teacher should check first." /></label></div></fieldset>
+        <fieldset><legend><span>3</span> Sharing and transparency</legend><label>Who can open this PDF?<select value={submission.visibility} onChange={(event) => setSubmission((current) => ({ ...current, visibility: event.target.value as ResourceSubmission["visibility"] }))}><option value="shared">All signed-in Kalinga teachers</option><option value="private">Only me</option></select></label><div className="submission-transparency"><p><b>Shown on the resource card</b><span>Uploaded by {teacherLabel(teacherName)} · {submission.visibility === "shared" ? "Shared with signed-in teachers" : "Private to your account"} · Community upload, not reviewed</span></p><p><b>Not shared automatically</b><span>Your classes, learners, attendance, and lesson-plan records are never added to the PDF submission.</span></p></div>{submission.visibility === "shared" && <div className="rights-check"><input id="resource-sharing-rights" type="checkbox" aria-labelledby="resource-sharing-rights-label" checked={sharingRightsConfirmed} onChange={(event) => setSharingRightsConfirmed(event.target.checked)} /><span id="resource-sharing-rights-label"><b>I made this resource or have permission to share it.</b><small>I understand other signed-in teachers can open it and discuss it.</small></span></div>}</fieldset>
+      </div>
+      <footer><button className="secondary-button" type="button" onClick={() => setSubmissionOpen(false)}>Cancel</button><button className="primary-button" type="submit" disabled={submitting || !submissionFile || !submission.title.trim() || !submission.description.trim() || (submission.visibility === "shared" && !sharingRightsConfirmed)}>{submitting ? "Uploading…" : submission.visibility === "shared" ? "Publish resource" : "Upload privately"}</button></footer>
+    </form>}
+    <section className="starter-library-toolbar"><div role="tablist" aria-label="Filter resources">{[["all", "All resources"], ["Mathematics", "Mathematics"], ["Science", "Science"]].map(([value, label]) => <button role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} type="button" onClick={() => setFilter(value as typeof filter)} key={value}>{label}</button>)}</div>{activeClass ? <p><b>Matched to {activeClass.name}</b><span>{gradeList(activeClass.grades)} · {activeClass.subjects.join(", ")}</span></p> : <button type="button" onClick={onSetUpClass}>Set up a class for matching →</button>}</section>
     {libraryError && <p className="library-error" role="status">{libraryError}</p>}
     {shareMessage && <p className="resource-share-message" role="status">{shareMessage}</p>}
     <section className="resource-grid starter-resource-grid">
-      {visible.map((resource) => { const resourceComments = comments.filter((comment) => comment.resourceId === resource.id); return <article className={`library-card starter-resource-card ${resource.subject.toLowerCase()}`} key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.subject}</span></div><div className="library-body"><div className="library-badges"><span className="verified">PDF · {resource.pages} pages</span><span>{resource.type}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.author}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="resource-social-proof"><span><b>{resourceComments.length}</b> teacher {resourceComments.length === 1 ? "note" : "notes"}</span><span>Notes are practical feedback, not official approval</span></div><div className="library-actions starter-resource-actions"><button className="dark-button" type="button" onClick={() => setPreviewResource(resource)}>View PDF</button><button className="secondary-button" type="button" onClick={() => setPreviewResource(resource)}>Discuss</button><button className="secondary-button" type="button" onClick={() => shareResource(resource)}>Share</button></div></div></article>; })}
+      {visible.map((resource) => { const resourceComments = comments.filter((comment) => comment.resourceId === resource.id); const isOwner = resource.ownerId === teacherAccountId; return <article className={`library-card starter-resource-card ${resource.subject.toLowerCase()}`} key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.subject}</span></div><div className="library-body"><div className="library-badges"><span className={resource.source === "starter" ? "verified" : "community-upload"}>{resource.source === "starter" ? `PDF · ${resource.pages} pages` : "TEACHER UPLOAD · NOT REVIEWED"}</span><span className={`resource-visibility ${resource.visibility || "shared"}`}>{resource.visibility === "private" ? "Only me" : "Shared"}</span><span>{resource.type}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.author}{isOwner ? " · Your resource" : ""}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="resource-social-proof"><span><b>{resourceComments.length}</b> teacher {resourceComments.length === 1 ? "note" : "notes"}</span><span>{resource.reviewStatus || "Community upload · not reviewed"}</span></div><div className="library-actions starter-resource-actions"><button className="dark-button" type="button" disabled={!resource.pdfPath} onClick={() => setPreviewResource(resource)}>View PDF</button><button className="secondary-button" type="button" onClick={() => setPreviewResource(resource)}>Discuss</button>{resource.visibility === "private" && isOwner ? <button className="secondary-button" type="button" onClick={() => makeResourceShared(resource)}>Share with teachers</button> : <button className="secondary-button" type="button" onClick={() => onOpenCommunity(resource.id)}>Ask teachers</button>}</div></div></article>; })}
     </section>
     {previewResource && <div className="resource-preview-backdrop"><section className="resource-reader" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><header><div><p className="eyebrow">{previewResource.subject} · PDF RESOURCE</p><h2 id="resource-preview-title">{previewResource.title}</h2></div><button type="button" aria-label="Close resource" onClick={() => { setPreviewResource(undefined); setCommentInput(""); }}>×</button></header><div className="resource-reader-layout"><div className="resource-pdf-panel"><iframe src={previewResource.pdfPath} title={`${previewResource.title} PDF`} /><a href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open PDF in a new tab ↗</a></div><aside className="resource-conversation"><div className="resource-reader-actions"><a className="secondary-button" href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open full PDF</a><button className="secondary-button" type="button" onClick={() => shareResource(previewResource)}>Share link</button></div><p className="resource-reader-description">{previewResource.description}</p><div className="resource-comments-heading"><b>Teacher notes</b><span>{previewComments.length}</span></div><div className="resource-comment-list">{previewComments.map((comment) => <article key={comment.id}><span className="avatar">{teacherInitials(comment.teacherName.replace(/^Teacher\s+/i, ""))}</span><p><b>{comment.teacherName} <small>{communityTime(comment.createdAt)}</small></b>{comment.body}</p></article>)}{!previewComments.length && <p>No notes yet. Add what worked, what you changed, or a question for teachers using this material.</p>}</div>{authenticated ? <form className="resource-comment-form" onSubmit={submitComment}><label className="sr-only" htmlFor="resource-comment">Comment on this resource</label><textarea id="resource-comment" maxLength={1500} value={commentInput} onChange={(event) => setCommentInput(event.target.value)} placeholder="What worked? What would you change?" /><button type="submit" disabled={!commentInput.trim() || submitting}>{submitting ? "Posting…" : "Add note"}</button><small>Keep this thread about the material. Ask broader questions in Ask Teachers.</small></form> : <button className="resource-signin-comment" type="button" onClick={onRequestSignIn}>Sign in to join the material discussion</button>}</aside></div></section></div>}
   </div>;
@@ -2352,7 +2444,7 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
 type TeacherDiscussion = { id: string; authorId: string; authorName: string; schoolName: string; title: string; body: string; resourceId: string; subject: string; gradeLevels: string[]; createdAt: string };
 type TeacherReply = { id: string; discussionId: string; authorId: string; authorName: string; body: string; resourceId: string; createdAt: string };
 
-const sharedResourceMarker = /\n?\[\[kalinga-resource:(starter-(?:math|science))\]\]\s*$/i;
+const sharedResourceMarker = /\n?\[\[kalinga-resource:([a-z0-9-]+)\]\]\s*$/i;
 
 function encodeCommunityMessage(body: string, resourceId: string) {
   return resourceId ? `${body.trim()}\n[[kalinga-resource:${resourceId}]]` : body.trim();
@@ -2366,10 +2458,10 @@ function renderCommunityMessage(body: string) {
   return body.split(/(@[a-z0-9_]+)/gi).map((part, index) => part.startsWith("@") ? <strong className="teacher-mention" key={`${part}-${index}`}>{part}</strong> : <Fragment key={`${index}-${part.slice(0, 8)}`}>{part}</Fragment>);
 }
 
-function SharedMaterialCard({ resourceId }: { resourceId: string }) {
-  const resource = starterResources.find((item) => item.id === resourceId);
+function SharedMaterialCard({ resourceId, resources }: { resourceId: string; resources: LibraryResource[] }) {
+  const resource = resources.find((item) => item.id === resourceId);
   if (!resource) return null;
-  return <a className="community-material-card" href={resource.pdfPath} target="_blank" rel="noreferrer"><span>{resource.icon}</span><p><b>{resource.title}</b><small>{resource.subject} · PDF · {resource.pages} pages</small></p><strong>Open ↗</strong></a>;
+  return <a className="community-material-card" href={resource.pdfPath} target="_blank" rel="noreferrer"><span>{resource.icon}</span><p><b>{resource.title}</b><small>{resource.subject} · PDF · {resource.author}{resource.source === "teacher" ? " · Community upload, not reviewed" : ""}</small></p><strong>Open ↗</strong></a>;
 }
 
 function communityTime(value: string) {
@@ -2382,22 +2474,23 @@ function communityTime(value: string) {
   return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 }
 
-function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscussionId, onRequestSignIn, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; openDiscussionId: string; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscussionId, initialResourceId, onRequestSignIn, onOpenLibrary, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; openDiscussionId: string; initialResourceId: string; onRequestSignIn: () => void; onOpenLibrary: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [tab, setTab] = useState<"all" | "mine">("all");
   const [discussions, setDiscussions] = useState<TeacherDiscussion[]>([]);
   const [replies, setReplies] = useState<TeacherReply[]>([]);
-  const [selectedDiscussionId, setSelectedDiscussionId] = useState("");
+  const [selectedDiscussionId, setSelectedDiscussionId] = useState(openDiscussionId);
   const [loading, setLoading] = useState(authenticated);
   const [communityError, setCommunityError] = useState("");
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(Boolean(initialResourceId));
   const [questionTitle, setQuestionTitle] = useState("");
   const [questionBody, setQuestionBody] = useState("");
   const [questionSubject, setQuestionSubject] = useState("General");
   const [questionGrades, setQuestionGrades] = useState("");
-  const [questionResourceId, setQuestionResourceId] = useState("");
+  const [questionResourceId, setQuestionResourceId] = useState(initialResourceId);
   const [reply, setReply] = useState("");
   const [replyResourceId, setReplyResourceId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [teacherResources, setTeacherResources] = useState<LibraryResource[]>([]);
 
   useEffect(() => {
     if (!authenticated || !teacherAccountId) return;
@@ -2405,29 +2498,24 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     if (!supabase) return;
     let active = true;
     async function refresh() {
-      const [discussionResult, replyResult] = await Promise.all([
+      const [discussionResult, replyResult, uploadedResources] = await Promise.all([
         supabase!.from("teacher_discussions").select("id,author_id,author_name,school_name,title,body,subject,grade_levels,created_at").order("created_at", { ascending: false }).limit(80),
         supabase!.from("teacher_replies").select("id,discussion_id,author_id,author_name,body,created_at").order("created_at").limit(500),
+        loadTeacherResources(supabase!).catch(() => []),
       ]);
       if (!active) return;
       if (discussionResult.error || replyResult.error) { setCommunityError("The teacher room could not refresh. Please check your connection."); setLoading(false); return; }
       const nextDiscussions = (discussionResult.data || []).map((row): TeacherDiscussion => { const message = decodeCommunityMessage(String(row.body)); return { id: String(row.id), authorId: String(row.author_id), authorName: String(row.author_name), schoolName: row.school_name ? String(row.school_name) : "", title: String(row.title), body: message.body, resourceId: message.resourceId, subject: row.subject ? String(row.subject) : "General", gradeLevels: Array.isArray(row.grade_levels) ? row.grade_levels.map(String) : [], createdAt: String(row.created_at) }; });
       const nextReplies = (replyResult.data || []).map((row): TeacherReply => { const message = decodeCommunityMessage(String(row.body)); return { id: String(row.id), discussionId: String(row.discussion_id), authorId: String(row.author_id), authorName: String(row.author_name), body: message.body, resourceId: message.resourceId, createdAt: String(row.created_at) }; });
-      setDiscussions(nextDiscussions); setReplies(nextReplies); setSelectedDiscussionId((current) => nextDiscussions.some((item) => item.id === current) ? current : nextDiscussions[0]?.id || ""); setCommunityError(""); setLoading(false);
+      setDiscussions(nextDiscussions); setReplies(nextReplies); setTeacherResources(uploadedResources.filter((resource) => resource.visibility === "shared")); setSelectedDiscussionId((current) => nextDiscussions.some((item) => item.id === current) ? current : nextDiscussions[0]?.id || ""); setCommunityError(""); setLoading(false);
     }
     void refresh();
-    const channel = supabase.channel(`teacher-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "teacher_discussions" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "teacher_replies" }, () => { void refresh(); }).subscribe();
+    const channel = supabase.channel(`teacher-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "teacher_discussions" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "teacher_replies" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "resources" }, () => { void refresh(); }).subscribe();
     return () => { active = false; void supabase.removeChannel(channel); };
   }, [authenticated, teacherAccountId]);
 
-  useEffect(() => {
-    if (openDiscussionId && discussions.some((item) => item.id === openDiscussionId)) {
-      setTab("all");
-      setSelectedDiscussionId(openDiscussionId);
-    }
-  }, [discussions, openDiscussionId]);
-
   const visibleDiscussions = tab === "mine" ? discussions.filter((item) => item.authorId === teacherAccountId) : discussions;
+  const attachableResources = [...teacherResources, ...starterResources];
   const selectedDiscussion = visibleDiscussions.find((item) => item.id === selectedDiscussionId) || visibleDiscussions[0];
   const selectedReplies = replies.filter((item) => item.discussionId === selectedDiscussion?.id);
   const teacherTags = [...new Map([...discussions.map((item) => ({ name: item.authorName, id: item.authorId })), ...replies.map((item) => ({ name: item.authorName, id: item.authorId }))].map((item) => [item.id, teacherMention(item.name, item.id)])).entries()]
@@ -2438,10 +2526,10 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
   useEffect(() => {
     onGabayContext({
       view: "community", pageStep: selectedDiscussion ? "Read and reply to a teacher discussion" : "Teacher discussion room", gradeLevels: selectedDiscussion?.gradeLevels || [], subjects: selectedDiscussion?.subject ? [selectedDiscussion.subject] : [],
-      currentSummary: [`Viewing ${tab === "mine" ? "questions from this account" : "all teacher questions"}`, `${visibleDiscussions.length} discussions visible`, selectedDiscussion ? `Open discussion: ${selectedDiscussion.title}` : "No discussion is open", `${selectedReplies.length} replies in the open discussion`, reply.trim() ? "A reply is being drafted" : "No reply is being drafted"],
+      currentSummary: [`Viewing ${tab === "mine" ? "questions from this account" : "all teacher questions"}`, `${visibleDiscussions.length} discussions visible`, `${attachableResources.length} shared resources can be attached`, selectedDiscussion ? `Open discussion: ${selectedDiscussion.title}` : "No discussion is open", `${selectedReplies.length} replies in the open discussion`, reply.trim() ? "A reply is being drafted" : "No reply is being drafted"],
       availableActions: ["Help write a clear teacher question", "Draft a constructive reply", "Summarize the open discussion", "Suggest useful teaching context to include"],
     });
-  }, [onGabayContext, reply, selectedDiscussion, selectedReplies.length, tab, visibleDiscussions.length]);
+  }, [attachableResources.length, onGabayContext, reply, selectedDiscussion, selectedReplies.length, tab, visibleDiscussions.length]);
 
   async function submitQuestion(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2474,7 +2562,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
   if (!authenticated) return <div className="view-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
   return <div className="view-page community-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
-    <aside className="community-explainer"><span>@</span><p><b>Your tag is {teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach a starter PDF when it helps explain the idea.</small></p></aside>
+    <aside className="community-explainer"><span>@</span><p><b>Your tag is {teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><button type="button" onClick={onOpenLibrary}>Upload or manage resources →</button></aside>
     {composerOpen && <form className="community-composer" onSubmit={submitQuestion}>
       <header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header>
       <div>
@@ -2482,7 +2570,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
         <label>Subject<select value={questionSubject} onChange={(event) => setQuestionSubject(event.target.value)}><option>General</option>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}</select></label>
         <label>Grade levels<input value={questionGrades} onChange={(event) => setQuestionGrades(event.target.value)} placeholder="e.g. Grade 2, Grade 3" /></label>
         <label className="wide">Classroom context<textarea required minLength={4} maxLength={3000} value={questionBody} onChange={(event) => setQuestionBody(event.target.value)} placeholder="What have you tried? Add a teacher tag if you want their attention." /></label>
-        <div className="community-compose-tools wide"><label>Attach a teaching material<select value={questionResourceId} onChange={(event) => setQuestionResourceId(event.target.value)}><option value="">No attachment</option>{starterResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.subject} · {resource.title}</option>)}</select></label><div><small>Tag a teacher</small>{teacherTags.length ? teacherTags.map((tag) => <button type="button" onClick={() => setQuestionBody((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>) : <span>Teacher tags appear after another account posts.</span>}</div></div>
+        <div className="community-compose-tools wide"><label>Attach your resource <small>Shared PDFs only</small><select value={questionResourceId} onChange={(event) => setQuestionResourceId(event.target.value)}><option value="">No attachment</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.subject} · {resource.title}</option>)}</select></label><div><small>Tag a teacher</small>{teacherTags.length ? teacherTags.map((tag) => <button type="button" onClick={() => setQuestionBody((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>) : <span>Teacher tags appear after another account posts.</span>}</div></div>
       </div>
       <footer><small>Shared with signed-in Kalinga teachers. Keep learner names and private records out.</small><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Posting…" : "Post question"}</button></footer>
     </form>}
@@ -2491,10 +2579,10 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     {loading ? <div className="community-loading">Opening the teacher room…</div> : <section className="teacher-room-layout"><aside className="discussion-index" aria-label="Teacher discussions">{visibleDiscussions.map((discussion) => { const replyCount = replies.filter((item) => item.discussionId === discussion.id).length; return <button className={selectedDiscussion?.id === discussion.id ? "active" : ""} type="button" onClick={() => setSelectedDiscussionId(discussion.id)} key={discussion.id}><span><b>{discussion.title}</b><small>{discussion.subject || "General"} · {discussion.authorName}</small></span><em>{replyCount} {replyCount === 1 ? "reply" : "replies"}</em></button>; })}{!visibleDiscussions.length && <div className="discussion-index-empty"><b>{tab === "mine" ? "You have not asked anything yet" : "No questions yet"}</b><p>Start the first focused teacher discussion.</p><button type="button" onClick={() => setComposerOpen(true)}>Ask a question</button></div>}</aside>
       <article className="discussion-thread">{selectedDiscussion ? <>
         <header><div><span className="avatar">{teacherInitials(selectedDiscussion.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{selectedDiscussion.authorName}</b><small>{selectedDiscussion.schoolName || "Kalinga teacher"} · {communityTime(selectedDiscussion.createdAt)}</small></p></div><div><span className="pill orange">{selectedDiscussion.subject || "GENERAL"}</span>{selectedDiscussion.gradeLevels.map((grade) => <span className="pill" key={grade}>{grade}</span>)}</div></header>
-        <h2>{selectedDiscussion.title}</h2><p className="discussion-body">{renderCommunityMessage(selectedDiscussion.body)}</p><SharedMaterialCard resourceId={selectedDiscussion.resourceId} />
+        <h2>{selectedDiscussion.title}</h2><p className="discussion-body">{renderCommunityMessage(selectedDiscussion.body)}</p><SharedMaterialCard resourceId={selectedDiscussion.resourceId} resources={attachableResources} />
         <div className="discussion-replies-heading"><b>{selectedReplies.length} {selectedReplies.length === 1 ? "reply" : "replies"}</b><small>Replying automatically notifies the teacher who asked.</small></div>
-        <div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><div><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{renderCommunityMessage(item.body)}</p><SharedMaterialCard resourceId={item.resourceId} /></div></div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div>
-        <div className="reply-composer"><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion or tag a teacher…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div><div className="reply-tools"><select aria-label="Attach a teaching material" value={replyResourceId} onChange={(event) => setReplyResourceId(event.target.value)}><option value="">＋ Attach material</option>{starterResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.subject} · {resource.title}</option>)}</select>{teacherTags.map((tag) => <button type="button" onClick={() => setReply((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>)}</div></div>
+        <div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><div><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{renderCommunityMessage(item.body)}</p><SharedMaterialCard resourceId={item.resourceId} resources={attachableResources} /></div></div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div>
+        <div className="reply-composer"><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion or tag a teacher…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div><div className="reply-tools"><select aria-label="Attach one of your shared resources" value={replyResourceId} onChange={(event) => setReplyResourceId(event.target.value)}><option value="">＋ Attach your resource</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.title}</option>)}</select><button type="button" onClick={onOpenLibrary}>＋ Upload PDF</button>{teacherTags.map((tag) => <button type="button" onClick={() => setReply((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>)}</div></div>
       </> : <div className="discussion-empty"><span>♧</span><b>Choose a question</b><p>Open a teacher discussion to read its replies.</p></div>}</article>
     </section>}
   </div>;
