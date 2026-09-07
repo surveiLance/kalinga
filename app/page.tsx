@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { attendanceStatusLabel, attendanceStatuses, isStoredAttendanceStatus, toStoredAttendanceStatus } from "@/lib/attendance";
 import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGradeLevels } from "@/lib/grades";
 import { createSampleLearners, learnerRosterSummary, learnerSexCounts, normalizeLearnerSex } from "@/lib/learners";
 import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes, weekDays } from "@/lib/schedule";
@@ -163,7 +164,7 @@ async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string,
     const grade = learnerGrades.get(row.learner_id);
     if (!grade) continue;
     const key = `${row.class_id}-${row.attendance_date}-grade-${grade}`;
-    attendance[key] = { ...(attendance[key] || {}), [row.learner_id]: row.status };
+    attendance[key] = { ...(attendance[key] || {}), [row.learner_id]: attendanceStatusLabel(row.status) };
     if (row.note) attendanceNotes[key] = { ...(attendanceNotes[key] || {}), [row.learner_id]: row.note };
   }
   const savedResourceIds = (resourceBookmarkResult.data || []).map((bookmark) => normalizeResourceBookmarkId(bookmark.resource_id)).filter(isStarterResourceId);
@@ -234,8 +235,8 @@ async function saveAttendanceToCloud(
     if (!match || !classIds.has(match[1])) return [];
     const [, classId, attendanceDate] = match;
     return Object.entries(learnerStatuses).flatMap(([learnerId, value]) => {
-      const status = value.toLowerCase();
-      if (!(["present", "late", "absent", "excused", "leave"] as string[]).includes(status)) return [];
+      const status = toStoredAttendanceStatus(value);
+      if (!isStoredAttendanceStatus(status)) return [];
       return [{
         class_id: classId,
         learner_id: learnerId,
@@ -2341,7 +2342,6 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
     setSaved(true);
   }
 
-  const attendanceStatuses = ["Present", "Absent", "Late", "Excused", "Leave"];
   const counts = learners.reduce<Record<string, number>>((total, learner) => ({ ...total, [statuses[learner.id]]: (total[statuses[learner.id]] || 0) + 1 }), {});
   const attendedCount = (counts.Present || 0) + (counts.Late || 0);
   const attendanceRate = learners.length ? Math.round((attendedCount / learners.length) * 100) : 0;

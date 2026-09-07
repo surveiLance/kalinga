@@ -1,3 +1,5 @@
+import { attendanceStatusLabel, isStoredAttendanceStatus, toStoredAttendanceStatus } from "@/lib/attendance";
+
 type SyncClass = { id: string; learners: { id: string; grade: string }[] };
 type SyncPlan = { id: string; classId: string };
 type AttendanceMap = Record<string, Record<string, string>>;
@@ -28,7 +30,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function validAttendanceRow(value: unknown): value is AttendanceRow {
-  return record(value) && typeof value.learnerId === "string" && typeof value.grade === "string" && typeof value.note === "string" && typeof value.status === "string" && ["present", "late", "absent", "excused", "leave"].includes(value.status);
+  return record(value) && typeof value.learnerId === "string" && typeof value.grade === "string" && typeof value.note === "string" && typeof value.status === "string" && isStoredAttendanceStatus(value.status);
 }
 
 export function readPendingWrites<C extends SyncClass, P extends SyncPlan>(stored: string | null, scope: string): PendingWrite<C, P>[] {
@@ -102,7 +104,7 @@ export function attendanceChanges<C extends SyncClass>(classes: C[], updates: At
     const change = changes.get(`${classId}:${date}`) || { kind: "attendance", classId, date, records: [] };
     for (const [learnerId, status] of Object.entries(statuses)) {
       const learner = item.learners.find((entry) => entry.id === learnerId);
-      const row = { learnerId, grade: learner?.grade || "", status: status.toLowerCase(), note: notes[key]?.[learnerId]?.trim() || "" };
+      const row = { learnerId, grade: learner?.grade || "", status: toStoredAttendanceStatus(status), note: notes[key]?.[learnerId]?.trim() || "" };
       if (!learner || !validAttendanceRow(row)) throw new Error("Attendance contains an unknown learner or status.");
       change.records.push(row);
     }
@@ -132,7 +134,8 @@ export function reconcilePendingWrites<C extends SyncClass, P extends SyncPlan, 
           if (key.includes(`-${item.date}-grade-`)) { delete attendance[key]?.[row.learnerId]; delete attendanceNotes[key]?.[row.learnerId]; }
         }
         const key = `${item.classId}-${item.date}-grade-${row.grade}`;
-        attendance[key] = { ...attendance[key], [row.learnerId]: row.status };
+        // The queue holds the database's lowercase form; the roster reads labels.
+        attendance[key] = { ...attendance[key], [row.learnerId]: attendanceStatusLabel(row.status) };
         attendanceNotes[key] = { ...attendanceNotes[key], [row.learnerId]: row.note };
       }
     }
