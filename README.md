@@ -80,5 +80,18 @@ Keep `GROQ_API_KEY` in Supabase Edge Function secrets, not Vercel’s public env
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
+
+Migrations can be checked without Docker or a Supabase project. This applies every
+migration to a throwaway local Postgres and asserts the behaviour they produce —
+mention tags, notification triggers, the backfill, Gabay rate limiting, and that
+row-level security still isolates one teacher from another:
+
+```bash
+brew install postgresql@17
+./scripts/verify-migrations.sh
+```
+
+It never touches a real database. Run it before `supabase db push`.
