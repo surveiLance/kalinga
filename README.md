@@ -56,7 +56,10 @@ npx supabase secrets set ALLOW_LOCAL_ORIGINS=true
 
 Each teacher may make 30 Gabay requests every 5 minutes. The counter lives in
 `public.gabay_rate_limits` and is only writable through the `claim_gabay_request`
-function, so a browser cannot reset its own quota. Override the defaults with:
+function, so a browser cannot reset its own quota. The check fails open: if it
+cannot run, the request is logged and allowed, because the limiter guards cost
+rather than access and should never be able to take Gabay down. Override the
+defaults with:
 
 ```bash
 npx supabase secrets set GABAY_RATE_WINDOW_SECONDS=300

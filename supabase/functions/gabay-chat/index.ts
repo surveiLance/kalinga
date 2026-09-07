@@ -136,7 +136,13 @@ function parseJsonObject(value: string) {
 
 Deno.serve(async (request) => {
   const origin = allowedOrigin(request);
-  if (!origin) return new Response("Origin not allowed", { status: 403 });
+  if (!origin) {
+    // The browser cannot read a cross-origin response without CORS headers, so a
+    // rejection here reaches the app as an unexplained network error. Name the
+    // origin in the logs, which is the only place the cause is visible.
+    console.error(`Rejected origin ${request.headers.get("origin") ?? "(none)"}. Add it to ALLOWED_ORIGINS, or set ALLOW_LOCAL_ORIGINS=true for localhost.`);
+    return new Response("Origin not allowed", { status: 403 });
+  }
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(origin) });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
 
@@ -164,9 +170,11 @@ Deno.serve(async (request) => {
     window_seconds: positiveEnvNumber("GABAY_RATE_WINDOW_SECONDS", 300),
     max_requests: positiveEnvNumber("GABAY_RATE_MAX_REQUESTS", 30),
   }).maybeSingle();
+  // Fail open. The limiter guards cost, not access — the session check above is
+  // the security boundary. A limiter that takes Gabay down when the limiter
+  // itself misbehaves is worse than no limiter, so log and let the request pass.
   if (quotaError) {
-    console.error("Gabay rate limit check failed", quotaError.message);
-    return json({ error: "Gabay is temporarily unavailable." }, 503, origin);
+    console.error("Gabay rate limit check failed, allowing the request", quotaError.message);
   }
   if (quota && quota.allowed === false) {
     const retryAfter = Math.max(1, Number(quota.retry_after_seconds) || 60);
