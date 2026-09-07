@@ -723,6 +723,8 @@ export default function Home() {
       window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-email"), teacherEmail);
       window.localStorage.setItem(workspaceStorageKey(workspaceScope, "gabay-motion"), String(gabayMotion));
     } catch {
+      // Only reached when device storage rejects the write, so this reports a failure rather than cascading renders.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStorageError("Device storage could not save your work. Keep this page open and free some space before retrying.");
     }
   }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, gabayMotion, classDataReady, hydratedWorkspaceScope, workspaceScope, storageError]);
@@ -935,6 +937,22 @@ export default function Home() {
     : [];
   const notifications = entryMode === "authenticated" ? [...replyNotifications, ...resourceNotifications] : [];
   const unreadNotifications = notifications.filter((item) => !notificationReadIds.includes(item.id));
+  const blockedWrites = pendingWrites.filter((item) => item.attempts >= maxSyncAttempts);
+  const syncState = storageError ? "blocked"
+    : entryMode !== "authenticated" ? "device"
+      : blockedWrites.length ? "blocked"
+        : !online ? "offline"
+          : syncing ? "syncing"
+            : pendingWrites.length ? "waiting"
+              : cloudLoaded ? "synced" : "device";
+  const syncLabel = {
+    blocked: `${blockedWrites.length || "Some"} ${blockedWrites.length === 1 ? "change needs" : "changes need"} attention`,
+    device: "Saved on this device",
+    offline: `Offline · ${pendingWrites.length} waiting`,
+    syncing: "Syncing…",
+    waiting: `${pendingWrites.length} waiting to sync`,
+    synced: "All work synced",
+  }[syncState];
   const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
   const latestPlan = activePlans[0];
@@ -1054,6 +1072,31 @@ export default function Home() {
     return { ok: true };
   }
 
+  function queueChanges(changes: PendingChange<TeachingClass, SavedPlan>[], offlineNotice: string) {
+    if (entryMode !== "authenticated" || !canSyncScope(workspaceScope, teacherAccountId) || storageError || !changes.length) return;
+    try {
+      const queue = changes.reduce((current, change) => enqueuePendingWrite(current, workspaceScope, change, crypto.randomUUID(), Date.now()), loadPendingWrites(workspaceScope));
+      setPendingWrites(persistPendingWrites(workspaceScope, queue));
+    } catch {
+      setStorageError("This change could not be queued for sync because device storage is unavailable. Keep this page open and free some space before editing again.");
+      return;
+    }
+    if (!navigator.onLine) setNotice(offlineNotice);
+    wakeSync.current();
+  }
+
+  function retrySync() {
+    if (entryMode !== "authenticated" || !canSyncScope(workspaceScope, teacherAccountId) || storageError) return;
+    try {
+      setPendingWrites(persistPendingWrites(workspaceScope, retryPendingWrites(loadPendingWrites(workspaceScope), workspaceScope, Date.now())));
+    } catch {
+      setStorageError("Pending changes could not be read from device storage. They have not been discarded. Keep this page open and check device storage.");
+      return;
+    }
+    setNotice("");
+    wakeSync.current(true);
+  }
+
   function saveClass(newClass: Omit<TeachingClass, "id">, classId?: string) {
     const item = { ...newClass, id: classId || crypto.randomUUID() };
     setClasses((current) => classId ? current.map((entry) => entry.id === classId ? item : entry) : [...current, item]);
@@ -1061,10 +1104,7 @@ export default function Home() {
     setView("classes");
     setNotice(`${item.name} ${classId ? "was updated" : "is ready"} across planning, attendance, and resources.`);
     setGabayEventMessage(classId ? `Updated na ang ${item.name}. Ginagamit na rin ang changes sa planning at attendance.` : `Handa na ang ${item.name}! Saved na ang roster at schedule para hindi mo na ulit i-encode.`);
-    const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      void saveClassToCloud(supabase, teacherAccountId, item).catch(() => setNotice(`${item.name} is saved offline and will need to sync when your connection returns.`));
-    }
+    queueChanges([{ kind: "class", classId: item.id, value: item }], `${item.name} is saved on this device and will sync when your connection returns.`);
   }
 
   function deleteClass(classId: string) {
@@ -1078,12 +1118,7 @@ export default function Home() {
     setEditingPlanId((current) => savedPlans.some((plan) => plan.id === current && plan.classId === classId) ? "" : current);
     setNotice(`${removedClass?.name || "Class"} and its connected plans and attendance records were deleted.`);
     setGabayEventMessage(`Tinanggal na ang ${removedClass?.name || "class"} at ang connected local records nito.`);
-    const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      void supabase.from("classes").delete().eq("teacher_id", teacherAccountId).eq("id", classId).then(({ error }) => {
-        if (error) setNotice(`${removedClass?.name || "Class"} was removed on this device, but the cloud copy could not be deleted yet.`);
-      });
-    }
+    queueChanges([{ kind: "delete-class", classId }], `${removedClass?.name || "Class"} was removed on this device. The cloud copy is deleted when your connection returns.`);
   }
 
   function loadSampleClass() {
@@ -1093,10 +1128,7 @@ export default function Home() {
     setView("classes");
     setNotice("Sample school data loaded. You can edit or add classes anytime.");
     setGabayEventMessage("Sample class loaded. Puwede mo itong galawin para makita ang buong workflow.");
-    const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      void saveClassToCloud(supabase, teacherAccountId, sample).catch(() => setNotice("The sample class is saved on this device and will need to sync later."));
-    }
+    queueChanges([{ kind: "class", classId: sample.id, value: sample }], "The sample class is saved on this device and will sync when your connection returns.");
   }
 
   function savePlan(plan: SavedPlan) {
@@ -1104,22 +1136,21 @@ export default function Home() {
     setEditingPlanId(plan.id);
     setNotice(`${plan.title} was saved under ${classes.find((item) => item.id === plan.classId)?.name || "your class"}.`);
     setGabayEventMessage(`Saved ang “${plan.title}.” Nasa class workspace na ito at puwedeng balikan offline.`);
-    const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      void savePlanToCloud(supabase, teacherAccountId, plan).catch(() => setNotice(`${plan.title} is saved offline and will need to sync later.`));
-    }
+    queueChanges([{ kind: "plan", classId: plan.classId, value: plan }], `${plan.title} is saved on this device and will sync when your connection returns.`);
   }
 
   function saveAttendance(updates: Record<string, Record<string, string>>, noteUpdates: Record<string, Record<string, string>>) {
     setAttendanceRecords((current) => ({ ...current, ...updates }));
     setAttendanceNotes((current) => ({ ...current, ...noteUpdates }));
     setGabayEventMessage("Attendance saved locally. Maaari mo pa itong i-edit before it syncs later.");
-    const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      void saveAttendanceToCloud(supabase, teacherAccountId, classes, updates, noteUpdates).then(() => {
-        setGabayEventMessage("Attendance saved for this teacher account. Editable pa rin if may correction.");
-      }).catch(() => setNotice("Attendance is saved offline and will need to sync when your connection returns."));
+    let changes: PendingChange<TeachingClass, SavedPlan>[];
+    try {
+      changes = attendanceChanges(classes, updates, noteUpdates);
+    } catch {
+      setNotice("Attendance is saved on this device, but these records could not be prepared for sync. Reopen the class roster and save again.");
+      return;
     }
+    queueChanges(changes, "Attendance is saved on this device and will sync when your connection returns.");
   }
 
   if (entryMode === "loading") {
@@ -1168,7 +1199,9 @@ export default function Home() {
         <header className="topbar">
           <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority /></button>
           <div className="top-actions">
-            <span className="connection"><i /> Offline-ready</span>
+            {blockedWrites.length && !storageError
+              ? <button className={`connection ${syncState}`} type="button" onClick={retrySync} aria-label={`${syncLabel}. Retry sync now.`}><i /> {syncLabel} · Retry</button>
+              : <span className={`connection ${syncState}`} role="status"><i /> {syncLabel}</span>}
             <button className="language" type="button">ENG / FIL</button>
             <button className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
             <div className="notification-anchor">
@@ -1181,6 +1214,8 @@ export default function Home() {
             </div>
           </div>
         </header>
+
+        {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
 
         <div className="content">
           {view === "home" ? <div className="view-page home-page">
