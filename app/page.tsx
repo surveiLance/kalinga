@@ -1,10 +1,11 @@
 "use client";
 
-import { Fragment, useEffect, useId, useMemo, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { acknowledgePendingWrite, attendanceChanges, canSyncScope, enqueuePendingWrite, failPendingWrite, maxSyncAttempts, pendingCandidates, readPendingWrites, reconcilePendingWrites, retryPendingWrites, startPendingWrite, type PendingChange, type PendingWrite } from "@/lib/pending-writes";
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
@@ -12,7 +13,7 @@ type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
 type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string };
 
-type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion";
+type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion" | "pending-writes";
 
 type GradeLevel = string;
 
@@ -155,7 +156,7 @@ const notificationResourceCatalog = [
   { id: "starter-science", subject: "Science", title: "Schoolyard Plant Detectives" },
 ];
 const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino", "Mariel C. Torres", "Noel B. Pangan", "Olivia R. Cabahug", "Paolo S. Evasco", "Queenie M. Dayao", "Ramon L. Flores"];
-const legacyWorkspaceKeys: Record<WorkspaceStorageKey, string> = {
+const legacyWorkspaceKeys: Record<Exclude<WorkspaceStorageKey, "pending-writes">, string> = {
   classes: "kalinga-classes",
   "active-class": "kalinga-active-class",
   plans: "kalinga-plans",
@@ -169,6 +170,33 @@ const legacyWorkspaceKeys: Record<WorkspaceStorageKey, string> = {
 
 function workspaceStorageKey(scope: string, key: WorkspaceStorageKey) {
   return `kalinga:${scope}:${key}`;
+}
+
+function loadPendingWrites(scope: string) {
+  return readPendingWrites<TeachingClass, SavedPlan>(window.localStorage.getItem(workspaceStorageKey(scope, "pending-writes")), scope);
+}
+
+function persistPendingWrites(scope: string, queue: PendingWrite<TeachingClass, SavedPlan>[]) {
+  window.localStorage.setItem(workspaceStorageKey(scope, "pending-writes"), JSON.stringify(queue));
+  return queue;
+}
+
+function loadDeviceWorkspace(scope: string): TeacherWorkspace {
+  return {
+    classes: (JSON.parse(window.localStorage.getItem(workspaceStorageKey(scope, "classes")) || "[]") as LegacyTeachingClass[]).map(normalizeClass),
+    plans: (JSON.parse(window.localStorage.getItem(workspaceStorageKey(scope, "plans")) || "[]") as LegacySavedPlan[]).map(normalizeSavedPlan),
+    savedResourceIds: (JSON.parse(window.localStorage.getItem(workspaceStorageKey(scope, "saved-resources")) || "[]") as Array<string | number>).map(normalizeResourceBookmarkId).filter(isStarterResourceId),
+    attendance: JSON.parse(window.localStorage.getItem(workspaceStorageKey(scope, "attendance")) || "{}"),
+    attendanceNotes: JSON.parse(window.localStorage.getItem(workspaceStorageKey(scope, "attendance-notes")) || "{}"),
+  };
+}
+
+function persistDeviceWorkspace(scope: string, workspace: TeacherWorkspace) {
+  window.localStorage.setItem(workspaceStorageKey(scope, "classes"), JSON.stringify(workspace.classes));
+  window.localStorage.setItem(workspaceStorageKey(scope, "plans"), JSON.stringify(workspace.plans));
+  window.localStorage.setItem(workspaceStorageKey(scope, "attendance"), JSON.stringify(workspace.attendance));
+  window.localStorage.setItem(workspaceStorageKey(scope, "attendance-notes"), JSON.stringify(workspace.attendanceNotes));
+  window.localStorage.setItem(workspaceStorageKey(scope, "saved-resources"), JSON.stringify(workspace.savedResourceIds));
 }
 
 function normalizeResourceBookmarkId(value: string | number) {
@@ -349,13 +377,13 @@ function remoteSchedule(value: unknown) {
   return { quarter: "Quarter 1", meetings: [] };
 }
 
-async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string): Promise<TeacherWorkspace> {
+async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string, signal: AbortSignal): Promise<TeacherWorkspace> {
   const [classResult, learnerResult, planResult, attendanceResult, resourceBookmarkResult] = await Promise.all([
-    supabase.from("classes").select("id,name,grade_levels,subjects,schedule").eq("teacher_id", teacherId).order("created_at"),
-    supabase.from("learners").select("id,class_id,display_name,grade_level,sex").eq("teacher_id", teacherId).order("created_at"),
-    supabase.from("lesson_plans").select("id,class_id,title,subject,grade_levels,content").eq("teacher_id", teacherId).order("updated_at", { ascending: false }),
-    supabase.from("attendance_records").select("class_id,learner_id,attendance_date,status,note").eq("teacher_id", teacherId),
-    supabase.from("resource_bookmarks").select("resource_id").eq("teacher_id", teacherId).order("created_at"),
+    supabase.from("classes").select("id,name,grade_levels,subjects,schedule").eq("teacher_id", teacherId).order("created_at").abortSignal(signal),
+    supabase.from("learners").select("id,class_id,display_name,grade_level,sex").eq("teacher_id", teacherId).order("created_at").abortSignal(signal),
+    supabase.from("lesson_plans").select("id,class_id,title,subject,grade_levels,content").eq("teacher_id", teacherId).order("updated_at", { ascending: false }).abortSignal(signal),
+    supabase.from("attendance_records").select("class_id,learner_id,attendance_date,status,note").eq("teacher_id", teacherId).abortSignal(signal),
+    supabase.from("resource_bookmarks").select("resource_id").eq("teacher_id", teacherId).order("created_at").abortSignal(signal),
   ]);
   const firstError = classResult.error || learnerResult.error || planResult.error || attendanceResult.error || resourceBookmarkResult.error;
   if (firstError) throw firstError;
@@ -411,7 +439,8 @@ async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string)
   return { classes, plans, savedResourceIds, attendance, attendanceNotes };
 }
 
-async function saveClassToCloud(supabase: SupabaseClient, teacherId: string, item: TeachingClass) {
+async function saveClassToCloud(supabase: SupabaseClient, teacherId: string, item: TeachingClass, signal: AbortSignal, checkSession: () => void) {
+  checkSession();
   const { error: classError } = await supabase.from("classes").upsert({
     id: item.id,
     teacher_id: teacherId,
@@ -419,18 +448,21 @@ async function saveClassToCloud(supabase: SupabaseClient, teacherId: string, ite
     grade_levels: item.grades,
     subjects: item.subjects,
     schedule: { quarter: item.quarter, meetings: item.meetings },
-  });
+  }).abortSignal(signal);
   if (classError) throw classError;
 
-  const { data: existingLearners, error: learnerReadError } = await supabase.from("learners").select("id").eq("teacher_id", teacherId).eq("class_id", item.id);
+  checkSession();
+  const { data: existingLearners, error: learnerReadError } = await supabase.from("learners").select("id").eq("teacher_id", teacherId).eq("class_id", item.id).abortSignal(signal);
   if (learnerReadError) throw learnerReadError;
   const learnerIds = new Set(item.learners.map((learner) => learner.id));
   const removedLearnerIds = (existingLearners || []).map((learner) => learner.id as string).filter((id) => !learnerIds.has(id));
   if (removedLearnerIds.length) {
-    const { error } = await supabase.from("learners").delete().eq("teacher_id", teacherId).in("id", removedLearnerIds);
+    checkSession();
+    const { error } = await supabase.from("learners").delete().eq("teacher_id", teacherId).in("id", removedLearnerIds).abortSignal(signal);
     if (error) throw error;
   }
   if (item.learners.length) {
+    checkSession();
     const { error } = await supabase.from("learners").upsert(item.learners.map((learner) => ({
       id: learner.id,
       class_id: item.id,
@@ -438,12 +470,12 @@ async function saveClassToCloud(supabase: SupabaseClient, teacherId: string, ite
       display_name: learner.name,
       grade_level: learner.grade,
       sex: learner.sex,
-    })));
+    }))).abortSignal(signal);
     if (error) throw error;
   }
 }
 
-async function savePlanToCloud(supabase: SupabaseClient, teacherId: string, plan: SavedPlan) {
+async function savePlanToCloud(supabase: SupabaseClient, teacherId: string, plan: SavedPlan, signal: AbortSignal) {
   const { error } = await supabase.from("lesson_plans").upsert({
     id: plan.id,
     class_id: plan.classId,
@@ -453,23 +485,25 @@ async function savePlanToCloud(supabase: SupabaseClient, teacherId: string, plan
     grade_levels: plan.grades,
     status: "draft",
     content: plan,
-  });
+  }).abortSignal(signal);
   if (error) throw error;
 }
 
 async function saveAttendanceToCloud(
   supabase: SupabaseClient,
   teacherId: string,
-  classes: TeachingClass[],
+  classes: Pick<TeachingClass, "id">[],
   updates: Record<string, Record<string, string>>,
   noteUpdates: Record<string, Record<string, string>>,
+  signal: AbortSignal,
 ) {
   const classIds = new Set(classes.map((item) => item.id));
   const rows = Object.entries(updates).flatMap(([key, learnerStatuses]) => {
     const match = key.match(/^(.*)-(\d{4}-\d{2}-\d{2})-grade-(.+)$/);
     if (!match || !classIds.has(match[1])) return [];
     const [, classId, attendanceDate] = match;
-    return Object.entries(learnerStatuses).flatMap(([learnerId, status]) => {
+    return Object.entries(learnerStatuses).flatMap(([learnerId, value]) => {
+      const status = value.toLowerCase();
       if (!(["present", "late", "absent", "excused", "leave"] as string[]).includes(status)) return [];
       return [{
         class_id: classId,
@@ -481,8 +515,8 @@ async function saveAttendanceToCloud(
       }];
     });
   });
-  if (!rows.length) return;
-  const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "learner_id,attendance_date" });
+  if (!rows.length) throw new Error("No valid attendance records to sync.");
+  const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "learner_id,attendance_date" }).abortSignal(signal);
   if (error) throw error;
 }
 
@@ -555,6 +589,14 @@ export default function Home() {
   const [notificationReadIds, setNotificationReadIds] = useState<string[]>([]);
   const [communityTargetId, setCommunityTargetId] = useState("");
   const [communityResourceId, setCommunityResourceId] = useState("");
+  const [pendingWrites, setPendingWrites] = useState<PendingWrite<TeachingClass, SavedPlan>[]>([]);
+  const [online, setOnline] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [storageError, setStorageError] = useState("");
+  const [cloudLoaded, setCloudLoaded] = useState(false);
+  const sessionTeacherId = useRef("");
+  const wakeSync = useRef<(refresh?: boolean) => void>(() => {});
+  const syncRun = useRef<Promise<void> | null>(null);
   const workspaceScope = entryMode === "authenticated" && teacherAccountId
     ? `teacher-${teacherAccountId}`
     : entryMode === "prototype"
@@ -567,6 +609,7 @@ export default function Home() {
     let active = true;
 
     function applyTeacherAccount(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
+      sessionTeacherId.current = user.id;
       const displayName = typeof user.user_metadata?.display_name === "string"
         ? user.user_metadata.display_name
         : typeof user.user_metadata?.full_name === "string"
@@ -576,6 +619,7 @@ export default function Home() {
       setTeacherEmail(user.email || "");
       setTeacherAccountId(user.id);
       setEntryMode("authenticated");
+      window.setTimeout(() => wakeSync.current(true), 0);
       if (new URLSearchParams(window.location.search).get("confirmed") === "1") {
         setAuthWelcomeMessage("Email confirmed—welcome to Kalinga. Your teacher workspace is ready.");
         setView("home");
@@ -587,6 +631,7 @@ export default function Home() {
       if (!active) return;
       if (data.session?.user) applyTeacherAccount(data.session.user);
       else {
+        sessionTeacherId.current = "";
         setTeacherAccountId("");
         setEntryMode((current) => current === "prototype" ? current : "signed-out");
       }
@@ -596,6 +641,7 @@ export default function Home() {
       if (!active) return;
       if (session?.user) applyTeacherAccount(session.user);
       else {
+        sessionTeacherId.current = "";
         setTeacherAccountId("");
         setEntryMode((current) => current === "prototype" ? current : "signed-out");
       }
@@ -604,6 +650,20 @@ export default function Home() {
     return () => {
       active = false;
       listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    function updateConnection() {
+      setOnline(navigator.onLine);
+      if (navigator.onLine) wakeSync.current(true);
+    }
+    updateConnection();
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    return () => {
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
     };
   }, []);
 
@@ -621,32 +681,31 @@ export default function Home() {
       setEditingPlanId("");
       setNotice("");
       setGabayEventMessage("");
+      setPendingWrites([]);
+      setStorageError("");
+      setCloudLoaded(false);
+      setSyncing(false);
 
       try {
         if (workspaceScope === "prototype") migrateLegacyPrototypeWorkspace();
-        const storedClasses = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "classes"));
         const storedActiveClass = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "active-class"));
-        const storedPlans = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "plans"));
-        const storedResources = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "saved-resources"));
-        const storedAttendance = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "attendance"));
-        const storedAttendanceNotes = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "attendance-notes"));
         const storedTeacherName = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "teacher-name"));
         const storedTeacherEmail = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "teacher-email"));
         const storedGabayMotion = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "gabay-motion"));
-        if (storedClasses) {
-          const parsed = (JSON.parse(storedClasses) as LegacyTeachingClass[]).map(normalizeClass);
-          setClasses(parsed);
-          setActiveClassId(storedActiveClass || parsed[0]?.id || "");
-        }
-        if (storedPlans) setSavedPlans((JSON.parse(storedPlans) as LegacySavedPlan[]).map(normalizeSavedPlan));
-        if (storedResources) setSavedResourceIds((JSON.parse(storedResources) as Array<string | number>).map(normalizeResourceBookmarkId).filter(isStarterResourceId));
-        if (storedAttendance) setAttendanceRecords(JSON.parse(storedAttendance) as Record<string, Record<string, string>>);
-        if (storedAttendanceNotes) setAttendanceNotes(JSON.parse(storedAttendanceNotes) as Record<string, Record<string, string>>);
+        const queue = loadPendingWrites(workspaceScope);
+        const workspace = reconcilePendingWrites(loadDeviceWorkspace(workspaceScope), queue, workspaceScope);
+        setPendingWrites(queue);
+        setClasses(workspace.classes);
+        setActiveClassId(workspace.classes.some((item) => item.id === storedActiveClass) ? storedActiveClass! : workspace.classes[0]?.id || "");
+        setSavedPlans(workspace.plans);
+        setSavedResourceIds(workspace.savedResourceIds);
+        setAttendanceRecords(workspace.attendance);
+        setAttendanceNotes(workspace.attendanceNotes);
         if (workspaceScope === "prototype" && storedTeacherName) setTeacherName(storedTeacherName);
         if (workspaceScope === "prototype" && storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
         if (storedGabayMotion) setGabayMotion(storedGabayMotion !== "false");
       } catch {
-        // A clean zero state is safer than blocking the app on damaged local data.
+        setStorageError("This device’s saved work could not be read. Sync is paused to protect it. Do not clear browser storage; reload after checking device storage.");
       } finally {
         setHydratedWorkspaceScope(workspaceScope);
         setClassDataReady(true);
@@ -656,38 +715,155 @@ export default function Home() {
   }, [workspaceScope]);
 
   useEffect(() => {
-    if (!classDataReady || !workspaceScope || hydratedWorkspaceScope !== workspaceScope) return;
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "classes"), JSON.stringify(classes));
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "active-class"), activeClassId);
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "plans"), JSON.stringify(savedPlans));
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "saved-resources"), JSON.stringify(savedResourceIds));
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "attendance"), JSON.stringify(attendanceRecords));
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "attendance-notes"), JSON.stringify(attendanceNotes));
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-name"), teacherName);
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-email"), teacherEmail);
-    window.localStorage.setItem(workspaceStorageKey(workspaceScope, "gabay-motion"), String(gabayMotion));
-  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, gabayMotion, classDataReady, hydratedWorkspaceScope, workspaceScope]);
+    if (!classDataReady || !workspaceScope || hydratedWorkspaceScope !== workspaceScope || storageError) return;
+    try {
+      persistDeviceWorkspace(workspaceScope, { classes, plans: savedPlans, savedResourceIds, attendance: attendanceRecords, attendanceNotes });
+      window.localStorage.setItem(workspaceStorageKey(workspaceScope, "active-class"), activeClassId);
+      window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-name"), teacherName);
+      window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-email"), teacherEmail);
+      window.localStorage.setItem(workspaceStorageKey(workspaceScope, "gabay-motion"), String(gabayMotion));
+    } catch {
+      setStorageError("Device storage could not save your work. Keep this page open and free some space before retrying.");
+    }
+  }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, gabayMotion, classDataReady, hydratedWorkspaceScope, workspaceScope, storageError]);
 
   useEffect(() => {
-    if (entryMode !== "authenticated" || !teacherAccountId || hydratedWorkspaceScope !== workspaceScope) return;
+    if (entryMode !== "authenticated" || !canSyncScope(workspaceScope, teacherAccountId) || hydratedWorkspaceScope !== workspaceScope || storageError) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let active = true;
-    void loadTeacherWorkspace(supabase, teacherAccountId).then((workspace) => {
-      if (!active) return;
-      setClasses(workspace.classes);
-      setActiveClassId((current) => workspace.classes.some((item) => item.id === current) ? current : workspace.classes[0]?.id || "");
-      setSavedPlans(workspace.plans);
-      setSavedResourceIds(workspace.savedResourceIds);
-      setAttendanceRecords(workspace.attendance);
-      setAttendanceNotes(workspace.attendanceNotes);
-    }).catch(() => {
-      if (active) setNotice("You appear to be offline. This account’s saved device copy is still available.");
-    });
+    let running = false;
+    let requested = false;
+    let loadRequested = true;
+    let timer: number | undefined;
+    let controller: AbortController | undefined;
+
+    function currentSession() {
+      return active && canSyncScope(workspaceScope, sessionTeacherId.current);
+    }
+
+    function checkSession() {
+      if (!currentSession()) throw new Error("The teacher session changed.");
+    }
+
+    async function syncWorkspace() {
+      while (currentSession() && navigator.onLine) {
+        let queue = loadPendingWrites(workspaceScope);
+        if (loadRequested) {
+          loadRequested = false;
+          controller = new AbortController();
+          const timeout = window.setTimeout(() => controller?.abort(), 30_000);
+          let remote: TeacherWorkspace | undefined;
+          try {
+            remote = await loadTeacherWorkspace(supabase!, teacherAccountId, controller.signal);
+          } catch {
+            if (currentSession()) setNotice("The cloud workspace could not refresh. Your device copy and pending changes are being kept.");
+          } finally {
+            window.clearTimeout(timeout);
+          }
+          if (!currentSession()) return;
+          queue = loadPendingWrites(workspaceScope);
+          if (remote) {
+            const workspace = reconcilePendingWrites(remote, queue, workspaceScope);
+            persistDeviceWorkspace(workspaceScope, workspace);
+            setClasses(workspace.classes);
+            setActiveClassId((current) => workspace.classes.some((item) => item.id === current) ? current : workspace.classes[0]?.id || "");
+            setSavedPlans(workspace.plans);
+            setSavedResourceIds(workspace.savedResourceIds);
+            setAttendanceRecords(workspace.attendance);
+            setAttendanceNotes(workspace.attendanceNotes);
+            setCloudLoaded(true);
+          }
+        }
+        setPendingWrites(queue);
+        const candidates = pendingCandidates(queue, workspaceScope);
+        const item = candidates.find((entry) => entry.nextAttemptAt <= Date.now());
+        if (!item) {
+          if (candidates.length) timer = window.setTimeout(() => wake(), Math.max(0, Math.min(...candidates.map((entry) => entry.nextAttemptAt)) - Date.now()));
+          return;
+        }
+        const { data, error } = await supabase!.auth.getSession();
+        if (!currentSession() || error || !canSyncScope(workspaceScope, data.session?.user.id || "") || !navigator.onLine) return;
+        queue = loadPendingWrites(workspaceScope);
+        if (!queue.some((entry) => entry.id === item.id)) continue;
+        setPendingWrites(persistPendingWrites(workspaceScope, startPendingWrite(queue, workspaceScope, item.id, Date.now())));
+        controller = new AbortController();
+        const timeout = window.setTimeout(() => controller?.abort(), 30_000);
+        let failed = false;
+        try {
+          checkSession();
+          if (item.kind === "class") await saveClassToCloud(supabase!, teacherAccountId, item.value, controller.signal, checkSession);
+          if (item.kind === "plan") await savePlanToCloud(supabase!, teacherAccountId, item.value, controller.signal);
+          if (item.kind === "delete-class") {
+            const { error } = await supabase!.from("classes").delete().eq("teacher_id", teacherAccountId).eq("id", item.classId).abortSignal(controller.signal);
+            if (error) throw error;
+          }
+          if (item.kind === "attendance") {
+            const updates: Record<string, Record<string, string>> = {};
+            const notes: Record<string, Record<string, string>> = {};
+            for (const row of item.records) {
+              const key = `${item.classId}-${item.date}-grade-${row.grade}`;
+              updates[key] = { ...updates[key], [row.learnerId]: row.status };
+              notes[key] = { ...notes[key], [row.learnerId]: row.note };
+            }
+            await saveAttendanceToCloud(supabase!, teacherAccountId, [{ id: item.classId }], updates, notes, controller.signal);
+          }
+        } catch {
+          failed = true;
+        } finally {
+          window.clearTimeout(timeout);
+        }
+        if (!currentSession()) return;
+        queue = loadPendingWrites(workspaceScope);
+        if (failed) {
+          setPendingWrites(persistPendingWrites(workspaceScope, failPendingWrite(queue, workspaceScope, item.id, "The cloud rejected this change or could not be reached.")));
+        } else {
+          persistDeviceWorkspace(workspaceScope, reconcilePendingWrites(loadDeviceWorkspace(workspaceScope), [item, ...queue], workspaceScope));
+          setPendingWrites(persistPendingWrites(workspaceScope, acknowledgePendingWrite(queue, workspaceScope, item.id)));
+        }
+      }
+    }
+
+    function wake(refresh = false) {
+      if (!currentSession()) return;
+      if (refresh) loadRequested = true;
+      window.clearTimeout(timer);
+      if (running) { requested = true; return; }
+      running = true;
+      requested = false;
+      const previous = syncRun.current;
+      const task = (async () => {
+        await previous;
+        if (!currentSession() || !navigator.onLine) return;
+        setSyncing(true);
+        if (navigator.locks) await navigator.locks.request(workspaceStorageKey(workspaceScope, "pending-writes"), syncWorkspace);
+        else await syncWorkspace();
+      })().catch(() => {
+        if (currentSession()) setStorageError("Sync paused because device storage could not be read or updated. Your pending changes have not been discarded. Keep this page open and check device storage.");
+      }).finally(() => {
+        running = false;
+        if (!currentSession()) return;
+        setSyncing(false);
+        if (requested) wake();
+      });
+      syncRun.current = task;
+    }
+
+    function storageChanged(event: StorageEvent) {
+      if (event.key === workspaceStorageKey(workspaceScope, "pending-writes")) wake(true);
+    }
+
+    wakeSync.current = wake;
+    wake();
+    window.addEventListener("storage", storageChanged);
     return () => {
       active = false;
+      controller?.abort();
+      window.clearTimeout(timer);
+      window.removeEventListener("storage", storageChanged);
+      wakeSync.current = () => {};
     };
-  }, [entryMode, hydratedWorkspaceScope, teacherAccountId, workspaceScope]);
+  }, [entryMode, hydratedWorkspaceScope, teacherAccountId, workspaceScope, storageError]);
 
   useEffect(() => {
     if (entryMode !== "authenticated" || !teacherAccountId) return;
