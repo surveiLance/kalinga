@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
     "lint": "eslint . --ignore-pattern .next --ignore-pattern supabase/functions"
   },
   "dependencies": {
@@ -33,7 +34,8 @@
     "globals": "16.4.0",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.59.3"
+    "typescript-eslint": "8.59.3",
+    "vitest": "^3.2.7"
   },
   "type": "module"
 }

@@ -5,6 +5,15 @@ import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGradeLevels } from "@/lib/grades";
+import { createSampleLearners, learnerRosterSummary, learnerSexCounts, normalizeLearnerSex } from "@/lib/learners";
+import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes, weekDays } from "@/lib/schedule";
+import { hasTeacherMention, teacherInitials, teacherLabel, teacherMention } from "@/lib/teachers";
+import { dateInputValue, displayDate, moveDate } from "@/lib/dates";
+import { normalizeClass, normalizeSavedPlan, remoteSchedule } from "@/lib/normalize";
+import { decodeCommunityMessage, encodeCommunityMessage } from "@/lib/community-message";
+import { isStarterResourceId, legacyWorkspaceKeys, normalizeResourceBookmarkId, workspaceStorageKey, type WorkspaceStorageKey } from "@/lib/workspace-keys";
+import type { ClassLearner, ClassMeeting, GradeLevel, LegacySavedPlan, LegacyTeachingClass, PlanSlot, SavedPlan, TeachingClass, TeacherWorkspace, TodayTeachingBlock } from "@/lib/teaching-types";
 import { acknowledgePendingWrite, attendanceChanges, canSyncScope, enqueuePendingWrite, failPendingWrite, maxSyncAttempts, pendingCandidates, readPendingWrites, reconcilePendingWrites, retryPendingWrites, startPendingWrite, type PendingChange, type PendingWrite } from "@/lib/pending-writes";
 
 type View = "home" | "classes" | "plan" | "library" | "attendance" | "community";
@@ -12,92 +21,6 @@ type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
 type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string };
-
-type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion" | "pending-writes";
-
-type GradeLevel = string;
-
-type LearnerSex = "Female" | "Male" | "Not specified";
-
-type ClassLearner = {
-  id: string;
-  name: string;
-  grade: GradeLevel;
-  sex: LearnerSex;
-};
-
-type ClassMeeting = {
-  id: string;
-  days: string;
-  startTime: string;
-  durationMinutes: number;
-  label: string;
-};
-
-type TodayTeachingBlock = {
-  classId: string;
-  className: string;
-  grades: GradeLevel[];
-  meeting: ClassMeeting;
-};
-
-type TeachingClass = {
-  id: string;
-  name: string;
-  grades: GradeLevel[];
-  subjects: string[];
-  quarter: string;
-  meetingDays: string;
-  startTime: string;
-  meetings: ClassMeeting[];
-  learners: ClassLearner[];
-};
-
-type LegacyTeachingClass = Omit<Partial<TeachingClass>, "grades" | "learners" | "meetings"> & {
-  id: string;
-  name: string;
-  grades?: Array<GradeLevel | number>;
-  learners?: Array<Omit<ClassLearner, "grade" | "sex"> & { grade: GradeLevel | number; sex?: LearnerSex | string }>;
-  meetings?: Array<Partial<ClassMeeting>>;
-  subject?: string;
-  learnerCount?: number;
-};
-
-type PlanSlot = {
-  id: string;
-  time: string;
-  teacherFocus: string;
-  gradeTasks: Record<GradeLevel, string>;
-};
-
-type SavedPlan = {
-  id: string;
-  classId: string;
-  title: string;
-  subject: string;
-  quarter: string;
-  grades: GradeLevel[];
-  duration: string;
-  startTime?: string;
-  language?: string;
-  competencies?: Record<GradeLevel, string>;
-  sharedTheme?: string;
-  multigradeModel?: string;
-  objectives?: Record<GradeLevel, string>;
-  learnerContext?: string;
-  materials?: string;
-  formativeAssessments?: Record<GradeLevel, string>;
-  exitTasks?: Record<GradeLevel, string>;
-  successCriteria?: Record<GradeLevel, string>;
-  reflection?: string;
-  remediation?: string;
-  enrichment?: string;
-  nextSessionNotes?: string;
-  slots: PlanSlot[];
-  savedAt: string;
-};
-
-type LegacySavedPlan = Omit<SavedPlan, "grades"> & { grades: Array<GradeLevel | number> };
 
 type RemoteClassRow = {
   id: string;
@@ -132,16 +55,7 @@ type RemoteAttendanceRow = {
   note: string | null;
 };
 
-type TeacherWorkspace = {
-  classes: TeachingClass[];
-  plans: SavedPlan[];
-  savedResourceIds: string[];
-  attendance: Record<string, Record<string, string>>;
-  attendanceNotes: Record<string, Record<string, string>>;
-};
-
 const commonSubjects = ["Mathematics", "Science", "English", "Filipino", "Araling Panlipunan", "MAPEH", "Edukasyon sa Pagpapakatao", "TLE"];
-const commonGradeLevels: GradeLevel[] = ["Kindergarten", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 const gabayPageLabels: Record<View, string> = {
   home: "Today",
   classes: "Classes",
@@ -150,28 +64,10 @@ const gabayPageLabels: Record<View, string> = {
   attendance: "Attendance",
   community: "Teacher community",
 };
-const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const notificationResourceCatalog = [
   { id: "starter-math", subject: "Mathematics", title: "Fraction Market with Bottle Caps" },
   { id: "starter-science", subject: "Science", title: "Schoolyard Plant Detectives" },
 ];
-const learnerNames = ["Angela P. Morales", "Benjie R. Santos", "Carla M. Dela Cruz", "Daryl T. Gomez", "Elaine B. Ramos", "Francis A. Uy", "Grace L. Villanueva", "Harold N. Flores", "Irene C. Mendoza", "Jose R. Lim", "Karla S. Reyes", "Luis M. Aquino", "Mariel C. Torres", "Noel B. Pangan", "Olivia R. Cabahug", "Paolo S. Evasco", "Queenie M. Dayao", "Ramon L. Flores"];
-const legacyWorkspaceKeys: Record<Exclude<WorkspaceStorageKey, "pending-writes">, string> = {
-  classes: "kalinga-classes",
-  "active-class": "kalinga-active-class",
-  plans: "kalinga-plans",
-  "saved-resources": "kalinga-saved-resources",
-  attendance: "kalinga-attendance",
-  "attendance-notes": "kalinga-attendance-notes",
-  "teacher-name": "kalinga-teacher-name",
-  "teacher-email": "kalinga-teacher-email",
-  "gabay-motion": "kalinga-gabay-motion",
-};
-
-function workspaceStorageKey(scope: string, key: WorkspaceStorageKey) {
-  return `kalinga:${scope}:${key}`;
-}
-
 function loadPendingWrites(scope: string) {
   return readPendingWrites<TeachingClass, SavedPlan>(window.localStorage.getItem(workspaceStorageKey(scope, "pending-writes")), scope);
 }
@@ -199,15 +95,6 @@ function persistDeviceWorkspace(scope: string, workspace: TeacherWorkspace) {
   window.localStorage.setItem(workspaceStorageKey(scope, "saved-resources"), JSON.stringify(workspace.savedResourceIds));
 }
 
-function normalizeResourceBookmarkId(value: string | number) {
-  const id = String(value);
-  return /^\d+$/.test(id) ? `catalog-${id}` : id;
-}
-
-function isStarterResourceId(value: string) {
-  return value === "starter-math" || value === "starter-science";
-}
-
 function migrateLegacyPrototypeWorkspace() {
   const alreadyMigrated = window.localStorage.getItem("kalinga:prototype:migrated") === "true";
   if (alreadyMigrated) return;
@@ -218,163 +105,6 @@ function migrateLegacyPrototypeWorkspace() {
     }
   }
   window.localStorage.setItem("kalinga:prototype:migrated", "true");
-}
-
-function normalizeGradeLevel(grade: GradeLevel | number): GradeLevel {
-  const cleaned = String(grade).trim();
-  if (!cleaned) return "1";
-  if (/^(k|kinder|kindergarten)$/i.test(cleaned)) return "Kindergarten";
-  const numberedGrade = cleaned.match(/^grade\s+(\d+)$/i);
-  return numberedGrade ? numberedGrade[1] : cleaned;
-}
-
-function gradeLabel(grade: GradeLevel) {
-  return grade === "Kindergarten" || /[a-z]/i.test(grade) ? grade : `Grade ${grade}`;
-}
-
-function gradeList(grades: GradeLevel[]) {
-  return grades.map(gradeLabel).join(", ");
-}
-
-function normalizeLearnerSex(value?: string): LearnerSex {
-  if (/^(female|f)$/i.test(value || "")) return "Female";
-  if (/^(male|m)$/i.test(value || "")) return "Male";
-  return "Not specified";
-}
-
-function learnerSexCounts(learners: ClassLearner[]) {
-  return learners.reduce((counts, learner) => {
-    if (learner.sex === "Female") counts.female += 1;
-    else if (learner.sex === "Male") counts.male += 1;
-    else counts.unspecified += 1;
-    return counts;
-  }, { female: 0, male: 0, unspecified: 0 });
-}
-
-function learnerRosterSummary(learners: ClassLearner[], compact = false) {
-  if (!learners.length) return compact ? "No learners yet" : "No sex data yet";
-  const counts = learnerSexCounts(learners);
-  const labels = compact
-    ? [`${counts.female}F`, `${counts.male}M`]
-    : [`${counts.female} female`, `${counts.male} male`];
-  if (counts.unspecified) labels.push(compact ? `${counts.unspecified} not set` : `${counts.unspecified} not specified`);
-  return labels.join(" · ");
-}
-
-function teacherLabel(name: string) {
-  const cleaned = name.trim();
-  return cleaned ? `Teacher ${cleaned}` : "Teacher";
-}
-
-function teacherMention(name: string, accountId = "") {
-  const cleaned = name.replace(/^Teacher\s+/i, "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  const suffix = accountId.replace(/[^a-z0-9]/gi, "").slice(0, 4).toLowerCase();
-  return `@${cleaned || "teacher"}${suffix ? `_${suffix}` : ""}`;
-}
-
-function hasTeacherMention(message: string, tag: string) {
-  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`${escaped}(?=\\s|[.,!?;:]|$)`, "i").test(message);
-}
-
-function teacherInitials(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return "T";
-  return words.slice(0, 2).map((word) => word[0]?.toUpperCase()).join("");
-}
-
-function dateInputValue(date = new Date()) {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
-}
-
-function displayDate(value: string) {
-  return new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`));
-}
-
-function moveDate(value: string, days: number) {
-  const date = new Date(`${value}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return dateInputValue(date);
-}
-
-function sortGradeLevels(grades: GradeLevel[]) {
-  return [...grades].sort((a, b) => {
-    const aIndex = commonGradeLevels.indexOf(a);
-    const bIndex = commonGradeLevels.indexOf(b);
-    if (aIndex >= 0 || bIndex >= 0) return (aIndex >= 0 ? aIndex : commonGradeLevels.length) - (bIndex >= 0 ? bIndex : commonGradeLevels.length);
-    return a.localeCompare(b, undefined, { numeric: true });
-  });
-}
-
-function createSampleLearners(grades: GradeLevel[], count: number): ClassLearner[] {
-  const safeGrades = grades.length ? grades : ["1"];
-  return Array.from({ length: count }, (_, index) => ({
-    id: `learner-${index + 1}`,
-    name: learnerNames[index] || `Learner ${String(index + 1).padStart(2, "0")}`,
-    grade: safeGrades[index % safeGrades.length],
-    sex: index % 2 ? "Male" : "Female",
-  }));
-}
-
-function createDefaultMeeting(days = "Monday to Friday", startTime = "8:00 AM", index = 0): ClassMeeting {
-  return { id: typeof crypto !== "undefined" ? crypto.randomUUID() : `meeting-${Date.now()}-${index}`, days, startTime, durationMinutes: 60, label: "Regular class" };
-}
-
-function daysForPattern(pattern: string) {
-  if (pattern === "Monday to Friday") return weekDays.slice(0, 5);
-  if (pattern === "Monday, Wednesday, Friday") return ["Monday", "Wednesday", "Friday"];
-  if (pattern === "Tuesday and Thursday") return ["Tuesday", "Thursday"];
-  const namedDays = weekDays.filter((day) => pattern.toLowerCase().includes(day.toLowerCase()));
-  return namedDays.length ? namedDays : ["Custom schedule"];
-}
-
-function formatMeetingDays(days: string[]) {
-  const weekdays = weekDays.slice(0, 5);
-  return weekdays.every((day, index) => days[index] === day) && days.length === weekdays.length ? "Monday to Friday" : days.join(", ");
-}
-
-function normalizeClass(item: LegacyTeachingClass): TeachingClass {
-  const grades = Array.isArray(item.grades) && item.grades.length ? item.grades.map(normalizeGradeLevel) : ["1"];
-  const subjects = Array.isArray(item.subjects) && item.subjects.length
-    ? item.subjects.filter(Boolean)
-    : [item.subject || "Mathematics"];
-  const learners = Array.isArray(item.learners) && item.learners.length
-    ? item.learners.map((learner, index) => ({ id: learner.id || `${item.id}-learner-${index + 1}`, name: learner.name, grade: normalizeGradeLevel(learner.grade || grades[0]), sex: normalizeLearnerSex(learner.sex) }))
-    : createSampleLearners(grades, Math.max(0, item.learnerCount || 0)).map((learner) => ({ ...learner, id: `${item.id}-${learner.id}` }));
-  const meetingDays = item.meetingDays || "Monday to Friday";
-  const startTime = item.startTime || "8:00 AM";
-  const meetings = Array.isArray(item.meetings) && item.meetings.length
-    ? item.meetings.map((meeting, index) => ({ id: meeting.id || `${item.id}-meeting-${index + 1}`, days: meeting.days || meetingDays, startTime: meeting.startTime || startTime, durationMinutes: Math.max(5, Number(meeting.durationMinutes) || 60), label: meeting.label?.trim() || "Regular class" }))
-    : [{ ...createDefaultMeeting(meetingDays, startTime), id: `${item.id}-meeting-1` }];
-
-  return {
-    id: item.id,
-    name: item.name,
-    grades,
-    subjects,
-    quarter: item.quarter || "Quarter 1",
-    meetingDays: meetings[0].days,
-    startTime: meetings[0].startTime,
-    meetings,
-    learners,
-  };
-}
-
-function normalizeSavedPlan(plan: LegacySavedPlan): SavedPlan {
-  return { ...plan, grades: plan.grades.map(normalizeGradeLevel) };
-}
-
-function remoteSchedule(value: unknown) {
-  if (Array.isArray(value)) return { quarter: "Quarter 1", meetings: value };
-  if (value && typeof value === "object") {
-    const schedule = value as { quarter?: unknown; meetings?: unknown };
-    return {
-      quarter: typeof schedule.quarter === "string" ? schedule.quarter : "Quarter 1",
-      meetings: Array.isArray(schedule.meetings) ? schedule.meetings : [],
-    };
-  }
-  return { quarter: "Quarter 1", meetings: [] };
 }
 
 async function loadTeacherWorkspace(supabase: SupabaseClient, teacherId: string, signal: AbortSignal): Promise<TeacherWorkspace> {
@@ -1905,29 +1635,6 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   );
 }
 
-function parseTime(time: string) {
-  const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return { hour: 8, minute: 0, period: "AM" as "AM" | "PM" };
-  return { hour: Math.min(12, Math.max(1, Number(match[1]))), minute: Math.min(59, Math.max(0, Number(match[2]))), period: match[3].toUpperCase() as "AM" | "PM" };
-}
-
-function toMinutes(time: string) {
-  const { hour, minute, period } = parseTime(time);
-  return (hour % 12) * 60 + minute + (period === "PM" ? 720 : 0);
-}
-
-function formatTime(totalMinutes: number) {
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-  const period = normalized >= 720 ? "PM" : "AM";
-  const hour = Math.floor(normalized / 60) % 12 || 12;
-  return `${hour}:${String(normalized % 60).padStart(2, "0")} ${period}`;
-}
-
-function durationMinutes(duration: string | number) {
-  const parsed = typeof duration === "number" ? duration : Number.parseInt(duration, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 80;
-}
-
 function MeetingDayPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const selectedDays = daysForPattern(value).filter((day) => weekDays.includes(day));
   function toggleDay(day: string) {
@@ -2654,16 +2361,6 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
 
 type TeacherDiscussion = { id: string; authorId: string; authorName: string; schoolName: string; title: string; body: string; resourceId: string; subject: string; gradeLevels: string[]; createdAt: string };
 type TeacherReply = { id: string; discussionId: string; authorId: string; authorName: string; body: string; resourceId: string; createdAt: string };
-
-const sharedResourceMarker = /\n?\[\[kalinga-resource:([a-z0-9-]+)\]\]\s*$/i;
-
-function encodeCommunityMessage(body: string, resourceId: string) {
-  return resourceId ? `${body.trim()}\n[[kalinga-resource:${resourceId}]]` : body.trim();
-}
-
-function decodeCommunityMessage(body: string) {
-  return { body: body.replace(sharedResourceMarker, "").trim(), resourceId: body.match(sharedResourceMarker)?.[1] || "" };
-}
 
 function renderCommunityMessage(body: string) {
   return body.split(/(@[a-z0-9_]+)/gi).map((part, index) => part.startsWith("@") ? <strong className="teacher-mention" key={`${part}-${index}`}>{part}</strong> : <Fragment key={`${index}-${part.slice(0, 8)}`}>{part}</Fragment>);
