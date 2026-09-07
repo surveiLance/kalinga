@@ -37,8 +37,15 @@ function allowedOrigin(request: Request) {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  const localOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  const localOrigins = Deno.env.get("ALLOW_LOCAL_ORIGINS") === "true"
+    ? ["http://localhost:3000", "http://127.0.0.1:3000"]
+    : [];
   return [...configuredOrigins, ...localOrigins].includes(origin) ? origin : null;
+}
+
+function positiveEnvNumber(name: string, fallback: number) {
+  const parsed = Number(Deno.env.get(name));
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
 function corsHeaders(origin: string) {
@@ -152,6 +159,22 @@ Deno.serve(async (request) => {
   });
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return json({ error: "Invalid session" }, 401, origin);
+
+  const { data: quota, error: quotaError } = await supabase.rpc("claim_gabay_request", {
+    window_seconds: positiveEnvNumber("GABAY_RATE_WINDOW_SECONDS", 300),
+    max_requests: positiveEnvNumber("GABAY_RATE_MAX_REQUESTS", 30),
+  }).maybeSingle();
+  if (quotaError) {
+    console.error("Gabay rate limit check failed", quotaError.message);
+    return json({ error: "Gabay is temporarily unavailable." }, 503, origin);
+  }
+  if (quota && quota.allowed === false) {
+    const retryAfter = Math.max(1, Number(quota.retry_after_seconds) || 60);
+    return new Response(JSON.stringify({ error: "Gabay is busy. Try again shortly." }), {
+      status: 429,
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json", "Retry-After": String(retryAfter) },
+    });
+  }
 
   let payload: Record<string, unknown>;
   try {

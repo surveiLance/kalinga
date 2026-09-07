@@ -1342,7 +1342,11 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     }, chatMessages.slice(-12).map(({ role, text }) => ({ role, text })));
 
     setConnectionIssue(!result.connected);
-    const gabayReply = result.connected ? result.reply.slice(0, 3990) : "I could not reach Groq right now. Please try again shortly. Your classroom data is still safe.";
+    const gabayReply = result.connected
+      ? result.reply.slice(0, 3990)
+      : result.reason === "busy"
+        ? "Ang dami nating natanong sa maikling panahon. Let us pause for a moment, then ask again. Your classroom data is still safe."
+        : "I could not reach Groq right now. Please try again shortly. Your classroom data is still safe.";
     const gabayMessage: GabayChatMessage = {
       id: crypto.randomUUID(),
       conversationId,

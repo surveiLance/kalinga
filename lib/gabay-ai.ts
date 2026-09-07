@@ -26,7 +26,7 @@ export type GabayHistoryMessage = {
 
 type GabayResult =
   | { connected: true; reply: string }
-  | { connected: false; reason: "not-configured" | "not-signed-in" | "unavailable" };
+  | { connected: false; reason: "not-configured" | "not-signed-in" | "busy" | "unavailable" };
 
 export type GabayDraft =
   | { type: "intentions"; competency: string; objective: string }
@@ -54,7 +54,12 @@ export async function askConnectedGabay(message: string, pageContext: GabayPageC
       },
     });
 
-    if (error || typeof data?.reply !== "string" || !data.reply.trim()) {
+    if (error) {
+      const status = (error as { context?: { status?: number } }).context?.status;
+      return { connected: false, reason: status === 429 ? "busy" : "unavailable" };
+    }
+
+    if (typeof data?.reply !== "string" || !data.reply.trim()) {
       return { connected: false, reason: "unavailable" };
     }
 

@@ -43,8 +43,24 @@ Gabay calls Groq only through a Supabase Edge Function, so the Groq key is never
 ```bash
 npx supabase secrets set GROQ_API_KEY=YOUR_GROQ_KEY
 npx supabase secrets set GROQ_MODEL=openai/gpt-oss-20b
-npx supabase secrets set ALLOWED_ORIGINS=http://localhost:3000,https://your-vercel-domain.vercel.app
+npx supabase secrets set ALLOWED_ORIGINS=https://your-vercel-domain.vercel.app
 npx supabase functions deploy gabay-chat
+```
+
+Only the origins in `ALLOWED_ORIGINS` may call the function. To develop against a
+deployed function, opt localhost in explicitly — leave this unset in production:
+
+```bash
+npx supabase secrets set ALLOW_LOCAL_ORIGINS=true
+```
+
+Each teacher may make 30 Gabay requests every 5 minutes. The counter lives in
+`public.gabay_rate_limits` and is only writable through the `claim_gabay_request`
+function, so a browser cannot reset its own quota. Override the defaults with:
+
+```bash
+npx supabase secrets set GABAY_RATE_WINDOW_SECONDS=300
+npx supabase secrets set GABAY_RATE_MAX_REQUESTS=30
 ```
 
 Connected Gabay requires a valid Supabase user session. Prototype mode does not call the AI service or expose the secret.
