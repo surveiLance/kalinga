@@ -8,7 +8,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGradeLevels } from "@/lib/grades";
 import { createSampleLearners, learnerRosterSummary, learnerSexCounts, normalizeLearnerSex } from "@/lib/learners";
 import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes, weekDays } from "@/lib/schedule";
-import { hasTeacherMention, teacherInitials, teacherLabel, teacherMention } from "@/lib/teachers";
+import { teacherInitials, teacherLabel, teacherMention } from "@/lib/teachers";
 import { dateInputValue, displayDate, moveDate } from "@/lib/dates";
 import { normalizeClass, normalizeSavedPlan, remoteSchedule } from "@/lib/normalize";
 import { decodeCommunityMessage, encodeCommunityMessage } from "@/lib/community-message";
@@ -20,7 +20,8 @@ type View = "home" | "classes" | "plan" | "library" | "attendance" | "community"
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
-type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string };
+type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string; read?: boolean };
+type NotificationRow = { id: string; kind: string; title: string; body: string; discussion_id: string; read_at: string | null; created_at: string };
 
 type RemoteClassRow = {
   id: string;
@@ -290,6 +291,19 @@ function GradeLevelPicker({ value, onChange }: { value: GradeLevel[]; onChange: 
   }
 
   return <div className="grade-picker-wrap compact-picker"><details className="multi-select-picker"><summary><span>{value.length ? gradeList(value) : "Choose grade levels"}</span><small>{value.length ? `${value.length} selected` : "Select one or more"}</small></summary><div className="multi-select-panel"><div className="grade-picker">{commonGradeLevels.map((grade) => <button className={value.includes(grade) ? "selected" : ""} type="button" key={grade} onClick={() => toggle(grade)}><span>{value.includes(grade) ? "✓" : grade === "Kindergarten" ? "K" : grade}</span>{gradeLabel(grade)}</button>)}</div><div className="custom-grade"><input value={customGrade} onChange={(event) => setCustomGrade(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomGrade(); } }} placeholder="Another level (e.g. ALS, SPED group)" /><button className="secondary-button" type="button" onClick={addCustomGrade}>Add level</button></div></div></details>{!!value.length && <div className="selected-grades">{value.map((grade) => <button type="button" key={grade} onClick={() => toggle(grade)}>{gradeLabel(grade)} ×</button>)}</div>}</div>;
+}
+
+function notificationFromRow(row: NotificationRow): AppNotification {
+  return {
+    id: String(row.id),
+    kind: row.kind === "mention" ? "mention" : "reply",
+    title: String(row.title),
+    body: String(row.body || "Teacher discussion"),
+    createdAt: String(row.created_at),
+    view: "community",
+    targetId: String(row.discussion_id),
+    read: Boolean(row.read_at),
+  };
 }
 
 export default function Home() {
@@ -603,48 +617,36 @@ export default function Home() {
     if (!supabase) return;
     let active = true;
 
-    async function refreshNotifications() {
-      const [discussionResult, replyResult, readResult] = await Promise.all([
-        supabase!.from("teacher_discussions").select("id,title,body,author_id,author_name,created_at").order("created_at", { ascending: false }).limit(100),
-        supabase!.from("teacher_replies").select("id,discussion_id,author_id,author_name,body,created_at").order("created_at", { ascending: false }).limit(500),
+    async function loadNotifications() {
+      const [notificationResult, readResult] = await Promise.all([
+        supabase!.from("teacher_notifications").select("id,kind,title,body,discussion_id,read_at,created_at").eq("teacher_id", teacherAccountId).order("created_at", { ascending: false }).limit(40),
         supabase!.from("notification_reads").select("notification_id").eq("teacher_id", teacherAccountId),
       ]);
       if (!active) return;
-      if (!readResult.error) setNotificationReadIds((readResult.data || []).map((row) => String(row.notification_id)));
-      if (discussionResult.error || replyResult.error) {
+      const localReadIds = readResult.error ? [] : (readResult.data || []).map((row) => String(row.notification_id));
+      if (notificationResult.error) {
         setReplyNotifications([]);
+        setNotificationReadIds(localReadIds);
         return;
       }
-      const discussions = discussionResult.data || [];
-      const replies = replyResult.data || [];
-      const myTag = teacherMention(teacherName, teacherAccountId);
-      const discussionTitles = new Map(discussions.map((row) => [String(row.id), String(row.title)]));
-      const myDiscussionIds = new Set(discussions.filter((row) => String(row.author_id) === teacherAccountId).map((row) => String(row.id)));
-      const directReplies: AppNotification[] = replies
-        .filter((row) => myDiscussionIds.has(String(row.discussion_id)) && String(row.author_id) !== teacherAccountId && !hasTeacherMention(String(row.body || ""), myTag))
-        .slice(0, 30)
-        .map((row) => ({ id: `reply:${String(row.id)}`, kind: "reply", title: `${String(row.author_name)} replied`, body: discussionTitles.get(String(row.discussion_id)) || "Your teacher question", createdAt: String(row.created_at), view: "community", targetId: String(row.discussion_id) }));
-      const mentionedDiscussions: AppNotification[] = discussions
-        .filter((row) => String(row.author_id) !== teacherAccountId && hasTeacherMention(String(row.body || ""), myTag))
-        .map((row) => ({ id: `mention:discussion:${String(row.id)}`, kind: "mention", title: `${String(row.author_name)} mentioned you`, body: String(row.title), createdAt: String(row.created_at), view: "community", targetId: String(row.id) }));
-      const mentionedReplies: AppNotification[] = replies
-        .filter((row) => String(row.author_id) !== teacherAccountId && hasTeacherMention(String(row.body || ""), myTag))
-        .map((row) => ({ id: `mention:reply:${String(row.id)}`, kind: "mention", title: `${String(row.author_name)} mentioned you`, body: discussionTitles.get(String(row.discussion_id)) || "Teacher discussion", createdAt: String(row.created_at), view: "community", targetId: String(row.discussion_id) }));
-      setReplyNotifications([...mentionedDiscussions, ...mentionedReplies, ...directReplies]
-        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-        .slice(0, 40));
+      const rows = (notificationResult.data || []).map(notificationFromRow);
+      setReplyNotifications(rows);
+      setNotificationReadIds([...new Set([...localReadIds, ...rows.filter((row) => row.read).map((row) => row.id)])]);
     }
 
-    void refreshNotifications();
+    void loadNotifications();
     const channel = supabase.channel(`notifications-${teacherAccountId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_replies" }, () => { void refreshNotifications(); })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_discussions" }, () => { void refreshNotifications(); })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_notifications", filter: `teacher_id=eq.${teacherAccountId}` }, (payload) => {
+        if (!active) return;
+        const item = notificationFromRow(payload.new as NotificationRow);
+        setReplyNotifications((current) => current.some((entry) => entry.id === item.id) ? current : [item, ...current].slice(0, 40));
+      })
       .subscribe();
     return () => {
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [entryMode, teacherAccountId, teacherName]);
+  }, [entryMode, teacherAccountId]);
 
   useEffect(() => {
     if (!gabayOpen) return;
@@ -748,10 +750,19 @@ export default function Home() {
     if (!newIds.length) return;
     setNotificationReadIds((current) => [...new Set([...current, ...newIds])]);
     const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      void supabase.from("notification_reads").upsert(newIds.map((notificationId) => ({ teacher_id: teacherAccountId, notification_id: notificationId }))).then(({ error }) => {
-        if (error) setNotice("Notifications were read on this device, but could not sync yet.");
-      });
+    if (entryMode !== "authenticated" || !teacherAccountId || !supabase) return;
+    function reportUnsynced({ error }: { error: unknown }) {
+      if (error) setNotice("Notifications were read on this device, but could not sync yet.");
+    }
+    // Server-derived notifications carry their read state on the row itself; the
+    // resource matches are derived in the browser and have no row to update.
+    const serverIds = newIds.filter((id) => replyNotifications.some((item) => item.id === id));
+    const localIds = newIds.filter((id) => !serverIds.includes(id));
+    if (serverIds.length) {
+      void supabase.from("teacher_notifications").update({ read_at: new Date().toISOString() }).eq("teacher_id", teacherAccountId).in("id", serverIds).then(reportUnsynced);
+    }
+    if (localIds.length) {
+      void supabase.from("notification_reads").upsert(localIds.map((notificationId) => ({ teacher_id: teacherAccountId, notification_id: notificationId }))).then(reportUnsynced);
     }
   }
 
@@ -2092,18 +2103,32 @@ function resourceIcon(subject: string) {
   return "▤";
 }
 
+// Signed URLs last an hour, so a realtime event does not need to re-mint one for
+// every resource it already holds. Retired a few minutes early to avoid handing
+// out a link that expires while the reader is open.
+const signedResourceUrls = new Map<string, { url: string; expiresAt: number }>();
+
+async function signedResourceUrl(supabase: SupabaseClient, storagePath: string) {
+  const cached = signedResourceUrls.get(storagePath);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
+  const { data } = await supabase.storage.from("teacher-resources").createSignedUrl(storagePath, 60 * 60);
+  const url = data?.signedUrl || "";
+  if (url) signedResourceUrls.set(storagePath, { url, expiresAt: Date.now() + 55 * 60_000 });
+  return url;
+}
+
 async function loadTeacherResources(supabase: SupabaseClient) {
   const { data, error } = await supabase.from("resources").select("id,owner_id,title,storage_path,visibility,metadata,created_at").order("created_at", { ascending: false }).limit(100);
   if (error) throw error;
   return Promise.all((data || []).filter((row) => Boolean(row.storage_path)).map(async (row): Promise<LibraryResource> => {
     const metadata = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) ? row.metadata as Record<string, unknown> : {};
-    const { data: signed } = await supabase.storage.from("teacher-resources").createSignedUrl(String(row.storage_path), 60 * 60);
+    const signedUrl = await signedResourceUrl(supabase, String(row.storage_path));
     const subject = String(metadata.subject || "General");
     return {
       id: String(row.id), ownerId: String(row.owner_id), title: String(row.title), icon: resourceIcon(subject), subject,
       grades: String(metadata.grades || "Grade levels not specified"), type: String(metadata.type || "Teacher resource"),
       description: String(metadata.description || "No description was provided."), tags: Array.isArray(metadata.tags) ? metadata.tags.map(String) : [],
-      author: String(metadata.author || "Kalinga teacher"), pages: Number(metadata.pages || 0), pdfPath: signed?.signedUrl || "",
+      author: String(metadata.author || "Kalinga teacher"), pages: Number(metadata.pages || 0), pdfPath: signedUrl,
       source: "teacher", visibility: row.visibility === "shared" ? "shared" : "private", reviewStatus: String(metadata.reviewStatus || "Community upload · not reviewed"),
     };
   }));
@@ -2182,11 +2207,11 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
       await supabase.storage.from("teacher-resources").remove([storagePath]);
       setSubmitting(false); setLibraryError("The resource details could not be saved. The unfinished upload was removed; please try again."); return;
     }
-    const { data: signed } = await supabase.storage.from("teacher-resources").createSignedUrl(storagePath, 60 * 60);
+    const uploadedSignedUrl = await signedResourceUrl(supabase, storagePath);
     const uploadedResource: LibraryResource = {
       id: String(result.data.id), ownerId: teacherAccountId, title: submission.title.trim(), icon: resourceIcon(metadata.subject), subject: metadata.subject,
       grades: metadata.grades, type: metadata.type, description: metadata.description || "No description was provided.", tags: metadata.tags,
-      author: metadata.author, pages: 0, pdfPath: signed?.signedUrl || "", source: "teacher", visibility: submission.visibility, reviewStatus: metadata.reviewStatus,
+      author: metadata.author, pages: 0, pdfPath: uploadedSignedUrl, source: "teacher", visibility: submission.visibility, reviewStatus: metadata.reviewStatus,
     };
     setTeacherResources((current) => [uploadedResource, ...current.filter((item) => item.id !== uploadedResource.id)]);
     setSubmission(emptyResourceSubmission); setSubmissionFile(undefined); setSharingRightsConfirmed(false); setSubmissionOpen(false); setSubmitting(false);
@@ -2365,6 +2390,18 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
 
 type TeacherDiscussion = { id: string; authorId: string; authorName: string; schoolName: string; title: string; body: string; resourceId: string; subject: string; gradeLevels: string[]; createdAt: string };
 type TeacherReply = { id: string; discussionId: string; authorId: string; authorName: string; body: string; resourceId: string; createdAt: string };
+type CommunityDiscussionRow = { id: string; author_id: string; author_name: string; school_name: string | null; title: string; body: string; subject: string | null; grade_levels: unknown; created_at: string };
+type CommunityReplyRow = { id: string; discussion_id: string; author_id: string; author_name: string; body: string; created_at: string };
+
+function discussionFromRow(row: CommunityDiscussionRow): TeacherDiscussion {
+  const message = decodeCommunityMessage(String(row.body));
+  return { id: String(row.id), authorId: String(row.author_id), authorName: String(row.author_name), schoolName: row.school_name ? String(row.school_name) : "", title: String(row.title), body: message.body, resourceId: message.resourceId, subject: row.subject ? String(row.subject) : "General", gradeLevels: Array.isArray(row.grade_levels) ? row.grade_levels.map(String) : [], createdAt: String(row.created_at) };
+}
+
+function replyFromRow(row: CommunityReplyRow): TeacherReply {
+  const message = decodeCommunityMessage(String(row.body));
+  return { id: String(row.id), discussionId: String(row.discussion_id), authorId: String(row.author_id), authorName: String(row.author_name), body: message.body, resourceId: message.resourceId, createdAt: String(row.created_at) };
+}
 
 function renderCommunityMessage(body: string) {
   return body.split(/(@[a-z0-9_]+)/gi).map((part, index) => part.startsWith("@") ? <strong className="teacher-mention" key={`${part}-${index}`}>{part}</strong> : <Fragment key={`${index}-${part.slice(0, 8)}`}>{part}</Fragment>);
@@ -2417,12 +2454,30 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
       ]);
       if (!active) return;
       if (discussionResult.error || replyResult.error) { setCommunityError("The teacher room could not refresh. Please check your connection."); setLoading(false); return; }
-      const nextDiscussions = (discussionResult.data || []).map((row): TeacherDiscussion => { const message = decodeCommunityMessage(String(row.body)); return { id: String(row.id), authorId: String(row.author_id), authorName: String(row.author_name), schoolName: row.school_name ? String(row.school_name) : "", title: String(row.title), body: message.body, resourceId: message.resourceId, subject: row.subject ? String(row.subject) : "General", gradeLevels: Array.isArray(row.grade_levels) ? row.grade_levels.map(String) : [], createdAt: String(row.created_at) }; });
-      const nextReplies = (replyResult.data || []).map((row): TeacherReply => { const message = decodeCommunityMessage(String(row.body)); return { id: String(row.id), discussionId: String(row.discussion_id), authorId: String(row.author_id), authorName: String(row.author_name), body: message.body, resourceId: message.resourceId, createdAt: String(row.created_at) }; });
+      const nextDiscussions = (discussionResult.data || []).map(discussionFromRow);
+      const nextReplies = (replyResult.data || []).map(replyFromRow);
       setDiscussions(nextDiscussions); setReplies(nextReplies); setTeacherResources(uploadedResources.filter((resource) => resource.visibility === "shared")); setSelectedDiscussionId((current) => nextDiscussions.some((item) => item.id === current) ? current : nextDiscussions[0]?.id || ""); setCommunityError(""); setLoading(false);
     }
     void refresh();
-    const channel = supabase.channel(`teacher-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "teacher_discussions" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "teacher_replies" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "resources" }, () => { void refresh(); }).subscribe();
+    // A new post appends the one row it carries. Only edits and deletes, which
+    // carry no reliable before-image here, fall back to a full reload.
+    const channel = supabase.channel(`teacher-room-${teacherAccountId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_discussions" }, (payload) => {
+        if (!active) return;
+        const item = discussionFromRow(payload.new as CommunityDiscussionRow);
+        setDiscussions((current) => current.some((entry) => entry.id === item.id) ? current : [item, ...current].slice(0, 80));
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "teacher_replies" }, (payload) => {
+        if (!active) return;
+        const item = replyFromRow(payload.new as CommunityReplyRow);
+        setReplies((current) => current.some((entry) => entry.id === item.id) ? current : [...current, item]);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "teacher_discussions" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "teacher_discussions" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "teacher_replies" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "teacher_replies" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "resources" }, () => { void refresh(); })
+      .subscribe();
     return () => { active = false; void supabase.removeChannel(channel); };
   }, [authenticated, teacherAccountId]);
 
