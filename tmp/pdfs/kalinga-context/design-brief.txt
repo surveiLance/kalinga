@@ -1,0 +1,102 @@
+
+
+===== PAGE 1 =====
+
+OT Kang
+Foundation, Inc.
+Teachers’ Assistant App
+Design Brief
+
+===== PAGE 2 =====
+
+Who are we?
+Dr. Gelo Dasha Tr. Sabrina Tr. Gian Tr. JE Pepe
+Apostol Uy Ongkiko Adao Inojosa Reyes
+MD, MBA, MPH, PhD(c) MHealthProm MAEd Juris Doctor
+
+===== PAGE 3 =====
+
+Background
+Project Kalinga is a human-centered co-design initiative where educators collaboratively solve mental
+health promotion challenges in last-mile schools. It equips teachers to co-design practical, locally
+relevant solutions while strengthening peer learning, leadership, and community ownership rather
+than relying on top-down compliance.
+In June 2026, a three-day co-design workshop was conducted with teachers from last-mile schools
+(LMS) in Agusan del Sur to identify priority needs and design solutions that address their mental
+health and wellbeing challenges.
+
+===== PAGE 4 =====
+
+Key Insights
+What are the factors affecting LMS teachers’ well-being?
+Pag LMS, hindi na kami Madalas kami
+Ako lahat gumagawa
+nakikita o naririnig naa-aksidente
+Mahirap i-manage ang
+Napakaraming forms
+multigrade classroom
+
+===== PAGE 5 =====
+
+Key Insights
+Teachers are the most familiar with the The co-design process was welcomed by
+problems and are best equipped with the the teachers, and can be leveraged to
+perspectives to build the solutions; we must generate solutions to the biggest cross-
+give them space to do so. sectoral problems (health + education)
+“Tulungan niyo po kami mapagaan ang
+pagtuturo namin, magiging okay din ang
+mental health namin.”
+
+===== PAGE 6 =====
+
+Their idea:
+Teachers’ Assistant App
+
+===== PAGE 7 =====
+
+App Details
+Target users: Last-mile school teachers (for now, in Agusan del Sur)
+Platform: Web and mobile, with offline accessibility necessary for last-mile use
+*Core Functionality:
+Record: Assistance in minor record-keeping (attendance, marking/grading, etc.)
+Create: Multi-grade lesson planning support (AI-supported lesson plan builder up from
+competency to lesson plan to activity sheets)
+Share: Shared resource repository with upload, search by context (e.g., indigenous communities,
+multigrade combinations), tagging, customization features
+Collaborate: Teacher collaboration and knowledge exchange
+*can change after teacher consultations
+
+===== PAGE 8 =====
+
+
+
+===== PAGE 9 =====
+
+Pegs
+
+===== PAGE 10 =====
+
+Other details
+Timeline:
+TBA (Saturday) - Online meeting with the Project Kalinga team and teachers (so we can answer
+your questions and you can better understand the context!)
+TBA - Feedbacking session
+TBA - Final pitch
+Requirements:
+App name
+Functional app (Prototype style)
+Costing for project
+Pitch concept note
+For further questions: sandbox2026.projectkalinga@gmail.com
+
+===== PAGE 11 =====
+
+Prize for Best Group
+Php 5,000
+
+===== PAGE 12 =====
+
+OT Kang
+Foundation, Inc.
+Teachers’ Assistant App
+Design Brief

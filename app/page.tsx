@@ -17,12 +17,13 @@ import { isStarterResourceId, legacyWorkspaceKeys, normalizeResourceBookmarkId, 
 import type { ClassLearner, ClassMeeting, GradeLevel, LegacySavedPlan, LegacyTeachingClass, PlanSlot, SavedPlan, TeachingClass, TeacherWorkspace, TodayTeachingBlock } from "@/lib/teaching-types";
 import { acknowledgePendingWrite, attendanceChanges, canSyncScope, enqueuePendingWrite, failPendingWrite, maxSyncAttempts, pendingCandidates, readPendingWrites, reconcilePendingWrites, retryPendingWrites, startPendingWrite, type PendingChange, type PendingWrite } from "@/lib/pending-writes";
 
-type View = "home" | "classes" | "plan" | "teach" | "library" | "attendance" | "community";
+type View = "home" | "classes" | "plan" | "teach" | "library" | "attendance" | "community" | "tutorial";
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
 type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string; read?: boolean };
 type NotificationRow = { id: string; kind: string; title: string; body: string; discussion_id: string; read_at: string | null; created_at: string };
+type TutorialStatus = { step: number; completed: boolean; dismissed: boolean };
 
 type RemoteClassRow = {
   id: string;
@@ -66,7 +67,10 @@ const gabayPageLabels: Record<View, string> = {
   library: "Resources",
   attendance: "Attendance",
   community: "Teacher community",
+  tutorial: "Learn Kalinga",
 };
+const tutorialStepCount = 6;
+const emptyTutorialStatus: TutorialStatus = { step: 0, completed: false, dismissed: false };
 const notificationResourceCatalog = [
   { id: "starter-math", subject: "Mathematics", title: "Fraction Market with Bottle Caps" },
   { id: "starter-science", subject: "Science", title: "Schoolyard Plant Detectives" },
@@ -96,6 +100,16 @@ function persistDeviceWorkspace(scope: string, workspace: TeacherWorkspace) {
   window.localStorage.setItem(workspaceStorageKey(scope, "attendance"), JSON.stringify(workspace.attendance));
   window.localStorage.setItem(workspaceStorageKey(scope, "attendance-notes"), JSON.stringify(workspace.attendanceNotes));
   window.localStorage.setItem(workspaceStorageKey(scope, "saved-resources"), JSON.stringify(workspace.savedResourceIds));
+}
+
+function readTutorialStatus(value: string | null): TutorialStatus {
+  if (!value) return emptyTutorialStatus;
+  try {
+    const status = JSON.parse(value) as Partial<TutorialStatus>;
+    return { step: Math.min(tutorialStepCount, Math.max(0, Number(status.step) || 0)), completed: status.completed === true, dismissed: status.dismissed === true };
+  } catch {
+    return emptyTutorialStatus;
+  }
 }
 
 function migrateLegacyPrototypeWorkspace() {
@@ -340,6 +354,9 @@ export default function Home() {
   const [syncing, setSyncing] = useState(false);
   const [storageError, setStorageError] = useState("");
   const [cloudLoaded, setCloudLoaded] = useState(false);
+  const [tutorialStatus, setTutorialStatus] = useState<TutorialStatus>(emptyTutorialStatus);
+  const [tutorialStatusKnown, setTutorialStatusKnown] = useState(false);
+  const [tutorialStatusReady, setTutorialStatusReady] = useState(false);
   const sessionTeacherId = useRef("");
   const wakeSync = useRef<(refresh?: boolean) => void>(() => {});
   const syncRun = useRef<Promise<void> | null>(null);
@@ -431,6 +448,9 @@ export default function Home() {
       setStorageError("");
       setCloudLoaded(false);
       setSyncing(false);
+      setTutorialStatus(emptyTutorialStatus);
+      setTutorialStatusKnown(false);
+      setTutorialStatusReady(false);
 
       try {
         if (workspaceScope === "prototype") migrateLegacyPrototypeWorkspace();
@@ -438,6 +458,7 @@ export default function Home() {
         const storedTeacherName = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "teacher-name"));
         const storedTeacherEmail = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "teacher-email"));
         const storedGabayMotion = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "gabay-motion"));
+        const storedTutorialStatus = window.localStorage.getItem(workspaceStorageKey(workspaceScope, "tutorial-status"));
         const queue = loadPendingWrites(workspaceScope);
         const workspace = reconcilePendingWrites(loadDeviceWorkspace(workspaceScope), queue, workspaceScope);
         setPendingWrites(queue);
@@ -450,9 +471,12 @@ export default function Home() {
         if (workspaceScope === "prototype" && storedTeacherName) setTeacherName(storedTeacherName);
         if (workspaceScope === "prototype" && storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
         if (storedGabayMotion) setGabayMotion(storedGabayMotion !== "false");
+        setTutorialStatus(readTutorialStatus(storedTutorialStatus));
+        setTutorialStatusKnown(storedTutorialStatus !== null);
       } catch {
         setStorageError("This device’s saved work could not be read. Sync is paused to protect it. Do not clear browser storage; reload after checking device storage.");
       } finally {
+        setTutorialStatusReady(true);
         setHydratedWorkspaceScope(workspaceScope);
         setClassDataReady(true);
       }
@@ -687,6 +711,7 @@ export default function Home() {
     waiting: `${pendingWrites.length} waiting to sync`,
     synced: "All work synced",
   }[syncState];
+  const showTutorialOffer = tutorialStatusReady && !tutorialStatusKnown && view !== "tutorial" && classes.length === 0 && savedPlans.length === 0 && (entryMode === "prototype" || cloudLoaded);
   const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
   const latestPlan = activePlans[0];
@@ -715,6 +740,7 @@ export default function Home() {
     library: ["Open a ready-to-use PDF", "Filter by subject", "Discuss a resource with teachers", "Share a resource"],
     attendance: ["Change the attendance date", "Filter by grade", "Mark learners present", "Save attendance"],
     community: ["Start a discussion", "Ask a clearer question", "Reply to another teacher"],
+    tutorial: ["Complete the current practice mission", "Explain this feature", "Repeat a tutorial step", "Return to the real workspace"],
   };
   const gabayPageContext: GabayPageContext = {
     view,
@@ -756,6 +782,23 @@ export default function Home() {
     setActiveClassId(plan.classId);
     setView("teach");
     setNotice("");
+  }
+
+  function saveTutorialProgress(status: TutorialStatus) {
+    setTutorialStatus(status);
+    setTutorialStatusKnown(true);
+    try {
+      window.localStorage.setItem(workspaceStorageKey(workspaceScope, "tutorial-status"), JSON.stringify(status));
+    } catch {
+      setNotice("Tutorial progress could not be saved on this device, but you can continue while this page stays open.");
+    }
+  }
+
+  function openTutorial() {
+    if (!tutorialStatusKnown) saveTutorialProgress(emptyTutorialStatus);
+    setView("tutorial");
+    setGabayOpen(false);
+    setAccountOpen(false);
   }
 
   function markNotificationsRead(ids: string[]) {
@@ -932,6 +975,7 @@ export default function Home() {
           <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => beginPlan()}><span className="nav-icon">＋</span> Plan lessons</button>
           <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}><span className="nav-icon">▱</span> Find resources</button>
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span className="nav-icon">♧</span> Ask teachers</button>
+          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" onClick={openTutorial}><span className="nav-icon">?</span> Learn Kalinga{tutorialStatus.completed && <small>✓</small>}</button>
         </nav>
 
         <div className="offline-card">
@@ -970,6 +1014,7 @@ export default function Home() {
         </header>
 
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
+        {showTutorialOffer && <TutorialOffer teacherName={teacherName} onStart={() => { saveTutorialProgress(emptyTutorialStatus); setView("tutorial"); }} onDismiss={() => saveTutorialProgress({ ...emptyTutorialStatus, dismissed: true })} />}
 
         <div className="content">
           {view === "home" ? <div className="view-page home-page">
@@ -986,13 +1031,13 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" || view === "teach" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button>
+          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" || view === "teach" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button><button className={view === "tutorial" ? "active" : ""} type="button" onClick={openTutorial}><span>?</span>Learn</button>
         </nav>
       </section>
     </main>
@@ -1133,6 +1178,82 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
       {action}
     </header>
   );
+}
+
+const tutorialMissions = [
+  { label: "Today", title: "Know what needs you first", detail: "Read Gabay’s briefing and spot the most useful next action.", gabay: "Start here every day. I’ll summarize the schedule and unfinished work so you do not have to search the whole app." },
+  { label: "Classes", title: "Set up a practice class", detail: "Try the minimum information Kalinga needs to organize your work.", gabay: "A class is the home for its learners, meeting times, lesson plans, and attendance. This practice class will not be saved." },
+  { label: "Plan", title: "Start a focused lesson", detail: "Choose a subject and give the lesson a working topic.", gabay: "Begin with what you already know. The detailed ILAW sections can stay out of the way until they are useful." },
+  { label: "Teach", title: "Follow one teaching block", detail: "Choose the grade you would guide while other groups work independently.", gabay: "Teaching View turns the plan into a classroom guide: one time block, one teacher focus, and a clear task for every grade." },
+  { label: "Attendance", title: "Record a quick attendance check", detail: "Mark the three practice learners to see how fast a class can be recorded.", gabay: "Attendance belongs to the selected class and date. Kalinga keeps it available on the device and syncs it when possible." },
+  { label: "Share", title: "Ask with useful context", detail: "Attach a practice resource and write a clear question for other teachers.", gabay: "Resources and Ask Teachers work together. Share the material and explain what kind of help you need—without including private learner details." },
+] as const;
+
+function TutorialOffer({ teacherName, onStart, onDismiss }: { teacherName: string; onStart: () => void; onDismiss: () => void }) {
+  return <div className="tutorial-offer-backdrop"><section className="tutorial-offer" role="dialog" aria-modal="true" aria-labelledby="tutorial-offer-title"><div className="tutorial-offer-mascot"><GabayMascot size="hero" motion={false} /></div><div><p className="eyebrow">OPTIONAL GUIDED TOUR</p><h2 id="tutorial-offer-title">Want to practice first, {teacherLabel(teacherName)}?</h2><p>Gabay can walk you through six short missions using demo information. Nothing in the tutorial changes your real classes, plans, attendance, resources, or messages.</p><div className="tutorial-offer-facts"><span>About 5 minutes</span><span>Practice data only</span><span>Available again anytime</span></div><div className="tutorial-offer-actions"><button className="primary-button" type="button" onClick={onStart}>Start with Gabay →</button><button className="secondary-button" type="button" onClick={onDismiss}>Not now</button></div></div></section></div>;
+}
+
+function TutorialView({ teacherName, status, onProgress, onExit, onAskGabay, onGabayContext }: { teacherName: string; status: TutorialStatus; onProgress: (status: TutorialStatus) => void; onExit: () => void; onAskGabay: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+  const [selectedStep, setSelectedStep] = useState(status.completed ? tutorialStepCount : status.step);
+  const [briefingOpened, setBriefingOpened] = useState(false);
+  const [demoClassName, setDemoClassName] = useState("");
+  const [demoGrades, setDemoGrades] = useState<string[]>([]);
+  const [demoSubject, setDemoSubject] = useState("");
+  const [demoTopic, setDemoTopic] = useState("");
+  const [guidedGrade, setGuidedGrade] = useState("");
+  const [demoAttendance, setDemoAttendance] = useState<Record<string, string>>({});
+  const [resourceAttached, setResourceAttached] = useState(false);
+  const [demoQuestion, setDemoQuestion] = useState("");
+  const mission = tutorialMissions[Math.min(selectedStep, tutorialStepCount - 1)];
+  const previouslyCompleted = status.completed || selectedStep < status.step;
+  const ready = previouslyCompleted || (selectedStep === 0 ? briefingOpened
+    : selectedStep === 1 ? Boolean(demoClassName.trim() && demoGrades.length)
+      : selectedStep === 2 ? Boolean(demoSubject && demoTopic.trim())
+        : selectedStep === 3 ? Boolean(guidedGrade)
+          : selectedStep === 4 ? Object.keys(demoAttendance).length === 3
+            : resourceAttached && demoQuestion.trim().length >= 12);
+
+  useEffect(() => {
+    onGabayContext({ view: "tutorial", pageStep: status.completed ? "Tutorial complete" : `Practice mission ${selectedStep + 1} of ${tutorialStepCount}: ${mission.label}`, currentSummary: status.completed ? ["The teacher completed the guided Kalinga tutorial"] : [mission.title, mission.detail, "All information on this page is practice data and will not change the teacher workspace"], availableActions: ["Explain this practice step", "Tell me why this feature matters", "Give me an example", "Repeat the instruction in simpler Taglish"] });
+  }, [mission, onGabayContext, selectedStep, status.completed]);
+
+  function advance() {
+    const next = selectedStep + 1;
+    if (next >= tutorialStepCount) {
+      onProgress({ step: tutorialStepCount, completed: true, dismissed: false });
+      setSelectedStep(tutorialStepCount);
+      return;
+    }
+    onProgress({ step: Math.max(status.step, next), completed: false, dismissed: false });
+    setSelectedStep(next);
+  }
+
+  function restart() {
+    setSelectedStep(0); setBriefingOpened(false); setDemoClassName(""); setDemoGrades([]); setDemoSubject(""); setDemoTopic(""); setGuidedGrade(""); setDemoAttendance({}); setResourceAttached(false); setDemoQuestion("");
+    onProgress(emptyTutorialStatus);
+  }
+
+  if (selectedStep >= tutorialStepCount) return <div className="view-page tutorial-page"><section className="tutorial-complete"><GabayMascot size="hero" motion={false} speaking /><p className="eyebrow">ALL SIX MISSIONS COMPLETE</p><h1>You’re ready to use Kalinga.</h1><p>You practiced the full flow without changing any real records. Return to Today when you are ready, or replay the tour whenever you want.</p><div><button className="primary-button" type="button" onClick={onExit}>Go to Today →</button><button className="secondary-button" type="button" onClick={restart}>Replay tutorial</button></div></section></div>;
+
+  return <div className="view-page tutorial-page">
+    <PageIntro eyebrow="LEARN KALINGA" title={`Practice with Gabay, ${teacherLabel(teacherName)}`} description="A safe, guided workspace. Every class, learner, lesson, and message shown here is only a demo." action={<button className="secondary-button" type="button" onClick={onExit}>Exit tutorial</button>} />
+    <div className="tutorial-safety"><span>✓</span><p><b>Practice mode is on</b><small>Your real workspace will not be changed.</small></p><strong>{Math.round((status.step / tutorialStepCount) * 100)}% complete</strong></div>
+    <div className="tutorial-layout">
+      <nav className="tutorial-missions" aria-label="Tutorial missions">{tutorialMissions.map((item, index) => { const complete = status.completed || index < status.step; const available = complete || index === status.step; return <button className={`${index === selectedStep ? "active" : ""} ${complete ? "complete" : ""}`} type="button" disabled={!available} onClick={() => setSelectedStep(index)} key={item.label}><span>{complete ? "✓" : index + 1}</span><p><b>{item.label}</b><small>{complete ? "Completed" : index === status.step ? "Current mission" : "Locked"}</small></p></button>; })}</nav>
+      <main className="tutorial-stage">
+        <section className="tutorial-gabay"><GabayMascot size="medium" motion={false} speaking /><div><p className="eyebrow">GABAY · MISSION {selectedStep + 1}</p><h2>{mission.title}</h2><p>{mission.gabay}</p></div><button type="button" onClick={onAskGabay}>Ask Gabay</button></section>
+        <section className="tutorial-practice"><header><div><p className="eyebrow">YOUR TURN · PRACTICE ONLY</p><h2>{mission.detail}</h2></div><span>{selectedStep + 1} / {tutorialStepCount}</span></header>
+          {selectedStep === 0 && <div className="tutorial-today-demo"><div><small>TODAY</small><b>1 class at 8:00 AM</b></div><div><small>NEEDS ATTENTION</small><b>Lesson plan needs a learning check</b></div><button className={briefingOpened ? "done" : ""} type="button" onClick={() => setBriefingOpened(true)}>{briefingOpened ? "✓ Priorities checked" : "Check today’s priorities →"}</button></div>}
+          {selectedStep === 1 && <div className="tutorial-class-demo"><label>Practice class name<input value={demoClassName} onChange={(event) => setDemoClassName(event.target.value)} placeholder="e.g. Morning Multigrade Class" /></label><fieldset><legend>Choose at least one grade</legend><div>{["Grade 2", "Grade 3", "Grade 4"].map((grade) => <button className={demoGrades.includes(grade) ? "selected" : ""} type="button" onClick={() => setDemoGrades((current) => current.includes(grade) ? current.filter((item) => item !== grade) : [...current, grade])} key={grade}>{demoGrades.includes(grade) ? "✓ " : "+ "}{grade}</button>)}</div></fieldset><small>This class exists only inside this tutorial.</small></div>}
+          {selectedStep === 2 && <div className="tutorial-plan-demo"><label>Subject<select value={demoSubject} onChange={(event) => setDemoSubject(event.target.value)}><option value="">Choose a subject</option><option>Mathematics</option><option>Science</option><option>English</option><option>Filipino</option></select></label><label>Working lesson topic<input value={demoTopic} onChange={(event) => setDemoTopic(event.target.value)} placeholder="What will the class learn?" /></label><div><span>1</span><p><b>Start with the essentials</b><small>Detailed ILAW fields remain editable later.</small></p></div></div>}
+          {selectedStep === 3 && <div className="tutorial-teach-demo"><p>It is 8:15 AM. Which group will you guide directly?</p><div>{["Grade 2", "Grade 3", "Grade 4"].map((grade) => <button className={guidedGrade === grade ? "selected" : ""} type="button" onClick={() => setGuidedGrade(grade)} key={grade}><small>{guidedGrade === grade ? "WITH TEACHER" : "INDEPENDENT"}</small><b>{grade}</b><span>{guidedGrade === grade ? "Guided lesson" : "Practice activity"}</span></button>)}</div></div>}
+          {selectedStep === 4 && <div className="tutorial-attendance-demo">{["Mika · Grade 2", "Paolo · Grade 3", "Lina · Grade 4"].map((learner) => <div key={learner}><b>{learner}</b><span>{["Present", "Late", "Absent"].map((value) => <button className={demoAttendance[learner] === value ? "selected" : ""} type="button" onClick={() => setDemoAttendance((current) => ({ ...current, [learner]: value }))} key={value}>{value}</button>)}</span></div>)}</div>}
+          {selectedStep === 5 && <div className="tutorial-share-demo"><button className={resourceAttached ? "resource-attached" : ""} type="button" onClick={() => setResourceAttached(true)}><span>PDF</span><p><b>Fractions using local objects</b><small>{resourceAttached ? "✓ Attached to practice question" : "Attach this resource"}</small></p></button><label>Question for teachers<textarea value={demoQuestion} onChange={(event) => setDemoQuestion(event.target.value)} placeholder="What would you like another teacher to help with?" /></label><small>This question will not be posted.</small></div>}
+          <footer><button className="secondary-button" type="button" disabled={selectedStep === 0} onClick={() => setSelectedStep((current) => Math.max(0, current - 1))}>← Back</button><p>{ready ? <><b>✓ Ready</b> This practice step is complete.</> : "Complete the practice action above to continue."}</p><button className="primary-button" type="button" disabled={!ready} onClick={advance}>{selectedStep === tutorialStepCount - 1 ? "Finish tutorial" : "Complete mission →"}</button></footer>
+        </section>
+      </main>
+    </div>
+  </div>;
 }
 
 function BellIcon() {
@@ -1323,6 +1444,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     library: "Ask me to help narrow down a resource.",
     attendance: "Ask about a status, note, or attendance step.",
     community: "Ask me to help make your teacher question clearer.",
+    tutorial: "Ask me to explain this practice mission.",
   };
 
   async function askGabay(message: string) {

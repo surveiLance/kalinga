@@ -123,6 +123,7 @@ describe("workspace keys", () => {
   it("namespaces storage per teacher so two accounts cannot collide", () => {
     expect(workspaceStorageKey("teacher-abc", "classes")).toBe("kalinga:teacher-abc:classes");
     expect(workspaceStorageKey("prototype", "classes")).not.toBe(workspaceStorageKey("teacher-abc", "classes"));
+    expect(workspaceStorageKey("teacher-abc", "tutorial-status")).not.toBe(workspaceStorageKey("teacher-def", "tutorial-status"));
   });
 
   it("prefixes legacy numeric catalog bookmarks and leaves ids alone", () => {

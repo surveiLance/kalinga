@@ -1,0 +1,1281 @@
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Th     e    mod         els      so      fa   r                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Domain             models                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Learner             models                                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Pedagogical                    models                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                           “Col                d        c    ogni                 tion”                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                  Is         learning                                  an                                           
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            emotional                                          experience?                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                            Modeling                                       Affect                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                             Maria     Mercedes        T.  Rodrigo                                                  
+                                                                                                                                    
+                                                                                                                                    
+                               CSCI    111.13    Artificial    Intelligence       in  Education                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                       SY   2026-2027                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   A   ffectiv           e    sta     tes       rela      ted        to     lea     rn    in   g                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Fatigue                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Deconcentration                                                                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Low        motivation                                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Boredom                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   A   ffectiv           e    mea        sures                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Text                                                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Visual                                                                                                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Vocal                                                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Physiological                                                                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   A   ffect        -a   wa      re     sy    stems                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Software               program              that       recognizes                 emotional                state           
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         of    the      user                                                                                                        
+                                                                                                                                    
+                                                                                                                                    
+       • Has       control           mechanisms                     and       application                 logic        to           
+                                                                                                                                    
+                                                                                                                                    
+         handle            information                 on     affect                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Should          intervene           when        objectives            are     not     met                             
+                                                                                                                                    
+                                                                                                                                    
+            • No     intervention              if the     tasks       are    apppririate                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   A   ffect        -a   wa      re     in   telligen             t   tutor                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • System             that       is  aware           of    learner’s             emotional                state               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Should            intervene               if  and       only       if   learning            is                             
+                                                                                                                                    
+                                                                                                                                    
+         endangered                                                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Considers                the      fuzzy        nature           of    emotions                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Emotion                  represen               ta    tion        mod         els                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Discrete                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Dimensional                                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Componential                                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Ekma           n   ’s    six      ba    sic       emotion               s                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   I za    rd    ’s    1 0    core          emotion               s                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Interest                                               •  Disgust                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Joy                                                    •  Contempt                                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Surprise                                               •  Fear                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Sadness                                                •  Shame                                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Anger                                                  •  Guilt                                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Usin        g    la   bels                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Advantage                  of    comprehensability                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Might          also       be     misleading                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • We      have       different          words         for   the     same         feeling                                
+                                                                                                                                    
+                                                                                                                                    
+            • Words          might        have       different         meanings             depending               on              
+                                                                                                                                    
+              culture,         context,         and      individuals                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Emotion                  represen               ta    tion        mod         els                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Discrete                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Dimensional                                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Componential                                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Emotion                  represen               ta    tion        mod         els                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Discrete                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Dimensional                                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Componential                                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       Plutchik’s                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+       co   lo   rwheel             o  f                                                                                            
+                                                                                                                                    
+       e  mo     tio    ns                                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         D   y  a  d  s    of                                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+         emotion               s                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   OC      C    mod         el                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Hierarchy               of    22     emotion              types                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Each         emotion              is  a    result        of    an     affective             reaction                       
+                                                                                                                                    
+                                                                                                                                    
+         which          occurs           after        evaluating                aspects             of    a                         
+                                                                                                                                    
+                                                                                                                                    
+         situation                                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Consequences                    of   events         –  desirable            or   not                                  
+                                                                                                                                    
+                                                                                                                                    
+            • Actions         of    agents         –  approving             or   disapproving                                       
+                                                                                                                                    
+                                                                                                                                    
+            • Aspects           of   objects         –   appealing            or   not                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+Steunebrink, B. R., Dastani, M., & Meyer, J. J. C. (2009, September). The OCC model revisited. In Proc. of the 4th Workshop on Emotion and Computing. Association for the Advancement of
+Artificial Intelligence.                                                                                                            
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+Steunebrink, B. R., Dastani, M., & Meyer, J. J. C. (2009, September). The OCC model revisited. In Proc. of the 4th Workshop on Emotion and Computing. Association for the Advancement of
+Artificial Intelligence.                                                                                                            
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Emotion                  regula           tion        a  lgorith            ms                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Any       algorithm               can       be      selected             as     long        as:                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Its   input      is   collectable                                                                                     
+                                                                                                                                    
+                                                                                                                                    
+            • Its   output         matches           or    can     be     transformed               into     chosen                 
+                                                                                                                                    
+                                                                                                                                    
+              representation                 modle                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+            • It  provides           information             on    the     certainty          of   the     result                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                   T  rus     tworthiness                    mo      del      and        af   f e  ctive        s  tate             
+                                                                                                                                    
+                   e  licitatio           n   pro      ce   s  s                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • We        can      never          be     100%          certain          because                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Fuzzy        nature         of   emotion                                                                              
+                                                                                                                                    
+                                                                                                                                    
+            • Insufficient            accuracy           of    emotion           recognition             algorithms                 
+                                                                                                                                    
+                                                                                                                                    
+            • Unstable            nature        of   emotions                                                                       
+                                                                                                                                    
+                                                                                                                                    
+            • Limitations            of    the    representational                   model                                          
+                                                                                                                                    
+                                                                                                                                    
+       • Certainty              factor         –   estimate              of    the      certainty             of    the             
+                                                                                                                                    
+                                                                                                                                    
+         result                                                                                                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                   Patte         rns      o  f   e  mo     tio    n,    e  mo      tio    n   s  tate                               
+                                                                                                                                    
+                   clas      s  if icatio        n                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Not       all    emotions               can       be     detected                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Not       all    emotions               NEED           to    be     detected                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • We        need         to    define          the      subset           of    emotions               that       we          
+                                                                                                                                    
+                                                                                                                                    
+         need         to    detect                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Relev          a  n   t   sta     tes                                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Extreme              emotional                states          that      suppress               learning                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Best        for     learning:            engagement,                      concentration,                     and           
+                                                                                                                                    
+                                                                                                                                    
+         flow                                                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Different             emotional                states          that      facilitate            different                   
+                                                                                                                                    
+                                                                                                                                    
+         cognitive              tasks                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Slightly           negative              states         foster          critical         thinking                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Active          states          better         than        passive            states                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Emotion                a  l  stereoty               pes                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Emotional                recognition                 patterns             could          be     grouped                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • What          are      some          common                patterns             that       you       see?                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Inte      rve     ntio      n    mo      de    ls  ,  af   f e ct     aware           co    ntro       l         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Modification                   of    standard              flow       of    standard                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         interaction                path                                                                                            
+                                                                                                                                    
+                                                                                                                                    
+       • Can        be     thematic                                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Change           of   task,      modification              of   learning          path                                
+                                                                                                                                    
+                                                                                                                                    
+       • Can        be     off-topic                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+            • Telling        a   joke,     expressing              encouragement                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Sy     stem           beh       a  v  ior      libra       ry                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Text,        audio,         or    video          response                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Emotional                state        +   system            reaction                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Scooter                th   e    Tutor                                                                           
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Resea           rch        ga    ps                                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Detection               vs.                            •  Integration                into                              
+                                                                                                                                    
+                                                                                                                                    
+             regulation                                                systems                                                      
+                                                                                                                                    
+                                                                                                                                    
+          •  Capturing               data        in   the           •  Datasets                                                     
+                                                                                                                                    
+                                                                                                                                    
+             wild                                                                                                                   
+                                                                    •  Enhancing                learning                            
+                                                                                                                                    
+          •  Multimodal                                                                                                             
+                                                                    •  Ethical                                                      
+                                                                                                                                    
+             information                                                                                                            
+                                                                       considerations                                               
+                                                                                                                                    
+             processing                                                                                                             
+                                                                                                                                    
+                                                                                                                                    
+          •  Scalability                                                                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Referen              ces                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Kołakowska,         A., Landowska,         A., Szwoch,      M.,  Szwoch,      W.,   &  Wróbel,      M.  R. (2015).         
+                                                                                                                                    
+         Modeling       emotions       for  affect-aware        applications.       Information       Systems                       
+         Development         and    Applications,       55-69.                                                                      
+                                                                                                                                    
+       • Landowska,         A. (2013,    June).   Affect-awareness            framework        for  intelligent     tutoring        
+                                                                                                                                    
+         systems.      In  2013   6th   International      Conference        on  Human       System     Interactions                
+         (HSI)   (pp.  540-547).      IEEE.                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+       • Perkoff,     E. M.,  Lyons,    M.,  Mulqueen,        A., Baker,    R.  S., Gee,    A., Ocumpaugh,          J.,             
+         Porsch,     A., Ryant,    N.,  Parish-Morris,       J., &  Ungar,     L. (2026).    Engagement-driven                      
+                                                                                                                                    
+         differences       in acoustic      features     during     online    reading     comprehension                             
+         conversations.         In A.  Botelho,     M.  M.  T.  Rodrigo,     A.  Singla,    H. Ogata,     H.  So,  &  Y.  H.        
+         Cho    (Eds.),  Proceedings        of  the  19th   International       Conference        on  Educational       Data        
+                                                                                                                                    
+         Mining     (pp.  90–103).     International       Educational        Data    Mining     Society.                           
+                                                                                                                                    
+       • Yuvaraj,     R., Mittal,   R.,  Prince,    A. A., &  Huang,      J. S. (2025).    Affective     computing        for       
+                                                                                                                                    
+         learning     in  education:      A  systematic       review     and    bibliometric       analysis.    Education           
+         Sciences,     15(1),  65.                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                            Modeling                                       Affect                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                             Maria     Mercedes        T.  Rodrigo                                                  
+                                                                                                                                    
+                                                                                                                                    
+                               CSCI    111.13    Artificial    Intelligence       in  Education                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                       SY   2026-2027                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    

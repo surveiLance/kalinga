@@ -1,0 +1,180 @@
+
+
+===== PAGE 1 =====
+
+Project Specs for
+Teachers’ Assistant
+A p p
+Maria Mercedes T. Rodrigo
+CSCI 111.13 Artificial Intelligence in Education
+SY 2026-2027
+
+===== PAGE 2 =====
+
+Tea ch ers’ A ssista n t A pp
+• The goal of the project is to develop a prototype of a
+teachers’ assistant app as described by Teacher
+Sabrina Ongkiko and Ms. Dasha Uy
+• The prototype may be vibe-coded (I strongly
+encourage you to vibe-code.)
+• The prototype does not have to be fully functional.
+• The goal is to have something that can be shown to a
+funder and a development team to fund and construct
+in full.
+
+===== PAGE 3 =====
+
+Pa rt 1
+• Define the scope of the functions that you will
+support.
+• Identify the insertion points for AI
+
+===== PAGE 4 =====
+
+Pa rt 1
+• What teacher responsibilities will you support?
+• What core functions will your app have?
+• What is the general architecture of your app
+• They will need both a web and a mobile version
+• Data will need to be shared among teachers
+
+===== PAGE 5 =====
+
+Pa rt 1 I n structions
+• You may work in • Naming convention
+groups of up to three. for the submission is
+P01_LastName1LastN
+• This is 15% of your
+ame2LastName3.PDF
+final grade
+(lastnames in
+• Submit your PDF on
+alphabetical order),
+Canvas by 8 October,
+e.g.
+11:59 pm
+P01_BonifacioRizalSil
+ang.PDF
+
+===== PAGE 6 =====
+
+Rubrics
+14 to 15 12 to 13 10 to 11 Below 10
+High degree of clarity of Teaching and learning goals Teaching and learning goals Overall proposal is too
+teaching and learning goals could use further precision could are general general and imprecise to be
+Appropriate selection of Teaching and evaluation Teaching and evaluation implementable.
+teaching and evaluation methods are generally methods are broad and lack Needs revision before the
+methods aligned precision project can be implemented
+Appropriate methods of Methods of remediation are Methods of remediation are
+remediation generally aligned broad and lack precision
+Clear identification of Clear identification of Platform is still tentative
+platform platform
+
+===== PAGE 7 =====
+
+Pa rt 2
+• Using an LLM of your choice, implement the app
+• Test the app with at least 5 users
+• Document the design and the results.
+
+===== PAGE 8 =====
+
+Project 2 ch eck in
+• On November 5, present the status of your project
+to the class
+• 10-minutes max
+• Show a demo, if possible
+
+===== PAGE 9 =====
+
+Pa rt 2 ch eck in
+• This is 5% of your final grade
+5 4 3 and below
+Progress is evident. Progress is slow. Progress is stalled.
+Design is consistent with the Design requires further Design does not map to
+needs of the teachers. refinement. teacher needs.
+Architecture takes into Architecture somewhat Architecture does not take
+account the circumstances takes into account the into account the
+of last-mile schools. circumstances of last-mile circumstances of last-mile
+schools. schools.
+
+===== PAGE 10 =====
+
+Pa rt 2 D ocumen ta tion requiremen ts
+• Include all the content • Reflection
+of Part 1
+• Effectiveness or
+usefulness of the
+• Describe the
+application in the
+implementation,
+context of last-mile
+including screenshots
+schools
+• Link to the
+• How can effectiveness
+implementation
+or usefulness be
+increased?
+• Describe the testing
+(more on this later)
+
+===== PAGE 11 =====
+
+Part 2 Do cume ntatio n re quirements f o r
+te s ting
+• The goal of the testing • Who were the testers?
+is to determine the
+• What did you ask them
+effectiveness and
+to do?
+usefulness of the app
+• How did you measure
+• A secondary goal is to
+effectiveness and
+reflect on the ethics of
+usefulness?
+your work.
+• What are some of the
+ethical concerns or
+issues that your system
+might pose?
+
+===== PAGE 12 =====
+
+Pa rt 2 I n structions
+• This is 20% of your final grade
+• Submit your PDF on Canvas by 26 November,
+11:59 pm
+• Naming convention for the submission is
+P01_LastName1LastName2LastName3.PDF
+(lastnames in alphabetical order), e.g.
+P01_BonifacioRizalSilang.PDF
+
+===== PAGE 13 =====
+
+Rubrics
+18 to 20 16 to 17 14 to 15 13 and below
+Implementation was Implementation had some Implementation had many Implementation was sorely
+complete and functional missing functionalities missing functionalities lacking.
+Documentation of design Documentation had most Documentation had missing Documentation, test plan,
+was complete and well- elements and was well- elements. and reflection were
+organized organized. Test plan was missing details perfunctory.
+Testing documentation was Test plan could use more and lacked precision.
+complete and well- details and precision Test activities was
+organized Test activities was mostly misaligned with the goal of
+Test plan was clear. aligned with the goal of gauging effectiveness
+Test activities were aligned gauging effectiveness Reflection had limited
+with the goal of gauging Reflection was mostly thoughtfulness and
+effectiveness thoughtful and insightful insightfulness
+Reflection was thoughtful
+and insightful
+
+===== PAGE 14 =====
+
+Project Specs for
+Teachers’ Assistant
+A p p
+Maria Mercedes T. Rodrigo
+CSCI 111.13 Artificial Intelligence in Education
+SY 2026-2027

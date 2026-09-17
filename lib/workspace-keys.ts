@@ -1,6 +1,6 @@
-export type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion" | "pending-writes";
+export type WorkspaceStorageKey = "classes" | "active-class" | "plans" | "saved-resources" | "attendance" | "attendance-notes" | "teacher-name" | "teacher-email" | "gabay-motion" | "pending-writes" | "tutorial-status";
 
-export const legacyWorkspaceKeys: Record<Exclude<WorkspaceStorageKey, "pending-writes">, string> = {
+export const legacyWorkspaceKeys: Record<Exclude<WorkspaceStorageKey, "pending-writes" | "tutorial-status">, string> = {
   classes: "kalinga-classes",
   "active-class": "kalinga-active-class",
   plans: "kalinga-plans",

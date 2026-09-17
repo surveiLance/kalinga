@@ -1,0 +1,252 @@
+%-----------------------------------------------------------------------------------------------------------------------------------------------%
+% Resume - Lance Arnel G. Camacho
+% Template base: The MIT License (MIT) - Copyright (c) 2021 Jitin Nair
+%-----------------------------------------------------------------------------------------------------------------------------------------------%
+
+\documentclass[a4paper,10pt]{article}
+
+\usepackage{url}
+\usepackage{parskip}
+\setlength{\parskip}{0.25em}
+
+\RequirePackage{color}
+\RequirePackage{graphicx}
+\usepackage[usenames,dvipsnames]{xcolor}
+
+\usepackage[
+    ignoreheadfoot,
+    top=0.80cm,
+    bottom=0.55cm,
+    left=1.10cm,
+    right=1.10cm,
+    footskip=0.40cms
+]{geometry}
+
+\usepackage{tabularx}
+\usepackage{enumitem}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+\usepackage{titlesec}
+
+\titleformat{\section}
+    {\large\scshape\centering}
+    {}
+    {0em}
+    {}
+    [\titlerule]
+
+\titlespacing{\section}{0pt}{2pt}{3pt}
+
+\usepackage{fontawesome5}
+\usepackage[unicode,draft=false]{hyperref}
+
+\definecolor{linkcolour}{rgb}{0,0,0}
+
+\hypersetup{
+    colorlinks,
+    breaklinks,
+    urlcolor=linkcolour,
+    linkcolor=linkcolour
+}
+
+\newenvironment{highlights}{
+    \begin{itemize}[
+        topsep=0cm,
+        parsep=0cm,
+        partopsep=0cm,
+        itemsep=0.01cm,
+        leftmargin=0.48cm
+    ]
+}{
+    \end{itemize}
+}
+
+\newcommand{\entryhead}[4]{%
+\vspace{0.16cm}
+\begin{tabularx}{\linewidth}{@{}X r@{}}
+\textbf{#1} & #2 \\
+\textbf{#3} & #4 \\
+\end{tabularx}%
+\vspace{-0.34cm}
+}
+
+\newcommand{\skillrow}[2]{%
+\noindent
+\hangindent=0.6cm
+\hangafter=1
+\textbf{#1} #2\par%
+}
+
+\begin{document}
+
+\pagestyle{empty}
+
+\begin{tabularx}{\linewidth}{@{}C@{}}
+\textbf{\fontsize{18pt}{18pt}\selectfont Lance Arnel G. Camacho} \\[0.03cm]
+
+\small
+\raisebox{-0.05\height}\faMobile\
+0975 514 5042
+\,$\cdot$\,
+\href{mailto:lancecamacho29@gmail.com}
+{\raisebox{-0.05\height}\faEnvelope\ lancecamacho29@gmail.com}
+\,$\cdot$\,
+\href{https://www.linkedin.com/in/lance-camacho/}
+{\raisebox{-0.05\height}\faLinkedin\ linkedin.com/in/lance-camacho}
+\,$\cdot$\,
+\href{https://github.com/surveiLance}
+{\raisebox{-0.05\height}\faGithub\ github.com/surveiLance}
+\\
+\end{tabularx}
+
+\section{Education}
+
+\begin{tabularx}{\linewidth}{@{}X r@{}}
+\textbf{Ateneo de Manila University} & Quezon City, Philippines \\
+Bachelor of Science in Management Information Systems &
+Expected May 2028 \\
+\multicolumn{2}{@{}p{\linewidth}@{}}{
+Specialization in Data Science and Analytics
+}
+\end{tabularx}
+
+\section{Experience}
+
+\vspace{-0.20cm}
+
+\entryhead
+{Google Developer Groups on Campus Loyola}
+{Quezon City, Philippines}
+{Automations Engineer, Technology Department}
+{Aug 2026 -- Present}
+
+\begin{highlights}
+    \item Develop scripts, integrations, and automated workflows that reduce
+    repetitive manual work and improve organizational efficiency
+
+    \item Collaborate with the Technology Department on process automation using
+    Python, JavaScript, Google Apps Script, Google Workspace, APIs, and
+    AI-assisted tools
+\end{highlights}
+
+\entryhead
+{Antipolo City 1st Congressional District Office}
+{Antipolo City, Philippines}
+{Government Internship Program (GIP) Intern}
+{Jul 2026 -- Expected Dec 2026}
+
+\begin{highlights}
+    \item Conduct intake interviews and assist with collecting, reviewing, and
+    encoding financial-assistance applications from First District residents
+
+    \item Work with district staff and fellow interns to understand the office's
+    manual and Excel-based processes, identify recurring issues, and test
+    workflow improvements with actual users
+
+    \item Assigned to design and develop an internal database system for applicant
+    records, payout tracking, search, filtering, and management reports
+\end{highlights}
+
+\entryhead
+{MyDerm Aesthetics \& Dermatology Clinic}
+{Remote}
+{Full-Stack Web Developer}
+{Aug 2026 -- Present}
+
+\begin{highlights}
+    \item Designed and deployed a responsive clinic website using
+    \textbf{Next.js, React, TypeScript, and CSS}, translating MyDerm's branding
+    into an accessible experience across desktop and mobile
+
+    \item Engineered a \textbf{Supabase-backed appointment workflow} that records
+    treatment, schedule, assigned doctor, contact preference, and notes while
+    preventing conflicting confirmed time slots at the database level
+
+    \item Built a secure clinic dashboard with
+    \textbf{Supabase Auth, PostgreSQL, and Row Level Security} for administrator
+    review, status management, scheduling, automatic refresh, and protected deletion
+\end{highlights}
+
+\section{Projects}
+
+\vspace{-0.20cm}
+
+\entryhead
+{First District Assistance Management System}
+{Internship Project}
+{Full-Stack Developer}
+{Jul 2026 -- Present}
+
+\begin{highlights}
+    \item Designed and deployed an internal assistance-record system using
+    \textbf{Next.js, TypeScript, Supabase, PostgreSQL, and Vercel} as a technical
+    assignment during the GIP internship
+
+    \item Migrated and validated \textbf{3,523 historical applications} from the
+    office's Excel workflow while preserving incomplete fields and compatibility
+    with legacy records
+
+    \item Implemented applicant histories, identity and household review,
+    advanced filtering, payout workflows, and server-generated reports, supported
+    by indexed search, authentication, Row Level Security, and private ID-photo storage
+\end{highlights}
+
+\entryhead
+{LancePad $|$ AI Study Notebook}
+{\href{https://github.com/surveiLance/LancePad}
+{github.com/surveiLance/LancePad}}
+{Full-Stack Developer}
+{May 2026 -- Jun 2026}
+
+\begin{highlights}
+    \item Built a notebook-centered study application using
+    \textbf{Next.js, React, TypeScript, Convex, and Groq}, converting user notes
+    into summaries, flashcards, quizzes, tutor explanations, and study recaps
+
+    \item Implemented TipTap autosave, PDF/DOCX/TXT import, persistent quiz
+    sessions, missed-question practice, card-review tracking, and structured AI
+    response handling with JSON validation, deduplication, ambiguity checks,
+    fallbacks, and rate-limit feedback
+\end{highlights}
+
+\entryhead
+{Kalinga $|$ Multigrade Teaching Assistant}
+{\href{https://kalinga-gules.vercel.app}
+{kalinga-gules.vercel.app}}
+{Full-Stack Developer}
+{Aug 2026 -- Present}
+
+\begin{highlights}
+    \item Developed a teaching assistant for Filipino multigrade classrooms using
+    \textbf{Next.js, React, TypeScript, Supabase, and Groq}, connecting class
+    rosters, schedules, attendance, resources, and editable ILAW lesson plans
+
+    \item Built page-aware AI guidance for drafting grade-specific competencies,
+    objectives, and assessments, plus teacher discussions with resource
+    attachments, mentions, reply notifications, and account-scoped data protected
+    by PostgreSQL Row Level Security
+\end{highlights}
+
+\section{Skills}
+
+{\setlength{\parskip}{0pt}
+\vspace{0.10cm}
+
+\skillrow{Programming:}
+{TypeScript, JavaScript, SQL, HTML, CSS}
+
+\skillrow{Frameworks \& Libraries:}
+{React, Next.js, Tailwind CSS, TipTap, Framer Motion}
+
+\skillrow{Backend \& Data:}
+{Supabase, PostgreSQL, Convex, Groq API}
+
+\skillrow{Automation \& Tools:}
+{Google Apps Script, Google Workspace, Google Forms, Google Sheets, Git, GitHub, Vercel}
+
+\skillrow{Productivity:}
+{Microsoft Excel, Microsoft PowerPoint}
+
+}
+
+\end{document}

@@ -1,0 +1,933 @@
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                            Modeling                                       Affect                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                             Maria     Mercedes        T.  Rodrigo                                                  
+                                                                                                                                    
+                                                                                                                                    
+                               CSCI    111.13    Artificial    Intelligence       in  Education                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                       SY   2026-2027                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+           Before                         we             start,                   here’s                       an                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                  update                           on           the              state                   of                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                     Philip                   p     ine             education                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+
+
+
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                 Engagement                                - Dr      iven                                           
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                            Differences                             in      Acoustic                                                
+                                                                                                                                    
+                                                                                                                                    
+                            Featur               es       Dur         ing          Online                                           
+                                                                                                                                    
+                                                                                                                                    
+                          Reading                      Compr                 ehension                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                           Conversations                                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   C   on     text                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Phenomenon                       of    interest           is   engagement                     while                        
+                                                                                                                                    
+                                                                                                                                    
+         using         a   reading            platform                                                                              
+                                                                                                                                    
+                                                                                                                                    
+            • Reading           engagement:                 students           active        involvement               in           
+                                                                                                                                    
+              reading                                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+            • Different          from       motivation            –   motivation             is  a  mindset                         
+                                                                                                                                    
+                                                                                                                                    
+       • Reading              platforms               increase             literacy           but      only        if               
+                                                                                                                                    
+                                                                                                                                    
+         students              are      engaged.                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • No      standardized                    method              of    measuring                 student                        
+                                                                                                                                    
+                                                                                                                                    
+         engagement                      with       online          reading            platforms                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   C   on     tribution                                                                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Exploration                 of    acoustic             features             to    detect           reading                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         engagement                      among            neurodivergent                        learners                            
+                                                                                                                                    
+                                                                                                                                    
+            • Autism         Spectrum              Disorder          (ASD)                                                          
+                                                                                                                                    
+                                                                                                                                    
+            • Attention           Deficit       Hyperactivity               Disorder           (ADHD)                               
+                                                                                                                                    
+                                                                                                                                    
+       • One        of    the      first     studies            to    focus         on     understanding                            
+                                                                                                                                    
+                                                                                                                                    
+         acoustic             features             and       engagement                                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Ba     ckgroun                d                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Detecting              reading          engagement                                                                         
+                                                                                                                                    
+            • Use      of   video      –   highly      invasive                                                                     
+                                                                                                                                    
+                                                                                                                                    
+            • Posture         sensors         –  cannot        be    deployed            in  the    home                            
+                                                                                                                                    
+            • Interaction-based                  detectors           –  need       classroom            observation                 
+                                                                                                                                    
+              or   self-report          data                                                                                        
+                                                                                                                                    
+            • Student         response           times       –  can     be    used       at  home        but     need       to      
+                                                                                                                                    
+              be     renormed            for    different        populations                                                        
+                                                                                                                                    
+                                                                                                                                    
+       • Acoustic            features           have        been        explored                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Disengaged              students          respond          more       slowly,       and      with     a               
+                                                                                                                                    
+              more       steady        pitch                                                                                        
+                                                                                                                                    
+       • This      study        focuses           on     non-neurotypical                      learners                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                   Re     ading          e  ngage           ment          amo       ng      tho      s e    with                    
+                                                                                                                                    
+                   ASD         o  r   ADH        D                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Increasing          calls    for   more       understanding              of   more       diverse                       
+                                                                                                                                    
+             learners                                                                                                               
+                                                                                                                                    
+          •  Need       to  account         for   the    clinical      diagnoses                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  ASD     individuals          face     persistent         challenges           with     social                          
+                                                                                                                                    
+             communication                                                                                                          
+                                                                                                                                    
+          •  ADHD        individuals         have      persistent         patterns         of  inattention                          
+                                                                                                                                    
+                                                                                                                                    
+          •  Both     conditions          can     contribute          to  challenges            with    reading                     
+                                                                                                                                    
+               •  Impairments         with    communication,             word     recognition,       and    oral                    
+                                                                                                                                    
+                  language.                                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Presen             t   stud        y                                                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • RQ1:        Which           acoustic             features             are      indicative              of                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         reading            engagement                      in   the      online          learning                                  
+                                                                                                                                    
+                                                                                                                                    
+         setting?                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+       • RQ2:        How         does         clinical          diagnosis              impact            the                        
+                                                                                                                                    
+                                                                                                                                    
+         presentation                   of    reading            engagement                      in   the      online               
+                                                                                                                                    
+                                                                                                                                    
+         learning             setting?                                                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Stud         y   pa     rticipa           n  ts                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Recruited         through         the    Center       for                                                              
+                                                                                                                                    
+             Autism       Research          at   Children’s                                                                         
+                                                                                                                                    
+             Hospital        of  Philadelphia                                                                                       
+                                                                                                                                    
+          •  Aged      5-12     years      old                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+          •  Diagnosis         of   Autism        Spectrum                                                                          
+                                                                                                                                    
+             Disorder        (ASD),      Attention         Deficit                                                                  
+             Hyperactivity            Disorder        (ADHD),                                                                       
+                                                                                                                                    
+             ASD     +  ADHD,        or  neither                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  “Learning         to   read”      phase                                                                                
+                                                                                                                                    
+             according          to   parents                                                                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Experimen                    t   d   esign                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   D   a   ta     collected                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Parent-reported       engagement                                                                                       
+             measures      (PER)                                                                                                    
+                                                                                                                                    
+               •  Very  engaged,   somewhat     engaged,                                                                            
+                  not engaged                                                                                                       
+                                                                                                                                    
+          •  Acoustic    features                                                                                                   
+                                                                                                                                    
+               •  Prosodic   features  - voice  quality,                                                                            
+                  rhythm  and  intonation;  convey                                                                                  
+                  emotion   and  emphasis   (e.g. jitter,                                                                           
+                  shimmer,   and  harmonic   noise  ratio)                                                                          
+                                                                                                                                    
+               •  Frequency    features  - how   high or low                                                                        
+                  the voice  sounds,  variation  over time;                                                                         
+                  capture  fundamental    frequency    and                                                                          
+                  resonant  frequencies                                                                                             
+                                                                                                                                    
+               •  Temporal    features  - speech   timing,                                                                          
+                  speaking   rate, pause  frequency                                                                                 
+                                                                                                                                    
+               •  Spectral  features   - spectral shape,                                                                            
+                  including  slope, used   for affect                                                                               
+                  recognition                                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Mod         elin      g                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Based          on      Generalized                  Estimation                Equations                                
+                                                                                                                                    
+                                                                                                                                    
+             for    each         acoustic             feature                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                   RQ1:        Which             aco     us    tic     f e  ature        s   are       indicative                   
+                                                                                                                                    
+                   o  f   re   ading           e ngage           ment?                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Students               in   the      Somewhat                    Engaged                group                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         exhibited              higher           shimmer              than        those          in   the      Very                 
+                                                                                                                                    
+                                                                                                                                    
+         Engaged               group                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+       • Shimmer                is  also       known            as     harmonic-to-noise                            ratio           
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Higher         value       is  a   cleaner,         more        tonal       sound                                     
+                                                                                                                                    
+                                                                                                                                    
+            • Lower         value       means          more        background                noise                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                   RQ2:         H   o  w     do    e  s   clinical           diagno            s is    impact                       
+                                                                                                                                    
+                   the       pre     s  e  ntation             o  f  re   ading           e  ngage          ment?                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Energy                                                                                                                     
+                                                                                                                                    
+            • ASD     children      have    higher     harmonics-to-noise               ratio  when      engaged                    
+                                                                                                                                    
+            • ADHD       and    ASD+ADHD           children      have    lower     HNR     when      not   engaged                  
+                                                                                                                                    
+                 • High   variability   within    the  group                                                                        
+                                                                                                                                    
+            • Neurotypical          children     have     lower     SD   for   shimmer        than   ASD     children               
+                                                                                                                                    
+            • ADHD       group     has    higher     shimmer        (fluctuations       in  loudness)       values     when         
+                                                                                                                                    
+              engaged                                                                                                               
+                                                                                                                                    
+       • Frequency                                                                                                                  
+                                                                                                                                    
+            • ADHD       raised    pitch    when      engaged                                                                       
+                                                                                                                                    
+            • Neurotypical          children     drop     pitch    when     engaged                                                 
+                                                                                                                                    
+            • ASD     children      have    higher     jitter  (pitch    fluctuations)        when     very    engaged              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                   RQ2:         H   o  w     do    e  s   clinical           diagno            s is    impact                       
+                                                                                                                                    
+                   the       pre     s  e  ntation             o  f  re   ading           e  ngage          ment?                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Spectral          values                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+            • ADHD        children       speak      in  a  softer     tone    when       disengaged                                 
+                                                                                                                                    
+            • ASD+ADHD             children       speak      in  sharper       tones     when       disengaged                      
+                                                                                                                                    
+                                                                                                                                    
+       • Temporal                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+            • Checks        the   standard        deviations         of  voiced       segment         and     unvoiced              
+                                                                                                                                    
+              segment                                                                                                               
+                                                                                                                                    
+            • Lower       standard        deviations         mean      steadier,        more      confident        pace             
+                                                                                                                                    
+            • Neurotypical           children       sound       more      confident        when       engaged                       
+                                                                                                                                    
+                                                                                                                                    
+            • Neurodivergent              children’s        speech       may      not   reflect      confidence                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   K   ey      ta   kea       wa      y  s                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • RQ1:       Which          acoustic           features           are     indicative            of    reading                
+                                                                                                                                    
+         engagement                   in   the     online         learning           setting?                                       
+                                                                                                                                    
+                                                                                                                                    
+            • Alpha       Ratio,      Hammarberg                 Index,      Shimmer,           Loudness            Peaks           
+                                                                                                                                    
+              Per     Second,         Voiced         Segment           Length                                                       
+                                                                                                                                    
+            • Breathiness,            Speaking           Rates,       Pitch      Changes                                            
+                                                                                                                                    
+                                                                                                                                    
+       • RQ2:       How        does        clinical        diagnosis             impact          the                                
+                                                                                                                                    
+         presentation                 of   reading           engagement                   in   the     online                       
+                                                                                                                                    
+         learning           setting?                                                                                                
+                                                                                                                                    
+            • Clinical       diagnosis          has     a  strong       interaction           effect      with                      
+                                                                                                                                    
+              reading         engagement                                                                                            
+                                                                                                                                    
+                                                                                                                                    
+            • There       is  high      within-group             variability         for   students          with     AS            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Exercise                 4:    Pla      y    Ma     th    Sprin         g                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • https://mathspring.org/                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • As     with       ASSISTments                                                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Don’t       try   to    be    perfect                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+            • Try     to   make         mistakes                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Ask      for   hints                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+            • Ask      for   help                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+            • Give      the     wrong         answer                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                   Pro      vide        thre      e    s cre     e  n    s ho     ts    de    mo      ns   trating                  
+                                                                                                                                    
+                   af   f e  ct   -le    ve   l  f e  e  dback.                                                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Use       screen            shots         to    provide            context                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Explain            each        screen           shot        in   1-2      sentences                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Does         the      affect-level                 feedback                feel      authentic               to            
+                                                                                                                                    
+                                                                                                                                    
+         you?        Explain            in   1-2      sentences.                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Submission                       in   struction                s                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • This       is   an     individual              exercise.                                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • No      GenAI.                                                                                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Submit            a   PDF        on     Canvas                                                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Naming              convention                 for     the      submission                  is                             
+                                                                                                                                    
+                                                                                                                                    
+         Ex04_LastName1.PDF,                                  e.g.      Ex04_Rizal.PDF                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Rubrics                                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                      14-15                                    12-13                              11   and    below                 
+                                                                                                                                    
+                                                                                                                                    
+       Examples       illustrate                Examples        somewhat                 Examples        do   not                   
+                                                                                                                                    
+       affective     interventions.             illustrate     affective                 illustrate     affective                   
+                                                                                                                                    
+                                                                                                                                    
+       Explanations        align    with        interventions.                           interventions.                             
+                                                                                                                                    
+                                                                                                                                    
+       the   examples.                          Explanations         are                 Explanations         do   not              
+                                                                                                                                    
+       Comments          on  the                generally      aligned     with          align    with    the   examples.           
+                                                                                                                                    
+                                                                                                                                    
+       authenticity       are   well-           the   examples.                          No    comment         on   the             
+                                                                                                                                    
+       rationalized.                            Comments          on   the               authenticity.                              
+                                                                                                                                    
+                                                                                                                                    
+                                                authenticity        are   generic.                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Referen              ces                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Kołakowska,         A., Landowska,         A., Szwoch,      M.,  Szwoch,      W.,   &  Wróbel,      M.  R. (2015).         
+                                                                                                                                    
+         Modeling       emotions       for  affect-aware        applications.       Information       Systems                       
+         Development         and    Applications,       55-69.                                                                      
+                                                                                                                                    
+       • Landowska,         A. (2013,    June).   Affect-awareness            framework        for  intelligent     tutoring        
+                                                                                                                                    
+         systems.      In  2013   6th   International      Conference        on  Human       System     Interactions                
+         (HSI)   (pp.  540-547).      IEEE.                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+       • Perkoff,     E. M.,  Lyons,    M.,  Mulqueen,        A., Baker,    R.  S., Gee,    A., Ocumpaugh,          J.,             
+         Porsch,     A., Ryant,    N.,  Parish-Morris,       J., &  Ungar,     L. (2026).    Engagement-driven                      
+                                                                                                                                    
+         differences       in acoustic      features     during     online    reading     comprehension                             
+         conversations.         In A.  Botelho,     M.  M.  T.  Rodrigo,     A.  Singla,    H. Ogata,     H.  So,  &  Y.  H.        
+         Cho    (Eds.),  Proceedings        of  the  19th   International       Conference        on  Educational       Data        
+                                                                                                                                    
+         Mining     (pp.  90–103).     International       Educational        Data    Mining     Society.                           
+                                                                                                                                    
+       • Yuvaraj,     R., Mittal,   R.,  Prince,    A. A., &  Huang,      J. S. (2025).    Affective     computing        for       
+                                                                                                                                    
+         learning     in  education:      A  systematic       review     and    bibliometric       analysis.    Education           
+         Sciences,     15(1),  65.                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                            Modeling                                       Affect                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                             Maria     Mercedes        T.  Rodrigo                                                  
+                                                                                                                                    
+                                                                                                                                    
+                               CSCI    111.13    Artificial    Intelligence       in  Education                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                       SY   2026-2027                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    

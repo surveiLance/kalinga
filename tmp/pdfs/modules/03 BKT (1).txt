@@ -1,0 +1,1301 @@
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                   M       o     de          l  ing               t   h     e                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                Lea              rner                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                             Maria     Mercedes        T.  Rodrigo                                                  
+                                                                                                                                    
+                                                                                                                                    
+                               CSCI    111.13    Artificial    Intelligence       in  Education                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                       SY   2026-2027                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Sa     mple           a  rch      itectures                 of     stud        en    t   mod         els         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Overlay             model                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Stereotypes                   model                                                                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Perturbation                   model                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Bayesian               Knowledge                   Tracing                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • There          are      many          others.                                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Ba     y  esia       n    K   n  owled            ge      Tra      cin     g                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Widely            used         probabilistic                 model            to    estimate              that             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         the      learner           possesses                 the      knowledge                  or    skill                       
+                                                                                                                                    
+                                                                                                                                    
+       • Special            instance             of    a   Hidden            Markov             Model                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Goal        is   to    estimate              the      knowledge                   states         of                        
+                                                                                                                                    
+                                                                                                                                    
+         learners             based          on      opportunities                   to    practice                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Upd        a  tin     g    of     estima            tes                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                              •  𝑃   𝐿       -  prior      knowledge                                                                
+                                        0                                                                                           
+                                                                                                                                    
+                              •  𝑃(𝐿    )  –   learned          knowledge                                                           
+                                                                                                                                    
+                                       𝑡                                                                                            
+                                                                                                                                    
+                              •  𝑃(𝑆)     –  probability              of   a   slip                                                 
+                                                                                                                                    
+                                                                                                                                    
+                              •  𝑃(𝐺)     –   probability             of    a  guess                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   I f   th    e    stud        en    t   gets          a  n    a  n   swer          righ       t                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                         Estimate of true mastery                                                   
+                                                                                                                                    
+                                   What  is the chance that the student learned the skill and did not slip                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                 Got the answer  and  didn’t slip or didn’t know it and guessed                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   I f   th    e    stud        en    t   gets          a  n    a  n   swer          wron          g                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                               Careless slip                                                        
+                                                                                                                                    
+                                      What  is the chance that the student knew  the skill but slipped                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                        Knew  the answer  but slipped or didn’t know the answer  and guessed  correctly             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                   Es    timatio           n    o  f  the       pro     bability             that        the                        
+                                                                                                                                    
+                   le   arne       r   le  arne       d    the       s kill                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                   What  they already know                                                                          
+                                                                            What  they don’t know              Learning rate        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • 𝑃(𝑇)      –   probability                of    transitioning                  to    a   “known”                            
+                                                                                                                                    
+                                                                                                                                    
+         state;        learning             rate                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Ta     kea      wa      y                                                                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • BKT        estimates               the      probability                that       the      student                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         knows            a   skill     based           on     OptToPrac                 performance,                               
+                                                                                                                                    
+                                                                                                                                    
+         prior       knowledge,                   and       probabilities                  that       they                          
+                                                                                                                                    
+                                                                                                                                    
+         guessed              or    slipped                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Experimen                    t   with          th    e   BK      T    worksh             eet                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Question                 s                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • How         many          consecutive                   correct            answers             do      you                 
+                                                                                                                                    
+                                                                                                                                    
+         need         to    reach          95%        probability               of    knowing               the      skill?         
+                                                                                                                                    
+                                                                                                                                    
+       • What          happens               if  you       reach         95%        but      make           a                       
+                                                                                                                                    
+                                                                                                                                    
+         mistake?                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+       • How         can       you       get      100%         probability                of    knowing              a              
+                                                                                                                                    
+                                                                                                                                    
+         skill?                                                                                                                     
+                                                                                                                                    
+                                                                                                                                    
+       • Does         it   make          intuitive           sense          that       a   student            would                 
+                                                                                                                                    
+                                                                                                                                    
+         know          100%          of    a   skill?                                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Th     e    issue          with          lea     rn    er     mod         els                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Overlay            model                               •  The       learner           doesn’t                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                       know          what        the                                
+          •  Stereotypes                  model                                                                                     
+                                                                                                                                    
+                                                                       system            is   modeling                              
+          •  Perturbation                  model                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+          •  Bayesian              Knowledge                                                                                        
+                                                                                                                                    
+                                                                                                                                    
+             Tracing                                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Open            lea     rn    er     mod         els                                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Machine              representation                      of    the       learner                                           
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Made           visible         to    the      learner                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Ben        efits                                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Promotes                metacognitive                      activities            like      reflection,                     
+                                                                                                                                    
+                                                                                                                                    
+         planning,               and       self-monitoring                                                                          
+                                                                                                                                    
+                                                                                                                                    
+       • Allows           learner           to    take        control           and       responsibility                            
+                                                                                                                                    
+                                                                                                                                    
+         over        their       learning                                                                                           
+                                                                                                                                    
+                                                                                                                                    
+       • Prompting                 or    supporting                 collaborative                   or                              
+                                                                                                                                    
+                                                                                                                                    
+         competitive                   actions                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+       • Facilitates               interaction               between               stakeholders                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Facilitating               navigation                to    materials                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Ben        efits                                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Supports                assessment                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Increases               learner           trust                                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Addresses                 the      issue        of    people            having           access           to               
+                                                                                                                                    
+                                                                                                                                    
+         their       own        data                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Represen                  ta   tion       s                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Does         not      necessarily                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+         match           the      complexity                                                                                        
+                                                                                                                                    
+                                                                                                                                    
+         of    the      underlying                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+         model                                                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+            • Needs          to   be    simplified,                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+              e.g.    using       skill    meters          or                                                                       
+                                                                                                                                    
+              progress           bars                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+            • One       meter        per     concept                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Represen                  ta   tion       s                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Concept              maps                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Reflect           the      domain                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Nodes            indicate                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+         strength             of    knowledge                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+         of    a   concept                                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Represen                  ta   tion       s                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Represen                  ta   tion       s                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Lea       rn    er/    sy    stem           con       trol                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Most         straightforward:                       System             control           only                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Learner             model           is   available             for     viewing             but      not                    
+                                                                                                                                    
+                                                                                                                                    
+         editing                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Available              for     inspection                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Lea       rn    er/    sy    stem           con       trol                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Editable             learner                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+         models                                                                                                                     
+                                                                                                                                    
+                                                                                                                                    
+       • Learner             can      override                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+         system            assessment                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+         and       challenge                the                                                                                     
+                                                                                                                                    
+         model                                                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Additional               information                                                                                       
+                                                                                                                                    
+         feeds          back        into      the                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+         modeling                process                                                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Lea       rn    er/    sy    stem           con       trol                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Learners              can       inform          the      system                                                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • If  their     knowledge               increased                                                                       
+                                                                                                                                    
+                                                                                                                                    
+            • They       have       forgotten            information             or   techniques                                    
+                                                                                                                                    
+                                                                                                                                    
+            • They       were        guessing                                                                                       
+                                                                                                                                    
+                                                                                                                                    
+       • Invites          learners            to    take        responsibility                   for    their        own            
+                                                                                                                                    
+                                                                                                                                    
+         learning.                                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Lea       rn    er/    sy    stem           con       trol                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Mixed         control                                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+       • Learner           can      change                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+         model          data       but     model                                                                                    
+                                                                                                                                    
+         will     only      change            if the                                                                                
+                                                                                                                                    
+                                                                                                                                    
+         learn       can      demonstrate                                                                                           
+                                                                                                                                    
+         that      their      self-                                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+         assessment                 is  accurate                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Learner           must         add                                                                                         
+                                                                                                                                    
+         evidence                                                                                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Lea       rn    er/    sy    stem           con       trol                                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Independent                     learner           model                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Constructed                    as    in   any       system                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • No      tutoring            adjustments                    based          on     the      model                            
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Control            for     learning            decisions               is  purely           in   the                       
+                                                                                                                                    
+                                                                                                                                    
+         hands           of    the      learner.                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Open            lea     rn    er     mod         els      for       oth      er     users                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Can        be     open         to    peers                                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+            • Other        learners         can      look      for    collaborators                                                 
+                                                                                                                                    
+                                                                                                                                    
+            • Individuals            can      compare            their     own       knowledge               to    that     of      
+                                                                                                                                    
+                                                                                                                                    
+              others                                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+       • Can        be     open         to    teachers                                                                              
+                                                                                                                                    
+                                                                                                                                    
+            • Teacher           has      more         details        available                                                      
+                                                                                                                                    
+                                                                                                                                    
+            • Can      be     used       to   support          group        learning          based         on                      
+                                                                                                                                    
+                                                                                                                                    
+              evidence                                                                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                            Han                ds           o     n                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   SQL         Tutor                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • https://ictg.csse.canterbury.ac.nz/sqlt/login                                                                              
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   Tanja  Mitrovic                                  
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Exercise                 2  :  SQL         Tutor                                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Try     at    least      three        exercises            with       SQL       Tutor                                      
+                                                                                                                                    
+                                                                                                                                    
+       • Describe            the      problems             that      you      had       to   solve.                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Describe            any      mistakes             that     you       made         and      how        the                  
+                                                                                                                                    
+         system           responded.                                                                                                
+                                                                                                                                    
+                                                                                                                                    
+       • Examine              your       progress            as    reflected            in   the     skill     meters.              
+                                                                                                                                    
+                                                                                                                                    
+       • Submit           screen         shots        of    your      skill     meters           after      every                   
+                                                                                                                                    
+                                                                                                                                    
+         exercise.                                                                                                                  
+                                                                                                                                    
+                                                                                                                                    
+       • Are      the     skill     meters          an    accurate             reflection            of   your       skill?         
+                                                                                                                                    
+                                                                                                                                    
+         Would           you      have        wanted           to    edit     your       model?           Explain.                  
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Submission                       in   struction                s                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • This       is   an     individual              exercise.                                                                   
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Submit            a   PDF        on     Canvas                                                                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Write         your        name           on     the      PDF                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Naming              convention                 for     the      submission                  is                             
+                                                                                                                                    
+                                                                                                                                    
+         Ex02_LastName.PDF,                                 e.g.     Ex02_Rizal.PDF                                                 
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Rubrics                                                                                                          
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                       9-10                                      7-8                               6  and    below                  
+                                                                                                                                    
+                                                                                                                                    
+       Described     the  problems,             Described     the  problems,             Description     of  the  problems,         
+                                                                                                                                    
+       mistakes,    and   interventions         mistakes,    and   interventions         mistakes,     and  interventions           
+                                                                                                                                    
+       clearly.                                 but  details   were   lacking.           was   vague    and   too  general.         
+                                                                                                                                    
+       Submitted     three   screenshots        Submitted      two   screenshots         Submitted      less  than   two            
+                                                                                                                                    
+                                                                                                                                    
+       of skill meters                          of  skill meters                         screenshots      of  skill meters          
+                                                                                                                                    
+       Provided    a  clear  explanation        Explanation      was  could    use       Explanation      was   too  generic.       
+                                                                                                                                    
+       of consistency     or                    further   details.                                                                  
+                                                                                                                                    
+       inconsistency     with   self-                                                                                               
+                                                                                                                                    
+                                                                                                                                    
+       assessed    skill level                                                                                                      
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                   Referen              ces                                                                                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+       • Alkhatlan,    A., & Kalita,  J. (2018).  Intelligent   tutoring   systems:    A  comprehensive        historical           
+         survey    with  recent   developments.       arXiv  preprint   arXiv:1812.09628.                                           
+                                                                                                                                    
+       • Brown,    J. S., & Burton,   R. R. (1978).  Diagnostic     models    for procedural      bugs   in basic                   
+                                                                                                                                    
+         mathematical       skills. Cognitive   science,   2(2), 155-192.                                                           
+                                                                                                                                    
+       • Bull,  S., & Kay,  J. (2010).  Open   learner    models.    In Advances     in intelligent  tutoring   systems    (pp.     
+         301-322).   Berlin,  Heidelberg:     Springer    Berlin   Heidelberg.                                                      
+                                                                                                                                    
+       • Bulut,  O., Shin,  J., Yildirim-Erbasli,    S. N., Gorgun,    G., & Pardos,    Z. A. (2023).  An  introduction     to      
+         Bayesian     knowledge      tracing   with  pyBKT.    Psych,   5(3), 770-786.                                              
+                                                                                                                                    
+                                                                                                                                    
+       • Kay,  J. (2000,   June).  Stereotypes,     student    models     and  scrutability.   In International                     
+         Conference     on  Intelligent   Tutoring   Systems    (pp.  19-30).  Berlin,  Heidelberg:     Springer    Berlin          
+         Heidelberg.                                                                                                                
+                                                                                                                                    
+       • Liu, V., Latif, E., & Zhai,  X. (2025).  Advancing      education     through    tutoring   systems:    A                  
+         systematic     literature   review.   arXiv  preprint   arXiv:2503.09748.                                                  
+                                                                                                                                    
+                                                                                                                                    
+       • Mitrovic,   A. (2003).  An   intelligent   SQL   tutor  on  the  web.   International    Journal   of Artificial           
+         Intelligence    in Education,    13(2-4),  173-197.                                                                        
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                   M       o     de          l  ing               t   h     e                                       
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                Lea              rner                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                             Maria     Mercedes        T.  Rodrigo                                                  
+                                                                                                                                    
+                                                                                                                                    
+                               CSCI    111.13    Artificial    Intelligence       in  Education                                     
+                                                                                                                                    
+                                                                                                                                    
+                                                       SY   2026-2027                                                               
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
