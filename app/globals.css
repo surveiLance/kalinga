@@ -689,20 +689,15 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-briefing-action { min-height: 42px; padding: 9px 12px; border: 0; border-radius: 11px; display: flex; align-items: center; gap: 12px; color: #fff; background: var(--teal-ink); font-size: 10px; font-weight: 850; white-space: nowrap; cursor: pointer; }
 .gabay-sample-link { padding: 5px; border: 0; color: var(--teal-ink); background: transparent; font-size: 9px; font-weight: 800; cursor: pointer; }
 
-.home-essentials-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.home-essentials-grid { margin-top: 18px; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 16px; align-items: stretch; }
 .today-schedule-summary, .home-action-card { height: 100%; padding: 22px; border: 1px solid var(--line); border-radius: 17px; background: var(--paper); box-shadow: var(--shadow); }
 .today-schedule-summary { display: flex; flex-direction: column; }
 .today-schedule-summary > header, .home-action-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
 .today-schedule-summary h2, .home-action-heading h2 { margin: 0; font-size: 22px; }
 .today-schedule-summary > header > span { padding: 6px 9px; border-radius: 999px; color: var(--teal-ink); background: var(--teal); font-size: 9px; font-weight: 800; }
 .today-schedule-list { min-height: 0; margin-top: 15px; display: grid; align-content: stretch; flex: 1; gap: 9px; }
-.today-schedule-list article { min-height: 132px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; display: grid; grid-template-columns: minmax(150px, .75fr) minmax(0, 1fr) auto; align-items: center; gap: 18px; background: #fffdfa; }
-.schedule-time-visual { display: grid; grid-template-columns: auto minmax(48px, 1fr) auto; align-items: center; gap: 8px; }
-.schedule-time-visual > span { color: var(--ink); font-size: 10px; font-weight: 850; white-space: nowrap; }
-.schedule-time-visual > i { position: relative; height: 8px; border-radius: 999px; background: #e7e2d8; }
-.schedule-time-visual > i::before, .schedule-time-visual > i::after { content: ""; position: absolute; z-index: 1; top: 50%; width: 12px; height: 12px; border: 3px solid #fffdfa; border-radius: 50%; background: var(--orange); transform: translateY(-50%); }
-.schedule-time-visual > i::before { left: -2px; }.schedule-time-visual > i::after { right: -2px; background: var(--teal-ink); }
-.schedule-time-visual > i > b { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, var(--orange), var(--teal-ink)); opacity: .65; }
+.today-schedule-list article { min-height: 88px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 14px; background: #fffdfa; }
+.today-schedule-time b, .today-schedule-time span { display: block; white-space: nowrap; }.today-schedule-time b { font-size: 12px; }.today-schedule-time span { margin-top: 4px; color: var(--muted); font-size: 9px; }
 .today-schedule-details b, .today-schedule-details span, .today-schedule-details small { display: block; }
 .today-schedule-details b { font-size: 14px; }.today-schedule-details span { margin-top: 5px; color: var(--muted); font-size: 11px; }.today-schedule-details small { margin-top: 7px; color: var(--teal-ink); font-size: 9px; font-weight: 750; }
 .today-schedule-list article > button { min-height: 42px; padding: 10px 12px; border: 1px solid #dfd7cb; border-radius: 10px; display: inline-flex; align-items: center; gap: 9px; color: var(--orange-dark); background: #fff; font-size: 10px; font-weight: 850; cursor: pointer; white-space: nowrap; }
@@ -710,7 +705,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .home-action-heading > div > p:last-child { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
 .home-action-heading select { max-width: 190px; min-height: 36px; padding: 0 9px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: #fff; font-size: 9px; font-weight: 750; }
 .home-essential-actions { margin-top: 16px; display: grid; gap: 9px; }
-.home-essential-actions > button { min-height: 82px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 14px; color: var(--ink); background: #fffdfa; text-align: left; cursor: pointer; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.home-essential-actions > button { min-height: 76px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; color: var(--ink); background: #fffdfa; text-align: left; cursor: pointer; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
 .home-essential-actions > button:hover { border-color: #d9a58e; box-shadow: 0 8px 20px rgba(50, 40, 28, .06); transform: translateY(-1px); }
 .home-essential-actions > button > span { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; color: var(--orange-dark); background: #f9dfd3; font-size: 22px; font-weight: 850; }
 .home-essential-actions p { margin: 0; }.home-essential-actions b, .home-essential-actions small { display: block; }.home-essential-actions b { font-size: 14px; }.home-essential-actions small { max-width: 340px; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.35; }.home-essential-actions > button > b { color: var(--teal-ink); font-size: 18px; }
@@ -768,15 +763,10 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-intention-review > div > p { margin: 0; padding: 11px; border-radius: 9px; background: #fff; }.gabay-intention-review b, .gabay-intention-review span { display: block; }.gabay-intention-review b { color: var(--teal-ink); font-size: 9px; }.gabay-intention-review span { margin-top: 5px; color: var(--ink); font-size: 11px; line-height: 1.5; }
 .gabay-intention-review footer { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }.gabay-intention-review footer button { min-height: 38px; padding: 9px 12px; font-size: 9px; }
 
-/* Compact Today workspace: schedule first, three clear tools directly below it. */
-.home-essentials-grid { grid-template-columns: 1fr; align-items: start; }
+/* Compact Today workspace: schedule and essential tools share one calm row. */
 .today-schedule-summary, .home-action-card { height: auto; }
-.today-schedule-list { flex: initial; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); align-content: start; }
-.today-schedule-list article { min-height: 94px; padding: 13px 15px; grid-template-columns: minmax(180px, .75fr) minmax(190px, 1fr) auto; }
+.today-schedule-list { flex: initial; align-content: start; }
 .home-action-card { padding: 20px 22px; }
-.home-essential-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.home-essential-actions > button { min-height: 96px; grid-template-columns: 42px 1fr auto; }
-.home-essential-actions > button > span { width: 42px; height: 42px; }
 
 /* Reliable, explicit conversation deletion controls. */
 .gabay-delete-actions { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1051,6 +1041,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .reply-tools button { margin: 0; }
 
 @media (max-width: 980px) {
+  .home-essentials-grid { grid-template-columns: 1fr; }
   .home-essential-actions { grid-template-columns: 1fr; }
   .library-scope-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .teacher-room-layout { grid-template-columns: 260px minmax(0, 1fr); }
@@ -1109,8 +1100,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
   .today-schedule-list article > button { width: 100%; justify-content: space-between; }
   .home-action-heading { display: grid; }
   .home-action-heading select { width: 100%; max-width: none; }
-  .home-essential-actions > button { grid-template-columns: 42px 1fr auto; padding: 12px; }
-  .home-essential-actions > button > span { width: 42px; height: 42px; }
+  .home-essential-actions > button { grid-template-columns: 1fr auto; padding: 12px; }
   .gabay-draft-intention { align-items: stretch; flex-direction: column; }
   .gabay-intention-review > div { grid-template-columns: 1fr; }
   .gabay-intention-review footer { display: grid; }
