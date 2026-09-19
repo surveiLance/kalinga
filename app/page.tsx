@@ -1866,7 +1866,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
   if (!teachingClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>This lesson’s class is unavailable</h2><p>Return to Today and choose another saved lesson.</p></div><button className="secondary-button" type="button" onClick={onBack}>Back to Today</button></section>;
 
   return <div className="view-page teaching-page">
-    <PageIntro eyebrow="TEACH · MULTIGRADE LESSON" title={plan.title} description={`${teachingClass.name} · ${plan.subject} · ${planStart}–${planEnd}`} action={<div className="teaching-page-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="secondary-button" type="button" onClick={onEdit}>Edit plan</button><button className="primary-button" type="button" onClick={() => window.print()}>Print guide</button></div>} />
+    <PageIntro eyebrow="TEACH · MULTIGRADE LESSON" title={plan.title} description={`${teachingClass.name} · ${plan.subject} · ${planStart}–${planEnd}`} action={<div className="teaching-page-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="secondary-button" type="button" onClick={onEdit}>Edit plan</button><button className="primary-button" type="button" onClick={() => window.print()}>Print or save PDF</button></div>} />
 
     <section className="teaching-guide-summary">
       <div><p className="eyebrow">CLASSROOM TEACHING GUIDE</p><h2>{plan.slots.length ? `${plan.slots.length} teaching ${plan.slots.length === 1 ? "block" : "blocks"}` : "Add a teaching flow"}</h2><p>{gradeList(plan.grades)} · {plan.duration} · {plan.multigradeModel || "Multigrade lesson"}</p></div>
@@ -1893,7 +1893,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
 
 function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(initialPlan ? 3 : 1);
-  const [plannerEntry, setPlannerEntry] = useState<"choose" | "quick" | "full">(initialPlan ? "full" : "choose");
+  const [plannerEntry, setPlannerEntry] = useState<"quick" | "full">(initialPlan ? "full" : "quick");
   const [activePlanTask, setActivePlanTask] = useState<"overview" | "intentions" | "experience" | "assessment" | "after">("overview");
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
@@ -1918,6 +1918,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
   const [enrichment, setEnrichment] = useState(initialPlan?.enrichment || "");
   const [nextSessionNotes, setNextSessionNotes] = useState(initialPlan?.nextSessionNotes || "");
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
+  const [activeFlowSlotId, setActiveFlowSlotId] = useState(initialPlan?.slots[0]?.id || "slot-shared");
   const [saved, setSaved] = useState(false);
   const [, setActiveIntentionGrade] = useState<GradeLevel>("");
   const [draftingIntentionGrade, setDraftingIntentionGrade] = useState<GradeLevel>("");
@@ -1938,11 +1939,13 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
   const experienceDone = slots.some((slot) => slot.teacherFocus.trim() || Object.values(slot.gradeTasks).some((task) => task.trim()));
   const assessmentDone = grades.length > 0 && grades.every((grade) => formativeAssessments[grade]?.trim());
   const afterLessonDone = Boolean(reflection.trim() || remediation.trim() || enrichment.trim() || nextSessionNotes.trim());
+  const activeFlowSlot = slots.find((slot) => slot.id === activeFlowSlotId) || slots[0];
+  const activeFlowIndex = Math.max(0, slots.findIndex((slot) => slot.id === activeFlowSlot?.id));
 
   useEffect(() => {
     onGabayContext({
       view: "plan",
-      pageStep: plannerEntry === "choose" ? "Choose a planning path" : plannerEntry === "quick" ? "Quick lesson setup" : step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : `Lesson task · ${activePlanTask}`,
+      pageStep: plannerEntry === "quick" ? "Quick lesson setup" : step === 1 ? "Class and lesson" : step === 2 ? "Lesson details" : `Lesson task · ${activePlanTask}`,
       classId: selectedClass?.id,
       className: selectedClass?.name,
       gradeLevels: grades,
@@ -1953,7 +1956,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
       lessonDuration: `${durationMinutes(duration)} minutes starting at ${startTime}`,
       incompleteSections: incompletePlanSections,
       currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`), saved ? "Draft is saved" : "Draft has unsaved changes"],
-      availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Continue to the ILAW plan"] : ["Complete intentions", "Build the learning experience", "Add assessment", "Save the lesson"],
+      availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Build the lesson plan"] : ["Set learning goals", "Coordinate the grades", "Add a learning check", "Save the lesson"],
     });
   }, [activePlanTask, competencies, duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, plannerEntry, saved, selectedClass, sharedTheme, startTime, step, subject]);
 
@@ -1966,7 +1969,11 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
 
   function goToPlanStep(nextStep: 1 | 2 | 3) {
     if (!canOpenPlanStep(nextStep)) return;
-    if (nextStep === 3 && !slots.length) setSlots(createSchedule(grades, startTime, duration));
+    if (nextStep === 3 && !slots.length) {
+      const nextSlots = createSchedule(grades, startTime, duration);
+      setSlots(nextSlots);
+      setActiveFlowSlotId(nextSlots[0]?.id || "");
+    }
     setStep(nextStep);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
@@ -1993,7 +2000,9 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     setFormativeAssessments(Object.fromEntries(nextClass.grades.map((grade) => [grade, ""])));
     setExitTasks(Object.fromEntries(nextClass.grades.map((grade) => [grade, ""])));
     setSuccessCriteria(Object.fromEntries(nextClass.grades.map((grade) => [grade, ""])));
-    setSlots(createSchedule(nextClass.grades, nextClass.startTime, duration));
+    const nextSlots = createSchedule(nextClass.grades, nextClass.startTime, duration);
+    setSlots(nextSlots);
+    setActiveFlowSlotId(nextSlots[0]?.id || "");
     setSaved(false);
   }
 
@@ -2025,7 +2034,24 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
   }
 
   function addSlot() {
-    setSlots((current) => [...current, { id: `slot-${Date.now()}`, time: formatTime(toMinutes(current.at(-1)?.time || startTime) + 15), teacherFocus: "", gradeTasks: Object.fromEntries(grades.map((grade) => [grade, ""])) }]);
+    const id = `slot-${Date.now()}`;
+    setSlots((current) => [...current, { id, time: formatTime(toMinutes(current.at(-1)?.time || startTime) + 15), teacherFocus: "", gradeTasks: Object.fromEntries(grades.map((grade) => [grade, ""])) }]);
+    setActiveFlowSlotId(id);
+  }
+
+  function removeActiveSlot() {
+    if (!activeFlowSlot || slots.length === 1) return;
+    const nextSlots = slots.filter((slot) => slot.id !== activeFlowSlot.id);
+    setSlots(nextSlots);
+    setActiveFlowSlotId(nextSlots[Math.max(0, activeFlowIndex - 1)]?.id || nextSlots[0]?.id || "");
+    setSaved(false);
+  }
+
+  function resetTeachingFlow() {
+    const nextSlots = createSchedule(grades, startTime, duration);
+    setSlots(nextSlots);
+    setActiveFlowSlotId(nextSlots[0]?.id || "");
+    setSaved(false);
   }
 
   async function draftGradeIntention(grade: GradeLevel) {
@@ -2036,7 +2062,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     const topic = lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`;
     const result = await requestGabayDraft("intentions", {
         view: "plan",
-        pageStep: `ILAW plan · ${gradeLabel(grade)} intentions`,
+        pageStep: `Learning goals · ${gradeLabel(grade)}`,
         classId: selectedClass.id,
         className: selectedClass.name,
         gradeLevels: grades,
@@ -2078,7 +2104,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     const topic = lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`;
     const result = await requestGabayDraft("assessment", {
       view: "plan",
-      pageStep: `ILAW plan · ${gradeLabel(grade)} assessment`,
+      pageStep: `Learning check · ${gradeLabel(grade)}`,
       classId: selectedClass.id,
       className: selectedClass.name,
       gradeLevels: grades,
@@ -2129,25 +2155,20 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     <div className="view-page plan-page">
       <PageIntro
         eyebrow="CREATE · MULTIGRADE LESSON"
-        title={plannerEntry === "choose" ? "How do you want to begin?" : plannerEntry === "quick" ? "Start with the essentials" : step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : lessonTitle || "Your editable lesson plan"}
-        description={plannerEntry === "choose" ? "Pick the amount of structure you need today. You can always open the detailed ILAW fields later." : plannerEntry === "quick" ? "One compact setup, then edit only the part of the lesson you need." : step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : "Choose one task below. The rest stays out of the way."}
+        title={plannerEntry === "quick" ? "Start with the essentials" : step === 1 ? "Choose the class and lesson" : step === 2 ? "Set the lesson details" : lessonTitle || "Your editable lesson plan"}
+        description={plannerEntry === "quick" ? "Confirm five details, then shape what each grade will do during the same class period." : step === 1 ? "Start with only the class and learner groups you are preparing for." : step === 2 ? "Add the subject, timing, and classroom conditions for this lesson." : "Work on one practical part at a time. Your progress stays editable."}
         action={<button className="secondary-button" type="button" onClick={onBack}>← Back home</button>}
       />
 
-      {plannerEntry === "choose" && <section className="planner-paths">
-        <button className="recommended" type="button" onClick={() => setPlannerEntry("quick")}><span>QUICK START · RECOMMENDED</span><strong>Get to an editable plan fast</strong><p>Confirm the class, subject, title, and time on one screen. Then work on only one lesson task at a time.</p><b>Start a focused plan →</b></button>
-        <button type="button" onClick={() => setPlannerEntry("full")}><span>FULL SETUP</span><strong>Build it section by section</strong><p>Use the guided class and lesson-detail steps when you need to change grades, language, or the teaching window.</p><b>Use the full setup →</b></button>
-      </section>}
-
       {plannerEntry === "quick" && <section className="quick-plan-setup">
-        <header><div><p className="eyebrow">ONLY THE ESSENTIALS</p><h2>What are you teaching?</h2><p>Your saved class already supplies the grades and learners. Gabay can help inside Intentions and Assessment after this.</p></div><GabayMascot size="medium" motion /></header>
+        <header><div><p className="eyebrow">ONLY THE ESSENTIALS</p><h2>What are you teaching?</h2><p>Your saved class already supplies the grades and learners. Gabay can help draft learning goals and checks after this.</p></div><GabayMascot size="medium" motion /></header>
         <div className="quick-plan-fields"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Subject<input list="quick-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type a subject" /><datalist id="quick-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist></label><label className="wide">Lesson title <small>Optional</small><input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="e.g. Comparing fractions with bottle caps" /></label><div className="field-label"><span>Starts at</span><TimePicker value={startTime} onChange={setStartTime} /></div><label>Class time<div className="duration-input"><input aria-label="Class time in minutes" type="number" min="5" max="600" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} /><span>minutes</span></div></label></div>
-        <footer><button className="secondary-button" type="button" onClick={() => setPlannerEntry("choose")}>← Other ways to start</button><button className="primary-button" type="button" disabled={!selectedClassId || !subject.trim()} onClick={() => { setSlots(createSchedule(grades, startTime, duration)); setStep(3); setActivePlanTask("overview"); setPlannerEntry("full"); }}>Open my lesson workspace →</button></footer>
+        <footer><button className="secondary-button" type="button" onClick={() => { setStep(1); setPlannerEntry("full"); }}>Use detailed setup</button><button className="primary-button" type="button" disabled={!selectedClassId || !subject.trim()} onClick={() => { const nextSlots = createSchedule(grades, startTime, duration); setSlots(nextSlots); setActiveFlowSlotId(nextSlots[0]?.id || ""); setStep(3); setActivePlanTask("overview"); setPlannerEntry("full"); }}>Build the teaching flow →</button></footer>
       </section>}
 
       {plannerEntry === "full" && <>
       <div className="stepper" aria-label={`Step ${step} of 3`}>
-        {(["Class & lesson", "Lesson details", "ILAW plan"] as const).map((label, index) => { const targetStep = (index + 1) as 1 | 2 | 3; return <button type="button" key={label} disabled={!canOpenPlanStep(targetStep)} onClick={() => goToPlanStep(targetStep)} aria-current={step === targetStep ? "step" : undefined} className={step === targetStep ? "current" : step > targetStep ? "complete" : ""}><span>{step > targetStep ? "✓" : targetStep}</span><strong>{label}</strong></button>; })}
+        {(["Class & lesson", "Lesson details", "Build the plan"] as const).map((label, index) => { const targetStep = (index + 1) as 1 | 2 | 3; return <button type="button" key={label} disabled={!canOpenPlanStep(targetStep)} onClick={() => goToPlanStep(targetStep)} aria-current={step === targetStep ? "step" : undefined} className={step === targetStep ? "current" : step > targetStep ? "complete" : ""}><span>{step > targetStep ? "✓" : targetStep}</span><strong>{label}</strong></button>; })}
       </div>
 
       {step === 1 && (
@@ -2193,33 +2214,33 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
             </div>
           </div>
           <aside className="builder-help"><span>2</span><h3>One teaching window</h3><p>This is not a separate duration for every grade. Kalinga will organize one class period around your different learner groups.</p><div><b>{startTime}</b><small>starts · {durationMinutes(duration)} minutes total</small></div><div><b>{subject || "No subject yet"}</b><small>{quarter} · {language}</small></div></aside>
-          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => goToPlanStep(1)}>← Class & lesson</button><button className="primary-button" type="button" disabled={!subject.trim()} onClick={() => { setSlots(createSchedule(grades, startTime, duration)); goToPlanStep(3); }}>Continue to ILAW plan →</button></footer>
+          <footer className="builder-footer"><button className="secondary-button" type="button" onClick={() => goToPlanStep(1)}>← Class & lesson</button><button className="primary-button" type="button" disabled={!subject.trim()} onClick={() => { resetTeachingFlow(); goToPlanStep(3); }}>Build the lesson plan →</button></footer>
         </section>
       )}
 
       {step === 3 && (
         <section className="plan-result">
-          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => goToPlanStep(2)}>← Lesson details</button><button className="secondary-button" type="button" onClick={() => saveCurrentPlan(true)}>Save &amp; teaching view</button><button className="primary-button" type="button" onClick={() => saveCurrentPlan()}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
+          <div className="result-toolbar"><div><span className="pill orange">{saved ? "SAVED · EDITABLE" : "DRAFT · EDITABLE"}</span><b>{selectedClass?.name} · {subject} · {gradeList(grades)}</b></div><div><button className="secondary-button" type="button" onClick={() => goToPlanStep(2)}>Lesson setup</button><button className="secondary-button" type="button" onClick={() => saveCurrentPlan(true)}>Open teaching guide</button><button className="primary-button" type="button" onClick={() => saveCurrentPlan()}>{saved ? "✓ Saved to class" : "Save lesson"}</button></div></div>
           <div className="plan-title"><div><p className="eyebrow">{quarter} · MULTIGRADE LESSON PLAN</p><input className="plan-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); setSaved(false); }} /><p>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} · {durationMinutes(duration)} minutes total · {language}</p></div><button className="icon-button" type="button" aria-label="More lesson actions">···</button></div>
           <div className="ilaw-plan-summary"><div><span>Class</span><b>{selectedClass?.name}</b></div><div><span>Grade levels</span><b>{gradeList(grades)}</b></div><div><span>Enrolled learners</span><b>{selectedClass?.learners.length || 0} total · {planRosterCounts.female}F · {planRosterCounts.male}M{planRosterCounts.unspecified ? ` · ${planRosterCounts.unspecified} not set` : ""}</b></div><div><span>Multigrade model</span><b>{multigradeModel}</b></div>{sharedTheme && <div className="wide"><span>Shared theme</span><b>{sharedTheme}</b></div>}</div>
 
           <nav className="plan-task-nav" aria-label="Lesson plan tasks">{([
-            ["overview", "Overview", "See what needs attention"],
-            ["intentions", "Intentions", intentionDone ? "Ready" : "Needs work"],
+            ["overview", "Lesson brief", "See what needs attention"],
+            ["intentions", "Learning goals", intentionDone ? "Ready" : "Needs work"],
             ["experience", "Teaching flow", experienceDone ? "Ready" : "Needs work"],
-            ["assessment", "Assessment", assessmentDone ? "Ready" : "Needs work"],
+            ["assessment", "Learning check", assessmentDone ? "Ready" : "Needs work"],
             ["after", "After lesson", afterLessonDone ? "Started" : "Optional"],
           ] as const).map(([value, label, status]) => <button className={activePlanTask === value ? "active" : ""} type="button" onClick={() => setActivePlanTask(value)} key={value}><b>{label}</b><small>{status}</small></button>)}</nav>
 
-          {activePlanTask === "overview" && <section className="plan-task-overview"><header><p className="eyebrow">CHOOSE WHAT TO WORK ON</p><h2>You do not have to finish everything now.</h2><p>Open one task, save your progress, and return when the next detail is useful.</p></header><div>
-            <button type="button" onClick={() => setActivePlanTask("intentions")}><span>I</span><p><b>Set learning intentions</b><small>Competency and objective for each grade</small></p><strong>{intentionDone ? "Ready ✓" : "Start →"}</strong></button>
-            <button type="button" onClick={() => setActivePlanTask("experience")}><span>L</span><p><b>Shape the teaching flow</b><small>Activities, rotations, materials, and timing</small></p><strong>{experienceDone ? "Ready ✓" : "Start →"}</strong></button>
-            <button type="button" onClick={() => setActivePlanTask("assessment")}><span>A</span><p><b>Add a learning check</b><small>Gabay can draft an editable check per grade</small></p><strong>{assessmentDone ? "Ready ✓" : "Start →"}</strong></button>
-            <button type="button" onClick={() => setActivePlanTask("after")}><span>W</span><p><b>Reflect after class</b><small>Optional notes for support and the next session</small></p><strong>{afterLessonDone ? "Continue →" : "Later"}</strong></button>
+          {activePlanTask === "overview" && <section className="plan-task-overview"><header><p className="eyebrow">YOUR LESSON WORKSPACE</p><h2>Finish only what you need next.</h2><p>Kalinga keeps the official details, classroom flow, checks, and reflection together without showing every field at once.</p></header><div>
+            <button type="button" onClick={() => setActivePlanTask("intentions")}><span>1</span><p><b>Set learning goals</b><small>Exact competency and editable objective for each grade</small></p><strong>{intentionDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("experience")}><span>2</span><p><b>Coordinate the grades</b><small>Decide who is with you and what the other groups do</small></p><strong>{experienceDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("assessment")}><span>3</span><p><b>Add a learning check</b><small>One appropriate check and success measure per grade</small></p><strong>{assessmentDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("after")}><span>4</span><p><b>Reflect after class</b><small>Record results, remediation, and the next step</small></p><strong>{afterLessonDone ? "Continue →" : "After teaching"}</strong></button>
           </div></section>}
 
           {activePlanTask === "intentions" && <details open className="ilaw-disclosure intentions-section focused-plan-task">
-            <summary><span className="ilaw-letter">I</span><span><small>INTENTIONS</small><b>Set what each group should learn</b><em>{grades.length} grade {grades.length === 1 ? "group" : "groups"} · open one at a time</em></span></summary>
+            <summary><span className="ilaw-letter">1</span><span><small>LEARNING GOALS</small><b>Set what each group should learn</b><em>{grades.length} grade {grades.length === 1 ? "group" : "groups"} · open one at a time</em></span></summary>
             <div className="ilaw-disclosure-body intentions-body">
               <p className="competency-guidance">Nothing is generated without a verified source. Enter only what you know, or leave a field blank and return later.</p>
               <details className="ilaw-optional-disclosure"><summary><span>Shared theme and multigrade approach</span><small>Optional lesson setup</small></summary><div className="ilaw-intention-grid"><label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label><label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label></div></details>
@@ -2228,16 +2249,25 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
           </details>}
 
           {activePlanTask === "experience" && <details open className="ilaw-disclosure learning-experience-disclosure focused-plan-task">
-            <summary><span className="ilaw-letter">L</span><span><small>LEARNING EXPERIENCE</small><b>Build the teaching flow</b><em>{slots.length} editable blocks · {durationMinutes(duration)} minutes</em></span></summary>
+            <summary><span className="ilaw-letter">2</span><span><small>MULTIGRADE TEACHING FLOW</small><b>Coordinate every grade in one class period</b><em>{slots.length} editable blocks · {durationMinutes(duration)} minutes</em></span></summary>
             <div className="ilaw-disclosure-body">
               <details className="ilaw-optional-disclosure"><summary><span>Learner context and materials</span><small>Optional details</small></summary><div className="ilaw-two-column"><label>Learner context<textarea value={learnerContext} onChange={(event) => { setLearnerContext(event.target.value); setSaved(false); }} placeholder="What do these learners already know, experience, or need?" /></label><label>Materials and references<textarea value={materials} onChange={(event) => { setMaterials(event.target.value); setSaved(false); }} placeholder="Local objects, activity sheets, curriculum references…" /></label></div></details>
-              <div className="schedule-window-summary"><span>◎</span><p><b>Your teaching window</b><small>The blocks begin at {startTime}. Change a time only when the suggested flow does not fit your class.</small></p></div>
-              <details className="schedule-editor-disclosure"><summary><span>Review or adjust the timetable</span><small>{slots.map((slot) => slot.time).join(" · ")}</small></summary><div className="rotation-table"><div className="rotation-head" style={{ "--grade-count": grades.length } as React.CSSProperties}><span>Start time</span><span>Teacher focus</span>{grades.map((grade) => <span key={grade}>{gradeLabel(grade)}</span>)}</div>{slots.map((slot) => <div className="rotation-row editable-row" style={{ "--grade-count": grades.length } as React.CSSProperties} key={slot.id}><div className="slot-time-editor"><TimePicker value={slot.time} onChange={(value) => updateSlotTime(slot.id, value)} /></div><input aria-label={`Teacher focus at ${slot.time}`} value={slot.teacherFocus} placeholder="Who has teacher support?" onChange={(event) => updateSlot(slot.id, "teacherFocus", event.target.value)} />{grades.map((grade) => <textarea aria-label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`${gradeLabel(grade)} activity`} onChange={(event) => updateGradeTask(slot.id, grade, event.target.value)} key={grade} />)}</div>)}</div><div className="schedule-actions"><button className="secondary-button" type="button" onClick={addSlot}>＋ Add schedule block</button><span>Changing one time shifts every later block. Activities remain independently editable.</span></div></details>
+              <div className="schedule-window-summary"><span>◎</span><p><b>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} teaching window</b><small>Open one block at a time. When you teach one group, give every other group a clear independent task.</small></p></div>
+              <section className="flow-editor">
+                <header><div><p className="eyebrow">CLASSROOM SEQUENCE</p><h3>Who are you teaching right now?</h3></div><button className="secondary-button" type="button" onClick={addSlot}>＋ Add block</button></header>
+                <nav className="flow-block-tabs" aria-label="Teaching flow blocks">{slots.map((slot, index) => <button className={slot.id === activeFlowSlot?.id ? "active" : ""} type="button" onClick={() => setActiveFlowSlotId(slot.id)} key={slot.id}><span>{index + 1}</span><p><b>{slot.time}</b><small>{slot.teacherFocus || "Choose teacher focus"}</small></p></button>)}</nav>
+                {activeFlowSlot && <article className="flow-block-editor">
+                  <header><div><p className="eyebrow">BLOCK {activeFlowIndex + 1} OF {slots.length}</p><h3>{activeFlowSlot.teacherFocus || "Set the teacher focus"}</h3><p>Changing this block’s start time shifts this block and every block after it.</p></div><div className="flow-time-field"><span>Starts at</span><TimePicker value={activeFlowSlot.time} onChange={(value) => updateSlotTime(activeFlowSlot.id, value)} /></div></header>
+                  <label className="flow-focus-field">Teacher focus<input list="flow-focus-options" value={activeFlowSlot.teacherFocus} placeholder="e.g. Guide Grade 5" onChange={(event) => updateSlot(activeFlowSlot.id, "teacherFocus", event.target.value)} /><datalist id="flow-focus-options"><option value="All grades together" />{grades.map((grade) => <option value={`Guide ${gradeLabel(grade)}`} key={grade} />)}</datalist><small>This label determines which group appears as teacher-led in the teaching guide.</small></label>
+                  <div className="flow-grade-grid">{grades.map((grade) => { const focus = activeFlowSlot.teacherFocus.toLowerCase(); const withTeacher = focus.includes("all grade") || focus.includes(gradeLabel(grade).toLowerCase()); return <label className={withTeacher ? "with-teacher" : "independent"} key={grade}><span><b>{gradeLabel(grade)}</b><em>{withTeacher ? "WITH TEACHER" : "INDEPENDENT"}</em></span><textarea aria-label={`${gradeLabel(grade)} activity at ${activeFlowSlot.time}`} value={activeFlowSlot.gradeTasks[grade] || ""} placeholder={withTeacher ? "What will you teach or model?" : "What can learners do without direct guidance?"} onChange={(event) => updateGradeTask(activeFlowSlot.id, grade, event.target.value)} /></label>; })}</div>
+                  <footer><button type="button" disabled={activeFlowIndex === 0} onClick={() => setActiveFlowSlotId(slots[activeFlowIndex - 1]?.id || activeFlowSlot.id)}>← Previous</button><button className="remove" type="button" disabled={slots.length === 1} onClick={removeActiveSlot}>Remove block</button><button className="next" type="button" disabled={activeFlowIndex === slots.length - 1} onClick={() => setActiveFlowSlotId(slots[activeFlowIndex + 1]?.id || activeFlowSlot.id)}>Next block →</button></footer>
+                </article>}
+              </section>
             </div>
           </details>}
 
           {activePlanTask === "assessment" && <details open className="ilaw-disclosure assessment-section focused-plan-task">
-            <summary><span className="ilaw-letter">A</span><span><small>ASSESSMENT</small><b>Check learning by grade</b><em>Open when you are ready to add checks</em></span></summary>
+            <summary><span className="ilaw-letter">3</span><span><small>LEARNING CHECK</small><b>Check learning by grade</b><em>Open when you are ready to add checks</em></span></summary>
             <div className="ilaw-disclosure-body assessment-workspace">
               <nav className="assessment-grade-tabs" aria-label="Assessment grade group">{grades.map((grade) => <button className={grade === (activeAssessmentGrade || grades[0]) ? "active" : ""} type="button" onClick={() => setActiveAssessmentGrade(grade)} key={grade}><span>{gradeLabel(grade)}</span><small>{formativeAssessments[grade]?.trim() ? "Started" : "Not started"}</small></button>)}</nav>
               {grades.filter((grade) => grade === (activeAssessmentGrade || grades[0])).map((grade) => <article className="assessment-grade-panel" key={grade}>
@@ -2250,10 +2280,10 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
           </details>}
 
           {activePlanTask === "after" && <details open className="ilaw-disclosure ways-forward-section focused-plan-task">
-            <summary><span className="ilaw-letter">W</span><span><small>WAYS FORWARD</small><b>Complete after the lesson</b><em>Reflection, remediation, enrichment, and next steps</em></span></summary>
-            <div className="ilaw-disclosure-body"><p className="after-lesson-note">This section is intentionally optional during planning. Return after teaching while the lesson is still fresh.</p><div className="ilaw-two-column"><label>Reflection<textarea value={reflection} onChange={(event) => { setReflection(event.target.value); setSaved(false); }} placeholder="What worked, and who still needs support?" /></label><label>Remediation<textarea value={remediation} onChange={(event) => { setRemediation(event.target.value); setSaved(false); }} placeholder="What support will learners receive?" /></label><label>Enrichment<textarea value={enrichment} onChange={(event) => { setEnrichment(event.target.value); setSaved(false); }} placeholder="What extension can ready learners do?" /></label><label>Notes for the next session<textarea value={nextSessionNotes} onChange={(event) => { setNextSessionNotes(event.target.value); setSaved(false); }} placeholder="What should continue or change next time?" /></label></div></div>
+            <summary><span className="ilaw-letter">4</span><span><small>AFTER THE LESSON</small><b>Record results and next steps</b><em>Reflection, remediation, enrichment, and what comes next</em></span></summary>
+            <div className="ilaw-disclosure-body"><p className="after-lesson-note">Return after teaching while the lesson is still fresh. Note how many learners reached the expected level, including those below the school’s 80% mastery reference.</p><div className="ilaw-two-column"><label>Reflection and results<textarea value={reflection} onChange={(event) => { setReflection(event.target.value); setSaved(false); }} placeholder="What worked? How many learners reached 80% or the success criteria?" /></label><label>Remediation<textarea value={remediation} onChange={(event) => { setRemediation(event.target.value); setSaved(false); }} placeholder="What support will learners below the target receive?" /></label><label>Enrichment<textarea value={enrichment} onChange={(event) => { setEnrichment(event.target.value); setSaved(false); }} placeholder="What extension can ready learners do?" /></label><label>Notes for the next session<textarea value={nextSessionNotes} onChange={(event) => { setNextSessionNotes(event.target.value); setSaved(false); }} placeholder="What should continue or change next time?" /></label></div></div>
           </details>}
-          {activePlanTask === "experience" && <div className="plan-notes"><article><span>✦</span><div><b>You control the timetable</b><p>The generated blocks are only a starting point based on the lesson window you entered.</p></div></article><button className="text-button" type="button" onClick={() => setSlots(createSchedule(grades, startTime, duration))}>Reset from {startTime}</button></div>}
+          {activePlanTask === "experience" && <div className="plan-notes"><article><span>✦</span><div><b>This sequence is a starting point</b><p>Adjust the teacher focus and independent work until the transitions match how your classroom actually runs.</p></div></article><button className="text-button" type="button" onClick={resetTeachingFlow}>Reset from {startTime}</button></div>}
         </section>
       )}
       </>}
