@@ -2639,6 +2639,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
   const [reply, setReply] = useState("");
   const [replyResourceId, setReplyResourceId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ kind: "question" | "reply"; id: string }>();
   const [teacherResources, setTeacherResources] = useState<LibraryResource[]>([]);
 
   useEffect(() => {
@@ -2726,6 +2727,25 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     setReplies((current) => [...current.filter((entry) => entry.id !== item.id), item]); setReply(""); setReplyResourceId(""); setCommunityError("");
   }
 
+  async function deleteCommunityPost() {
+    if (!deleteTarget || !teacherAccountId) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setSubmitting(true);
+    const table = deleteTarget.kind === "question" ? "teacher_discussions" : "teacher_replies";
+    const { error } = await supabase.from(table).delete().eq("id", deleteTarget.id).eq("author_id", teacherAccountId);
+    setSubmitting(false);
+    if (error) { setCommunityError(`Your ${deleteTarget.kind} could not be deleted. Please try again.`); return; }
+    if (deleteTarget.kind === "question") {
+      setDiscussions((current) => current.filter((item) => item.id !== deleteTarget.id));
+      setReplies((current) => current.filter((item) => item.discussionId !== deleteTarget.id));
+      setSelectedDiscussionId("");
+    } else {
+      setReplies((current) => current.filter((item) => item.id !== deleteTarget.id));
+    }
+    setDeleteTarget(undefined); setCommunityError("");
+  }
+
   if (!authenticated) return <div className="view-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
   return <div className="view-page community-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
@@ -2743,12 +2763,13 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     </form>}
     <div className="community-toolbar"><div className="community-tabs"><button className={tab === "all" ? "active" : ""} type="button" onClick={() => setTab("all")}>All questions <span>{discussions.length}</span></button><button className={tab === "mine" ? "active" : ""} type="button" onClick={() => setTab("mine")}>My questions <span>{discussions.filter((item) => item.authorId === teacherAccountId).length}</span></button></div><small><i /> Live room · new replies appear automatically</small></div>
     {communityError && <p className="community-error" role="status">{communityError}</p>}
+    {deleteTarget && <div className="community-delete-confirm" role="alert"><p><b>Delete this {deleteTarget.kind}?</b><span>{deleteTarget.kind === "question" ? "Its replies and related notifications will also be removed." : "This cannot be undone."}</span></p><div><button type="button" onClick={() => setDeleteTarget(undefined)}>Keep it</button><button type="button" disabled={submitting} onClick={deleteCommunityPost}>{submitting ? "Deleting…" : "Delete permanently"}</button></div></div>}
     {loading ? <div className="community-loading">Opening the teacher room…</div> : <section className="teacher-room-layout"><aside className="discussion-index" aria-label="Teacher discussions">{visibleDiscussions.map((discussion) => { const replyCount = replies.filter((item) => item.discussionId === discussion.id).length; return <button className={selectedDiscussion?.id === discussion.id ? "active" : ""} type="button" onClick={() => setSelectedDiscussionId(discussion.id)} key={discussion.id}><span><b>{discussion.title}</b><small>{discussion.subject || "General"} · {discussion.authorName}</small></span><em>{replyCount} {replyCount === 1 ? "reply" : "replies"}</em></button>; })}{!visibleDiscussions.length && <div className="discussion-index-empty"><b>{tab === "mine" ? "You have not asked anything yet" : "No questions yet"}</b><p>Start the first focused teacher discussion.</p><button type="button" onClick={() => setComposerOpen(true)}>Ask a question</button></div>}</aside>
       <article className="discussion-thread">{selectedDiscussion ? <>
-        <header><div><span className="avatar">{teacherInitials(selectedDiscussion.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{selectedDiscussion.authorName}</b><small>{selectedDiscussion.schoolName || "Kalinga teacher"} · {communityTime(selectedDiscussion.createdAt)}</small></p></div><div><span className="pill orange">{selectedDiscussion.subject || "GENERAL"}</span>{selectedDiscussion.gradeLevels.map((grade) => <span className="pill" key={grade}>{grade}</span>)}</div></header>
+        <header><div><span className="avatar">{teacherInitials(selectedDiscussion.authorName.replace(/^Teacher\s+/i, ""))}</span><p><b>{selectedDiscussion.authorName}</b><small>{selectedDiscussion.schoolName || "Kalinga teacher"} · {communityTime(selectedDiscussion.createdAt)}</small></p></div><div><span className="pill orange">{selectedDiscussion.subject || "GENERAL"}</span>{selectedDiscussion.gradeLevels.map((grade) => <span className="pill" key={grade}>{grade}</span>)}{selectedDiscussion.authorId === teacherAccountId && <button className="community-delete-button" type="button" onClick={() => setDeleteTarget({ kind: "question", id: selectedDiscussion.id })}>Delete question</button>}</div></header>
         <h2>{selectedDiscussion.title}</h2><p className="discussion-body">{renderCommunityMessage(selectedDiscussion.body)}</p><SharedMaterialCard resourceId={selectedDiscussion.resourceId} resources={attachableResources} />
         <div className="discussion-replies-heading"><b>{selectedReplies.length} {selectedReplies.length === 1 ? "reply" : "replies"}</b><small>Replying automatically notifies the teacher who asked.</small></div>
-        <div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><div><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{renderCommunityMessage(item.body)}</p><SharedMaterialCard resourceId={item.resourceId} resources={attachableResources} /></div></div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div>
+        <div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><div><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{renderCommunityMessage(item.body)}</p><SharedMaterialCard resourceId={item.resourceId} resources={attachableResources} /></div>{item.authorId === teacherAccountId && <button className="reply-delete-button" type="button" onClick={() => setDeleteTarget({ kind: "reply", id: item.id })}>Delete</button>}</div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div>
         <div className="reply-composer"><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion or tag a teacher…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div><div className="reply-tools"><select aria-label="Attach one of your shared resources" value={replyResourceId} onChange={(event) => setReplyResourceId(event.target.value)}><option value="">＋ Attach your resource</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.title}</option>)}</select><button type="button" onClick={onOpenLibrary}>＋ Upload PDF</button>{teacherTags.map((tag) => <button type="button" onClick={() => setReply((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>)}</div></div>
       </> : <div className="discussion-empty"><span>♧</span><b>Choose a question</b><p>Open a teacher discussion to read its replies.</p></div>}</article>
     </section>}
