@@ -24,10 +24,9 @@ type SafeHistoryMessage = {
   content: string;
 };
 
-type DraftTask = {
-  type: "intentions" | "assessment";
-  grade: string;
-};
+type DraftTask =
+  | { type: "intentions" | "assessment"; grade: string }
+  | { type: "full-plan"; grade: "" };
 
 const MAX_MESSAGE_LENGTH = 2_000;
 
@@ -111,6 +110,7 @@ function safeHistory(value: unknown): SafeHistoryMessage[] {
 function safeDraftTask(value: unknown): DraftTask | null {
   if (!value || typeof value !== "object") return null;
   const input = value as Record<string, unknown>;
+  if (input.type === "full-plan") return { type: "full-plan", grade: "" };
   if (input.type !== "intentions" && input.type !== "assessment") return null;
   const grade = cleanText(input.grade, 40);
   return grade ? { type: input.type, grade } : null;
@@ -273,6 +273,8 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
     ? `Create a practical, editable starting point for ${draftTask.grade}. Return only a JSON object with exactly these string keys: competency, objective. The competency must be a suggested classroom competency, never described as an official DepEd competency. The objective must be measurable and realistic for the stated lesson duration.`
     : draftTask?.type === "assessment"
       ? `Create a practical, editable assessment set for ${draftTask.grade}. Return only a JSON object with exactly these string keys: formativeAssessment, exitTask, successCriteria. Each item must align with the supplied competency or objective, remain grade-appropriate, and be realistic in the stated lesson duration.`
+      : draftTask?.type === "full-plan"
+        ? `Create one complete but concise editable ILAW lesson-plan draft for every supplied grade level. Return only a JSON object with exactly these top-level keys: sharedTheme, learnerContext, materials, nextSessionNotes, grades, slots. The grades object must use each supplied grade label as a key, and each grade value must contain exactly these string keys: competency, competencyCode, contentStandard, performanceStandard, objective, formativeAssessment, exitTask, successCriteria, reflectionQuestion, remediation, enrichment. The slots array must contain objects with exactly these keys: stage, durationMinutes, teacherFocus, gradeTasks. Each gradeTasks object must use every supplied grade label as a key. Make the slot durations add up to the supplied lesson duration and design a realistic multigrade rotation in which every grade always has meaningful work. Use these ILAW stages where appropriate: Preliminary Activities, Motivation, Direct Teaching, Guided Practice, Independent Practice, Application, Generalization, Assessment. Competencies and codes are editable draft suggestions unless an exact verified source appears in the context; never claim they are official DepEd entries. Ways Forward entries are proposed supports, not invented post-lesson results. Keep every field brief enough to fit a printable lesson plan.`
       : "";
 
   const groqResponse = await fetch(
@@ -293,7 +295,7 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
         ],
         ...(draftTask ? { response_format: { type: "json_object" } } : {}),
         temperature: draftTask ? 0.35 : 0.55,
-        max_completion_tokens: draftTask ? 420 : 240,
+        max_completion_tokens: draftTask?.type === "full-plan" ? 3_200 : draftTask ? 420 : 240,
       }),
     },
   );
@@ -318,6 +320,45 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
       const objective = cleanText(parsed.objective, 1_000);
       if (!competency || !objective) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
       return json({ draft: { type: "intentions", competency, objective }, connected: true }, 200, origin);
+    }
+    if (draftTask.type === "full-plan") {
+      const gradeDrafts = parsed.grades && typeof parsed.grades === "object" ? parsed.grades as Record<string, unknown> : {};
+      const grades = Object.fromEntries((pageContext.gradeLevels || []).flatMap((grade) => {
+        const item = gradeDrafts[grade] || gradeDrafts[/^\d+$/.test(grade) ? `Grade ${grade}` : grade];
+        if (!item || typeof item !== "object") return [];
+        const input = item as Record<string, unknown>;
+        return [[grade, {
+          competency: cleanText(input.competency, 1_500),
+          competencyCode: cleanText(input.competencyCode, 200),
+          contentStandard: cleanText(input.contentStandard, 1_500),
+          performanceStandard: cleanText(input.performanceStandard, 1_500),
+          objective: cleanText(input.objective, 1_500),
+          formativeAssessment: cleanText(input.formativeAssessment, 1_500),
+          exitTask: cleanText(input.exitTask, 1_000),
+          successCriteria: cleanText(input.successCriteria, 1_000),
+          reflectionQuestion: cleanText(input.reflectionQuestion, 1_000),
+          remediation: cleanText(input.remediation, 1_000),
+          enrichment: cleanText(input.enrichment, 1_000),
+        }]];
+      }));
+      const slots = Array.isArray(parsed.slots) ? parsed.slots.slice(0, 10).flatMap((slot) => {
+        if (!slot || typeof slot !== "object") return [];
+        const input = slot as Record<string, unknown>;
+        const rawGradeTasks = input.gradeTasks && typeof input.gradeTasks === "object" ? input.gradeTasks as Record<string, unknown> : {};
+        const gradeTasks = Object.fromEntries((pageContext.gradeLevels || []).map((grade) => [grade, cleanText(rawGradeTasks[grade] || rawGradeTasks[/^\d+$/.test(grade) ? `Grade ${grade}` : grade], 1_500)]));
+        const durationMinutes = typeof input.durationMinutes === "number" && Number.isFinite(input.durationMinutes) ? Math.max(1, Math.min(240, Math.round(input.durationMinutes))) : 10;
+        return [{ stage: cleanText(input.stage, 100) || "Learning activity", durationMinutes, teacherFocus: cleanText(input.teacherFocus, 200) || "All grades together", gradeTasks }];
+      }) : [];
+      if (Object.keys(grades).length !== (pageContext.gradeLevels || []).length || !slots.length) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
+      return json({ draft: {
+        type: "full-plan",
+        sharedTheme: cleanText(parsed.sharedTheme, 500),
+        learnerContext: cleanText(parsed.learnerContext, 1_500),
+        materials: cleanText(parsed.materials, 1_500),
+        nextSessionNotes: cleanText(parsed.nextSessionNotes, 1_000),
+        grades,
+        slots,
+      }, connected: true }, 200, origin);
     }
     const formativeAssessment = cleanText(parsed.formativeAssessment, 1_000);
     const exitTask = cleanText(parsed.exitTask, 1_000);

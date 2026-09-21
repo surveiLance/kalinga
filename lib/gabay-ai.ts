@@ -30,7 +30,8 @@ type GabayResult =
 
 export type GabayDraft =
   | { type: "intentions"; competency: string; objective: string }
-  | { type: "assessment"; formativeAssessment: string; exitTask: string; successCriteria: string };
+  | { type: "assessment"; formativeAssessment: string; exitTask: string; successCriteria: string }
+  | { type: "full-plan"; sharedTheme: string; learnerContext: string; materials: string; nextSessionNotes: string; grades: Record<string, { competency: string; competencyCode: string; contentStandard: string; performanceStandard: string; objective: string; formativeAssessment: string; exitTask: string; successCriteria: string; reflectionQuestion: string; remediation: string; enrichment: string }>; slots: Array<{ stage: string; durationMinutes: number; teacherFocus: string; gradeTasks: Record<string, string> }> };
 
 type GabayDraftResult =
   | { connected: true; draft: GabayDraft }
@@ -97,6 +98,9 @@ export async function requestGabayDraft(type: GabayDraft["type"], pageContext: G
     }
     if (type === "assessment" && typeof draft.formativeAssessment === "string" && typeof draft.exitTask === "string" && typeof draft.successCriteria === "string" && draft.formativeAssessment.trim() && draft.exitTask.trim() && draft.successCriteria.trim()) {
       return { connected: true, draft: { type, formativeAssessment: draft.formativeAssessment.trim(), exitTask: draft.exitTask.trim(), successCriteria: draft.successCriteria.trim() } };
+    }
+    if (type === "full-plan" && typeof draft.sharedTheme === "string" && typeof draft.learnerContext === "string" && typeof draft.materials === "string" && draft.grades && typeof draft.grades === "object" && Array.isArray(draft.slots)) {
+      return { connected: true, draft: draft as GabayDraft };
     }
     return { connected: false, reason: "unavailable" };
   } catch {

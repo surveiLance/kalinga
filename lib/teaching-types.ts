@@ -49,6 +49,8 @@ export type LegacyTeachingClass = Omit<Partial<TeachingClass>, "grades" | "learn
 export type PlanSlot = {
   id: string;
   time: string;
+  stage?: string;
+  durationMinutes?: number;
   teacherFocus: string;
   gradeTasks: Record<GradeLevel, string>;
 };
@@ -63,7 +65,11 @@ export type SavedPlan = {
   duration: string;
   startTime?: string;
   language?: string;
+  teachingDate?: string;
   competencies?: Record<GradeLevel, string>;
+  competencyCodes?: Record<GradeLevel, string>;
+  contentStandards?: Record<GradeLevel, string>;
+  performanceStandards?: Record<GradeLevel, string>;
   sharedTheme?: string;
   multigradeModel?: string;
   objectives?: Record<GradeLevel, string>;
@@ -72,10 +78,14 @@ export type SavedPlan = {
   formativeAssessments?: Record<GradeLevel, string>;
   exitTasks?: Record<GradeLevel, string>;
   successCriteria?: Record<GradeLevel, string>;
+  reflectionQuestions?: Record<GradeLevel, string>;
+  remediations?: Record<GradeLevel, string>;
+  enrichments?: Record<GradeLevel, string>;
   reflection?: string;
   remediation?: string;
   enrichment?: string;
   nextSessionNotes?: string;
+  schoolHeadName?: string;
   slots: PlanSlot[];
   savedAt: string;
 };
