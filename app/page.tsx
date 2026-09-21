@@ -1859,7 +1859,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
       lessonDuration: `${plan.duration} starting at ${planStart}`,
       incompleteSections: readyTasks === 3 ? [] : [`${3 - readyTasks} core lesson ${3 - readyTasks === 1 ? "task is" : "tasks are"} incomplete`],
       currentSummary: activeSlot ? [`Current block: ${activeSlot.time} to ${activeEnd}`, `Teacher focus: ${activeSlot.teacherFocus}`, ...plan.grades.map((grade) => `${gradeLabel(grade)} task: ${activeSlot.gradeTasks[grade] || "not entered"}`)] : ["No teaching blocks have been added"],
-      availableActions: ["Explain the current teaching block", "Adapt a grade task", "Suggest a low-material alternative", "Create a quick transition", "Review the learning check"],
+      availableActions: ["Explain the current teaching block", "Adapt a grade task", "Suggest a low-material alternative", "Create a quick transition", "Review the assessment"],
     });
   }, [activeEnd, activeIndex, activeSlot, onGabayContext, plan, planStart, readyTasks, teachingClass]);
 
@@ -1886,7 +1886,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
     <section className="teaching-reference-grid">
       <article><p className="eyebrow">BEFORE CLASS</p><h3>Materials and context</h3><dl><div><dt>Materials</dt><dd>{plan.materials?.trim() || "No materials listed"}</dd></div><div><dt>Learner context</dt><dd>{plan.learnerContext?.trim() || "No additional learner notes"}</dd></div></dl></article>
       <article><p className="eyebrow">LEARNING TARGETS</p><h3>What each group should learn</h3><div className="teaching-reference-list">{plan.grades.map((grade) => <div key={grade}><b>{gradeLabel(grade)}</b><p>{plan.objectives?.[grade]?.trim() || plan.competencies?.[grade]?.trim() || "No learning target entered"}</p></div>)}</div></article>
-      <article><p className="eyebrow">CHECK LEARNING</p><h3>Assessment by grade</h3><div className="teaching-reference-list">{plan.grades.map((grade) => <div key={grade}><b>{gradeLabel(grade)}</b><p>{plan.formativeAssessments?.[grade]?.trim() || "No learning check entered"}</p>{plan.successCriteria?.[grade]?.trim() && <small>Success: {plan.successCriteria[grade]}</small>}</div>)}</div></article>
+      <article><p className="eyebrow">ASSESSMENT</p><h3>Assessment by grade</h3><div className="teaching-reference-list">{plan.grades.map((grade) => <div key={grade}><b>{gradeLabel(grade)}</b><p>{plan.formativeAssessments?.[grade]?.trim() || "No assessment entered"}</p>{plan.successCriteria?.[grade]?.trim() && <small>Success: {plan.successCriteria[grade]}</small>}</div>)}</div></article>
     </section>
   </div>;
 }
@@ -1920,7 +1920,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [activeFlowSlotId, setActiveFlowSlotId] = useState(initialPlan?.slots[0]?.id || "slot-shared");
   const [saved, setSaved] = useState(false);
-  const [, setActiveIntentionGrade] = useState<GradeLevel>("");
+  const [activeIntentionGrade, setActiveIntentionGrade] = useState<GradeLevel>((initialPlan?.grades || selectedClass?.grades || [])[0] || "");
   const [draftingIntentionGrade, setDraftingIntentionGrade] = useState<GradeLevel>("");
   const [intentionSuggestions, setIntentionSuggestions] = useState<Record<GradeLevel, { competency: string; objective: string }>>({});
   const [intentionDraftErrors, setIntentionDraftErrors] = useState<Record<GradeLevel, string>>({});
@@ -1941,6 +1941,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
   const afterLessonDone = Boolean(reflection.trim() || remediation.trim() || enrichment.trim() || nextSessionNotes.trim());
   const activeFlowSlot = slots.find((slot) => slot.id === activeFlowSlotId) || slots[0];
   const activeFlowIndex = Math.max(0, slots.findIndex((slot) => slot.id === activeFlowSlot?.id));
+  const activeFlowFocus = activeFlowSlot?.teacherFocus.toLowerCase() || "";
 
   useEffect(() => {
     onGabayContext({
@@ -1956,7 +1957,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
       lessonDuration: `${durationMinutes(duration)} minutes starting at ${startTime}`,
       incompleteSections: incompletePlanSections,
       currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`), saved ? "Draft is saved" : "Draft has unsaved changes"],
-      availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Build the lesson plan"] : ["Set learning goals", "Coordinate the grades", "Add a learning check", "Save the lesson"],
+      availableActions: step === 1 ? ["Choose the class", "Set the lesson title", "Continue to lesson details"] : step === 2 ? ["Set subject and timing", "Build the lesson plan"] : ["Complete Intentions", "Build the Learning Experience", "Add Assessment", "Complete Ways Forward", "Save the lesson"],
     });
   }, [activePlanTask, competencies, duration, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, plannerEntry, saved, selectedClass, sharedTheme, startTime, step, subject]);
 
@@ -1985,6 +1986,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     setFormativeAssessments((items) => Object.fromEntries(next.map((item) => [item, items[item] || ""])));
     setExitTasks((items) => Object.fromEntries(next.map((item) => [item, items[item] || ""])));
     setSuccessCriteria((items) => Object.fromEntries(next.map((item) => [item, items[item] || ""])));
+    setActiveIntentionGrade((current) => next.includes(current) ? current : next[0] || "");
     setActiveAssessmentGrade((current) => next.includes(current) ? current : next[0] || "");
   }
 
@@ -2000,6 +2002,8 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     setFormativeAssessments(Object.fromEntries(nextClass.grades.map((grade) => [grade, ""])));
     setExitTasks(Object.fromEntries(nextClass.grades.map((grade) => [grade, ""])));
     setSuccessCriteria(Object.fromEntries(nextClass.grades.map((grade) => [grade, ""])));
+    setActiveIntentionGrade(nextClass.grades[0] || "");
+    setActiveAssessmentGrade(nextClass.grades[0] || "");
     const nextSlots = createSchedule(nextClass.grades, nextClass.startTime, duration);
     setSlots(nextSlots);
     setActiveFlowSlotId(nextSlots[0]?.id || "");
@@ -2062,7 +2066,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     const topic = lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`;
     const result = await requestGabayDraft("intentions", {
         view: "plan",
-        pageStep: `Learning goals · ${gradeLabel(grade)}`,
+        pageStep: `Intentions · ${gradeLabel(grade)}`,
         classId: selectedClass.id,
         className: selectedClass.name,
         gradeLevels: grades,
@@ -2104,7 +2108,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
     const topic = lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`;
     const result = await requestGabayDraft("assessment", {
       view: "plan",
-      pageStep: `Learning check · ${gradeLabel(grade)}`,
+      pageStep: `Assessment · ${gradeLabel(grade)}`,
       classId: selectedClass.id,
       className: selectedClass.name,
       gradeLevels: grades,
@@ -2161,7 +2165,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
       />
 
       {plannerEntry === "quick" && <section className="quick-plan-setup">
-        <header><div><p className="eyebrow">ONLY THE ESSENTIALS</p><h2>What are you teaching?</h2><p>Your saved class already supplies the grades and learners. Gabay can help draft learning goals and checks after this.</p></div><GabayMascot size="medium" motion /></header>
+        <header><div><p className="eyebrow">ONLY THE ESSENTIALS</p><h2>What are you teaching?</h2><p>Your saved class already supplies the grades and learners. Gabay can help draft editable Intentions and Assessment sections after this.</p></div><GabayMascot size="medium" motion /></header>
         <div className="quick-plan-fields"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Subject<input list="quick-subject-options" value={subject} onChange={(event) => chooseSubject(event.target.value)} placeholder="Choose or type a subject" /><datalist id="quick-subject-options">{selectedClass?.subjects.map((item) => <option value={item} key={item} />)}</datalist></label><label className="wide">Lesson title <small>Optional</small><input value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} placeholder="e.g. Comparing fractions with bottle caps" /></label><div className="field-label"><span>Starts at</span><TimePicker value={startTime} onChange={setStartTime} /></div><label>Class time<div className="duration-input"><input aria-label="Class time in minutes" type="number" min="5" max="600" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} /><span>minutes</span></div></label></div>
         <footer><button className="secondary-button" type="button" onClick={() => { setStep(1); setPlannerEntry("full"); }}>Use detailed setup</button><button className="primary-button" type="button" disabled={!selectedClassId || !subject.trim()} onClick={() => { const nextSlots = createSchedule(grades, startTime, duration); setSlots(nextSlots); setActiveFlowSlotId(nextSlots[0]?.id || ""); setStep(3); setActivePlanTask("overview"); setPlannerEntry("full"); }}>Build the teaching flow →</button></footer>
       </section>}
@@ -2226,39 +2230,48 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
 
           <nav className="plan-task-nav" aria-label="Lesson plan tasks">{([
             ["overview", "Lesson brief", "See what needs attention"],
-            ["intentions", "Learning goals", intentionDone ? "Ready" : "Needs work"],
-            ["experience", "Teaching flow", experienceDone ? "Ready" : "Needs work"],
-            ["assessment", "Learning check", assessmentDone ? "Ready" : "Needs work"],
-            ["after", "After lesson", afterLessonDone ? "Started" : "Optional"],
+            ["intentions", "I · Intentions", intentionDone ? "Ready" : "Competencies and objectives"],
+            ["experience", "L · Learning Experience", experienceDone ? "Ready" : "Classroom activities"],
+            ["assessment", "A · Assessment", assessmentDone ? "Ready" : "Checks and success criteria"],
+            ["after", "W · Ways Forward", afterLessonDone ? "Started" : "Reflection and next steps"],
           ] as const).map(([value, label, status]) => <button className={activePlanTask === value ? "active" : ""} type="button" onClick={() => setActivePlanTask(value)} key={value}><b>{label}</b><small>{status}</small></button>)}</nav>
 
-          {activePlanTask === "overview" && <section className="plan-task-overview"><header><p className="eyebrow">YOUR LESSON WORKSPACE</p><h2>Finish only what you need next.</h2><p>Kalinga keeps the official details, classroom flow, checks, and reflection together without showing every field at once.</p></header><div>
-            <button type="button" onClick={() => setActivePlanTask("intentions")}><span>1</span><p><b>Set learning goals</b><small>Exact competency and editable objective for each grade</small></p><strong>{intentionDone ? "Ready ✓" : "Start →"}</strong></button>
-            <button type="button" onClick={() => setActivePlanTask("experience")}><span>2</span><p><b>Coordinate the grades</b><small>Decide who is with you and what the other groups do</small></p><strong>{experienceDone ? "Ready ✓" : "Start →"}</strong></button>
-            <button type="button" onClick={() => setActivePlanTask("assessment")}><span>3</span><p><b>Add a learning check</b><small>One appropriate check and success measure per grade</small></p><strong>{assessmentDone ? "Ready ✓" : "Start →"}</strong></button>
-            <button type="button" onClick={() => setActivePlanTask("after")}><span>4</span><p><b>Reflect after class</b><small>Record results, remediation, and the next step</small></p><strong>{afterLessonDone ? "Continue →" : "After teaching"}</strong></button>
+          {activePlanTask === "overview" && <section className="plan-task-overview"><header><p className="eyebrow">YOUR ILAW WORKSPACE</p><h2>Finish only what you need next.</h2><p>Each ILAW section is separate, so you can prepare one part without scrolling through the whole form.</p></header><div>
+            <button type="button" onClick={() => setActivePlanTask("intentions")}><span>I</span><p><b>Complete Intentions</b><small>Set the exact competency and an editable objective for each grade</small></p><strong>{intentionDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("experience")}><span>L</span><p><b>Build the Learning Experience</b><small>Choose who receives direct guidance and what every group will do</small></p><strong>{experienceDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("assessment")}><span>A</span><p><b>Plan the Assessment</b><small>Add an appropriate check and success measure for each grade</small></p><strong>{assessmentDone ? "Ready ✓" : "Start →"}</strong></button>
+            <button type="button" onClick={() => setActivePlanTask("after")}><span>W</span><p><b>Complete Ways Forward</b><small>Record results, remediation, enrichment, and the next step</small></p><strong>{afterLessonDone ? "Continue →" : "After teaching"}</strong></button>
           </div></section>}
 
           {activePlanTask === "intentions" && <details open className="ilaw-disclosure intentions-section focused-plan-task">
-            <summary><span className="ilaw-letter">1</span><span><small>LEARNING GOALS</small><b>Set what each group should learn</b><em>{grades.length} grade {grades.length === 1 ? "group" : "groups"} · open one at a time</em></span></summary>
+            <summary><span className="ilaw-letter">I</span><span><small>INTENTIONS</small><b>Set the competency and objective for each grade</b><em>{grades.length} grade {grades.length === 1 ? "group" : "groups"} · edit one at a time</em></span></summary>
             <div className="ilaw-disclosure-body intentions-body">
               <p className="competency-guidance">Nothing is generated without a verified source. Enter only what you know, or leave a field blank and return later.</p>
               <details className="ilaw-optional-disclosure"><summary><span>Shared theme and multigrade approach</span><small>Optional lesson setup</small></summary><div className="ilaw-intention-grid"><label>Shared theme or sub-theme <small>Optional</small><input value={sharedTheme} onChange={(event) => { setSharedTheme(event.target.value); setSaved(false); }} placeholder="What connects the grade-level lessons?" /></label><label>Multigrade approach<select value={multigradeModel} onChange={(event) => { setMultigradeModel(event.target.value); setSaved(false); }}><option>Same Theme, Different Task (STDT)</option><option>Teacher-led rotation</option><option>Peer or buddy learning</option><option>Cross-grade collaboration</option><option>Custom approach</option></select></label></div></details>
-              <div className="intention-grade-list">{grades.map((grade) => <details className={`competency-card competency-disclosure grade-${grade}`} onToggle={(event) => { if (event.currentTarget.open) setActiveIntentionGrade(grade); }} key={grade}><summary><span><b>{gradeLabel(grade)}</b><small>{subject || "Subject not entered"} · {quarter}</small></span><span>{competencies[grade] || objectives[grade] ? "Started" : "Not started"}</span></summary><div className="competency-fields"><div className="gabay-draft-intention"><div><GabayMascot size="small" motion /><p><b>Need a starting point?</b><span>Gabay can suggest an editable—not official—draft for this grade.</span></p></div><button type="button" disabled={Boolean(draftingIntentionGrade)} onClick={() => draftGradeIntention(grade)}>{draftingIntentionGrade === grade ? "Drafting…" : intentionSuggestions[grade] ? "Try another draft" : "Draft with Gabay"}</button></div>{intentionDraftErrors[grade] && <p className="gabay-draft-error" role="alert">{intentionDraftErrors[grade]}</p>}{intentionSuggestions[grade] && <aside className="gabay-intention-review"><p className="eyebrow">GABAY’S DRAFT · REVIEW FIRST</p><div><p><b>Possible competency</b><span>{intentionSuggestions[grade].competency}</span></p><p><b>Possible objective</b><span>{intentionSuggestions[grade].objective}</span></p></div><footer><button className="secondary-button" type="button" onClick={() => setIntentionSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)))}>Dismiss</button><button className="primary-button" type="button" onClick={() => applyGradeIntention(grade)}>Use and edit this draft</button></footer></aside>}<label>Learning competency<textarea value={competencies[grade] || ""} onFocus={() => setActiveIntentionGrade(grade)} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onFocus={() => setActiveIntentionGrade(grade)} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label><p className="competency-helper">Saved offline and editable at any time.</p></div></details>)}</div>
+              <div className="intention-workspace">
+                <nav className="intention-grade-tabs" aria-label="Intentions grade group">{grades.map((grade) => <button className={grade === (activeIntentionGrade || grades[0]) ? "active" : ""} type="button" onClick={() => setActiveIntentionGrade(grade)} key={grade}><span>{gradeLabel(grade)}</span><small>{competencies[grade]?.trim() || objectives[grade]?.trim() ? "Started" : "Not started"}</small></button>)}</nav>
+                {grades.filter((grade) => grade === (activeIntentionGrade || grades[0])).map((grade) => <article className="intention-grade-panel" key={grade}>
+                  <header><div><p className="eyebrow">EDITING INTENTIONS</p><h3>{gradeLabel(grade)}</h3><p>{subject || "Subject not entered"} · {quarter}</p></div><button className="gabay-draft-button" type="button" disabled={Boolean(draftingIntentionGrade)} onClick={() => draftGradeIntention(grade)}><GabayMascot size="small" motion />{draftingIntentionGrade === grade ? "Drafting…" : intentionSuggestions[grade] ? "Try another draft" : "Draft with Gabay"}</button></header>
+                  {intentionDraftErrors[grade] && <p className="gabay-draft-error" role="alert">{intentionDraftErrors[grade]}</p>}
+                  {intentionSuggestions[grade] && <aside className="gabay-intention-review"><p className="eyebrow">GABAY’S DRAFT · REVIEW FIRST</p><div><p><b>Possible competency</b><span>{intentionSuggestions[grade].competency}</span></p><p><b>Possible objective</b><span>{intentionSuggestions[grade].objective}</span></p></div><footer><button className="secondary-button" type="button" onClick={() => setIntentionSuggestions((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== grade)))}>Dismiss</button><button className="primary-button" type="button" onClick={() => applyGradeIntention(grade)}>Use and edit this draft</button></footer></aside>}
+                  <div className="intention-fields"><label>Learning competency<textarea value={competencies[grade] || ""} onChange={(event) => { setCompetencies((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`Enter the exact ${gradeLabel(grade)} competency`} /></label><label>Learning objective <small>Optional</small><textarea value={objectives[grade] || ""} onChange={(event) => { setObjectives((current) => ({ ...current, [grade]: event.target.value })); setSaved(false); }} placeholder={`What should ${gradeLabel(grade)} learners be able to do?`} /></label></div>
+                  <p className="competency-helper">Saved offline and editable at any time.</p>
+                </article>)}
+              </div>
             </div>
           </details>}
 
           {activePlanTask === "experience" && <details open className="ilaw-disclosure learning-experience-disclosure focused-plan-task">
-            <summary><span className="ilaw-letter">2</span><span><small>MULTIGRADE TEACHING FLOW</small><b>Coordinate every grade in one class period</b><em>{slots.length} editable blocks · {durationMinutes(duration)} minutes</em></span></summary>
+            <summary><span className="ilaw-letter">L</span><span><small>LEARNING EXPERIENCE</small><b>Coordinate every grade in one class period</b><em>{slots.length} editable blocks · {durationMinutes(duration)} minutes</em></span></summary>
             <div className="ilaw-disclosure-body">
               <details className="ilaw-optional-disclosure"><summary><span>Learner context and materials</span><small>Optional details</small></summary><div className="ilaw-two-column"><label>Learner context<textarea value={learnerContext} onChange={(event) => { setLearnerContext(event.target.value); setSaved(false); }} placeholder="What do these learners already know, experience, or need?" /></label><label>Materials and references<textarea value={materials} onChange={(event) => { setMaterials(event.target.value); setSaved(false); }} placeholder="Local objects, activity sheets, curriculum references…" /></label></div></details>
               <div className="schedule-window-summary"><span>◎</span><p><b>{startTime}–{formatTime(toMinutes(startTime) + durationMinutes(duration))} teaching window</b><small>Open one block at a time. When you teach one group, give every other group a clear independent task.</small></p></div>
               <section className="flow-editor">
-                <header><div><p className="eyebrow">CLASSROOM SEQUENCE</p><h3>Who are you teaching right now?</h3></div><button className="secondary-button" type="button" onClick={addSlot}>＋ Add block</button></header>
+                <header><div><p className="eyebrow">CLASSROOM SEQUENCE</p><h3>Choose one focus, then describe each group’s work.</h3></div><button className="secondary-button" type="button" onClick={addSlot}>＋ Add block</button></header>
                 <nav className="flow-block-tabs" aria-label="Teaching flow blocks">{slots.map((slot, index) => <button className={slot.id === activeFlowSlot?.id ? "active" : ""} type="button" onClick={() => setActiveFlowSlotId(slot.id)} key={slot.id}><span>{index + 1}</span><p><b>{slot.time}</b><small>{slot.teacherFocus || "Choose teacher focus"}</small></p></button>)}</nav>
                 {activeFlowSlot && <article className="flow-block-editor">
                   <header><div><p className="eyebrow">BLOCK {activeFlowIndex + 1} OF {slots.length}</p><h3>{activeFlowSlot.teacherFocus || "Set the teacher focus"}</h3><p>Changing this block’s start time shifts this block and every block after it.</p></div><div className="flow-time-field"><span>Starts at</span><TimePicker value={activeFlowSlot.time} onChange={(value) => updateSlotTime(activeFlowSlot.id, value)} /></div></header>
-                  <label className="flow-focus-field">Teacher focus<input list="flow-focus-options" value={activeFlowSlot.teacherFocus} placeholder="e.g. Guide Grade 5" onChange={(event) => updateSlot(activeFlowSlot.id, "teacherFocus", event.target.value)} /><datalist id="flow-focus-options"><option value="All grades together" />{grades.map((grade) => <option value={`Guide ${gradeLabel(grade)}`} key={grade} />)}</datalist><small>This label determines which group appears as teacher-led in the teaching guide.</small></label>
+                  <div className="flow-focus-picker"><span>Who has direct teacher guidance?</span><div><button className={activeFlowFocus.includes("all grade") ? "active" : ""} type="button" onClick={() => updateSlot(activeFlowSlot.id, "teacherFocus", "All grades together")}>All grades</button>{grades.map((grade) => <button className={activeFlowFocus.includes(gradeLabel(grade).toLowerCase()) ? "active" : ""} type="button" onClick={() => updateSlot(activeFlowSlot.id, "teacherFocus", `Guide ${gradeLabel(grade)}`)} key={grade}>{gradeLabel(grade)}</button>)}</div><small>Every other group is marked independent automatically.</small></div>
                   <div className="flow-grade-grid">{grades.map((grade) => { const focus = activeFlowSlot.teacherFocus.toLowerCase(); const withTeacher = focus.includes("all grade") || focus.includes(gradeLabel(grade).toLowerCase()); return <label className={withTeacher ? "with-teacher" : "independent"} key={grade}><span><b>{gradeLabel(grade)}</b><em>{withTeacher ? "WITH TEACHER" : "INDEPENDENT"}</em></span><textarea aria-label={`${gradeLabel(grade)} activity at ${activeFlowSlot.time}`} value={activeFlowSlot.gradeTasks[grade] || ""} placeholder={withTeacher ? "What will you teach or model?" : "What can learners do without direct guidance?"} onChange={(event) => updateGradeTask(activeFlowSlot.id, grade, event.target.value)} /></label>; })}</div>
                   <footer><button type="button" disabled={activeFlowIndex === 0} onClick={() => setActiveFlowSlotId(slots[activeFlowIndex - 1]?.id || activeFlowSlot.id)}>← Previous</button><button className="remove" type="button" disabled={slots.length === 1} onClick={removeActiveSlot}>Remove block</button><button className="next" type="button" disabled={activeFlowIndex === slots.length - 1} onClick={() => setActiveFlowSlotId(slots[activeFlowIndex + 1]?.id || activeFlowSlot.id)}>Next block →</button></footer>
                 </article>}
@@ -2267,7 +2280,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
           </details>}
 
           {activePlanTask === "assessment" && <details open className="ilaw-disclosure assessment-section focused-plan-task">
-            <summary><span className="ilaw-letter">3</span><span><small>LEARNING CHECK</small><b>Check learning by grade</b><em>Open when you are ready to add checks</em></span></summary>
+            <summary><span className="ilaw-letter">A</span><span><small>ASSESSMENT</small><b>Check learning by grade</b><em>Add one clear check at a time</em></span></summary>
             <div className="ilaw-disclosure-body assessment-workspace">
               <nav className="assessment-grade-tabs" aria-label="Assessment grade group">{grades.map((grade) => <button className={grade === (activeAssessmentGrade || grades[0]) ? "active" : ""} type="button" onClick={() => setActiveAssessmentGrade(grade)} key={grade}><span>{gradeLabel(grade)}</span><small>{formativeAssessments[grade]?.trim() ? "Started" : "Not started"}</small></button>)}</nav>
               {grades.filter((grade) => grade === (activeAssessmentGrade || grades[0])).map((grade) => <article className="assessment-grade-panel" key={grade}>
@@ -2280,7 +2293,7 @@ function PlanView({ classes, activeClassId, initialPlan, onSave, onTeach, onBack
           </details>}
 
           {activePlanTask === "after" && <details open className="ilaw-disclosure ways-forward-section focused-plan-task">
-            <summary><span className="ilaw-letter">4</span><span><small>AFTER THE LESSON</small><b>Record results and next steps</b><em>Reflection, remediation, enrichment, and what comes next</em></span></summary>
+            <summary><span className="ilaw-letter">W</span><span><small>WAYS FORWARD</small><b>Record results and next steps</b><em>Reflection, remediation, enrichment, and what comes next</em></span></summary>
             <div className="ilaw-disclosure-body"><p className="after-lesson-note">Return after teaching while the lesson is still fresh. Note how many learners reached the expected level, including those below the school’s 80% mastery reference.</p><div className="ilaw-two-column"><label>Reflection and results<textarea value={reflection} onChange={(event) => { setReflection(event.target.value); setSaved(false); }} placeholder="What worked? How many learners reached 80% or the success criteria?" /></label><label>Remediation<textarea value={remediation} onChange={(event) => { setRemediation(event.target.value); setSaved(false); }} placeholder="What support will learners below the target receive?" /></label><label>Enrichment<textarea value={enrichment} onChange={(event) => { setEnrichment(event.target.value); setSaved(false); }} placeholder="What extension can ready learners do?" /></label><label>Notes for the next session<textarea value={nextSessionNotes} onChange={(event) => { setNextSessionNotes(event.target.value); setSaved(false); }} placeholder="What should continue or change next time?" /></label></div></div>
           </details>}
           {activePlanTask === "experience" && <div className="plan-notes"><article><span>✦</span><div><b>This sequence is a starting point</b><p>Adjust the teacher focus and independent work until the transitions match how your classroom actually runs.</p></div></article><button className="text-button" type="button" onClick={resetTeachingFlow}>Reset from {startTime}</button></div>}
