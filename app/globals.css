@@ -971,7 +971,6 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .flow-footer { margin: 8px 0 0; display: flex; gap: 16px; }
 @media (max-width: 900px) { .plan-setup-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .plan-setup-grid { grid-template-columns: 1fr; } .plan-toolbar { position: static; } .plan-toolbar > div:last-child { margin-left: 0; } }
-@media print { .plan-page.ilaw-print-mode .ilaw-editor { display: none !important; } }.plan-preview-toolbar .eyebrow { margin-bottom: 3px; }
 .toolbar-gabay { gap: 8px; color: var(--teal-ink); background: #e0f2ee; font-weight: 800; }.toolbar-gabay:disabled { opacity: .7; cursor: wait; }
 .draft-restore { margin: 0 20px 14px; padding: 10px 14px; border-radius: 10px; color: #206d63; background: #dff3ef; font-size: 12px; font-weight: 650; }.draft-restore button { margin-left: 6px; border: 0; padding: 0; color: inherit; background: none; font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
 @media (max-width: 720px) { .plan-preview-toolbar { flex-direction: column; align-items: stretch; } .plan-preview-toolbar > div:last-child { flex-wrap: wrap; } .ilaw-export-document.ilaw-export-inline { padding: 18px 12px; } }
@@ -1124,5 +1123,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
   .teaching-reference-grid { grid-template-columns: repeat(3, 1fr); }
   @page { size: A4; margin: .5in; }
   .plan-page.ilaw-print-mode > :not(.ilaw-export-document) { display: none !important; }
-  .plan-page.ilaw-print-mode .ilaw-export-document { display: block !important; color: #111; font-family: Arial, sans-serif; font-size: 9pt; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* The editable copy shares the export-document class; only the clean copy prints. */
+  .plan-page.ilaw-print-mode .ilaw-editor { display: none !important; }
+  .plan-page.ilaw-print-mode .ilaw-export-document:not(.ilaw-editor) { display: block !important; color: #111; font-family: Arial, sans-serif; font-size: 9pt; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
