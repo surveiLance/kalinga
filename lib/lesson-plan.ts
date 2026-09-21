@@ -1,6 +1,7 @@
 import { gradeLabel } from "@/lib/grades";
+import { formatTime, toMinutes } from "@/lib/schedule";
 import { learnerSexCounts } from "@/lib/learners";
-import type { GradeLevel, SavedPlan, TeachingClass } from "@/lib/teaching-types";
+import type { GradeLevel, PlanSlot, SavedPlan, TeachingClass } from "@/lib/teaching-types";
 
 const perGradeFields = ["competencies", "competencyCodes", "contentStandards", "performanceStandards", "objectives", "formativeAssessments", "exitTasks", "successCriteria", "reflectionQuestions", "remediations", "enrichments"] as const;
 
@@ -24,7 +25,25 @@ export function learnerCountSummary(teachingClass: TeachingClass, grades: GradeL
   return learnersPerGrade(teachingClass, grades).map((item) => `${item.label}: ${item.total} (F-${item.female}, M-${item.male})`).join(" · ");
 }
 
-export function planTimeRange(plan: SavedPlan, toMinutes: (time: string) => number, formatTime: (minutes: number) => string, durationMinutes: (value: string | number) => number) {
+export const ilawStages = ["Preliminary Activities", "Motivation", "Direct Teaching", "Guided Practice", "Independent Practice", "Cross-Grade Collaboration", "Application", "Generalization", "Assessment", "Wrap-Up"];
+
+// Slot times are derived: the lesson starts at one time and each block follows
+// the last. Editing a duration therefore shifts everything after it.
+export function retimeSlots(slots: PlanSlot[], startTime: string) {
+  let cursor = toMinutes(startTime);
+  return slots.map((slot) => {
+    const time = formatTime(cursor);
+    cursor += Math.max(1, slot.durationMinutes || 10);
+    return slot.time === time ? slot : { ...slot, time };
+  });
+}
+
+export function slotsTotalMinutes(slots: PlanSlot[]) {
+  return slots.reduce((total, slot) => total + Math.max(1, slot.durationMinutes || 10), 0);
+}
+
+export function planTimeRange(plan: SavedPlan) {
   const start = plan.startTime || "8:00 AM";
-  return `${start}–${formatTime(toMinutes(start) + durationMinutes(plan.duration))} · ${durationMinutes(plan.duration)} minutes`;
+  const minutes = Number.parseInt(plan.duration, 10) || 80;
+  return `${start}–${formatTime(toMinutes(start) + minutes)} · ${minutes} minutes`;
 }
