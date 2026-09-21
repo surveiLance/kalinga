@@ -13,6 +13,7 @@ type PageContext = {
   subject?: string;
   lessonTopic?: string;
   lessonDuration?: string;
+  language?: string;
   incompleteSections?: string[];
   currentSummary?: string[];
   availableActions?: string[];
@@ -89,6 +90,7 @@ function safeContext(value: unknown): PageContext {
     subject: cleanText(input.subject, 100),
     lessonTopic: cleanText(input.lessonTopic, 200),
     lessonDuration: cleanText(input.lessonDuration, 120),
+    language: cleanText(input.language, 60),
     incompleteSections: cleanList(input.incompleteSections, 16, 100),
     currentSummary: cleanList(input.currentSummary, 16, 240),
     availableActions: cleanList(input.availableActions, 12, 120),
@@ -264,6 +266,7 @@ Class schedule: ${(pageContext.scheduleSummary ?? []).join(" | ") || "not suppli
 Subject: ${pageContext.subject || "not supplied"}
 Lesson topic: ${pageContext.lessonTopic || "not supplied"}
 Lesson duration: ${pageContext.lessonDuration || "not supplied"}
+Language of instruction for this plan: ${pageContext.language || "not supplied"}
 Incomplete sections: ${(pageContext.incompleteSections ?? []).join(", ") || "none reported"}
 What the app currently reports: ${(pageContext.currentSummary ?? []).join(" | ") || "nothing supplied"}
 Actions available on this page: ${(pageContext.availableActions ?? []).join(", ") || "not supplied"}
@@ -274,7 +277,7 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
     : draftTask?.type === "assessment"
       ? `Create a practical, editable assessment set for ${draftTask.grade}. Return only a JSON object with exactly these string keys: formativeAssessment, exitTask, successCriteria. Each item must align with the supplied competency or objective, remain grade-appropriate, and be realistic in the stated lesson duration.`
       : draftTask?.type === "full-plan"
-        ? `Create one complete but concise editable ILAW lesson-plan draft for every supplied grade level. Return only a JSON object with exactly these top-level keys: sharedTheme, learnerContext, materials, nextSessionNotes, grades, slots. The grades object must use each supplied grade label as a key, and each grade value must contain exactly these string keys: competency, competencyCode, contentStandard, performanceStandard, objective, formativeAssessment, exitTask, successCriteria, reflectionQuestion, remediation, enrichment. The slots array must contain objects with exactly these keys: stage, durationMinutes, teacherFocus, gradeTasks. Each gradeTasks object must use every supplied grade label as a key. Make the slot durations add up to the supplied lesson duration and design a realistic multigrade rotation in which every grade always has meaningful work. Use these ILAW stages where appropriate: Preliminary Activities, Motivation, Direct Teaching, Guided Practice, Independent Practice, Application, Generalization, Assessment. Competencies and codes are editable draft suggestions unless an exact verified source appears in the context; never claim they are official DepEd entries. Ways Forward entries are proposed supports, not invented post-lesson results. Keep every field brief enough to fit a printable lesson plan.`
+        ? `Create one complete but concise editable ILAW lesson-plan draft for every supplied grade level. Return only a JSON object with exactly these top-level keys: sharedTheme, learnerContext, materials, nextSessionNotes, grades, slots. The grades object must use each supplied grade label as a key, and each grade value must contain exactly these string keys: competency, competencyCode, contentStandard, performanceStandard, objective, formativeAssessment, exitTask, successCriteria, reflectionQuestion, remediation, enrichment. The slots array must contain objects with exactly these keys: stage, durationMinutes, teacherFocus, gradeTasks. Each gradeTasks object must use every supplied grade label as a key. Make the slot durations add up to the supplied lesson duration and design a realistic multigrade rotation in which every grade always has meaningful work. Use these ILAW stages where appropriate: Preliminary Activities, Motivation, Direct Teaching, Guided Practice, Independent Practice, Application, Generalization, Assessment. Competencies and codes are editable draft suggestions unless an exact verified source appears in the context; never claim they are official DepEd entries. Ways Forward entries are proposed supports, not invented post-lesson results. Write every field in the plan's stated language of instruction: if it is Filipino, write in formal classroom Filipino; if it is English & Filipino, write activities and questions in Filipino and standards and criteria in English; otherwise write in English. Keep every field brief enough to fit a printable lesson plan.`
       : "";
 
   const groqResponse = await fetch(

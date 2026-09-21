@@ -13,6 +13,7 @@ export type GabayPageContext = {
   subject?: string;
   lessonTopic?: string;
   lessonDuration?: string;
+  language?: string;
   incompleteSections?: string[];
   currentSummary?: string[];
   availableActions?: string[];
