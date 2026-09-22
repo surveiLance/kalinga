@@ -683,7 +683,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .home-essential-actions > button > span { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; color: var(--orange-dark); background: #f9dfd3; font-size: 22px; font-weight: 850; }
 .home-essential-actions p { margin: 0; }.home-essential-actions b, .home-essential-actions small { display: block; }.home-essential-actions b { font-size: 14px; }.home-essential-actions small { max-width: 340px; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.35; }.home-essential-actions > button > b { color: var(--teal-ink); font-size: 18px; }
 
-.gabay-chat-popover { top: 90px; right: 28px; bottom: auto; width: min(480px, calc(100vw - 56px)); height: min(640px, calc(100dvh - 118px)); min-width: 340px; min-height: 360px; max-width: calc(100vw - 56px); max-height: calc(100dvh - 112px); border-radius: 16px; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; resize: both; box-shadow: 0 16px 42px rgba(27, 55, 54, .18); }
+.gabay-chat-popover { top: 90px; right: 28px; bottom: auto; width: min(480px, calc(100vw - 56px)); height: min(640px, calc(100dvh - 118px)); min-width: 340px; min-height: 360px; max-width: calc(100vw - 56px); max-height: calc(100dvh - 112px); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; resize: both; box-shadow: 0 16px 42px rgba(27, 55, 54, .18); }
 .gabay-chat-popover::after { display: none; }
 .gabay-chat-popover > header { min-height: 58px; padding: 9px 11px; border-radius: 15px 15px 0 0; grid-template-columns: 32px 1fr auto; gap: 8px; }
 .gabay-chat-popover > header .gabay-mascot { width: 30px; height: 30px; filter: none; }
@@ -709,7 +709,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-recent-chats small { flex: 0 0 auto; color: var(--muted); font-size: 8px; }
 .gabay-conversation-menu > p, .gabay-conversation-menu > small { margin: 9px 0 0; display: block; color: var(--muted); font-size: 8px; line-height: 1.4; }
 .gabay-clear-chat { color: #a0473d; border-color: #e5beb3; background: #fff6f2; }
-.gabay-chat-body { min-height: 130px; padding: 12px; overflow-y: auto; }
+.gabay-chat-body { flex: 1 1 auto; min-height: 130px; padding: 12px; overflow-y: auto; }
 .gabay-chat-empty { min-height: 106px; display: grid; place-content: center; justify-items: center; text-align: center; }
 .gabay-chat-empty b { font-size: 18px; }
 .gabay-chat-empty p { max-width: 320px; margin: 7px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
@@ -719,8 +719,8 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
 .gabay-chat-popover .gabay-chat-thread p strong { color: var(--ink); font-weight: 850; }
 .gabay-chat-popover .gabay-chat-thread > .gabay-context-divider { justify-content: center; align-items: center; margin: 3px 0; }
 .gabay-context-divider span { padding: 4px 9px; border-radius: 999px; color: #6b7e7b; background: #edf3f1; font-size: 10px; font-weight: 750; }
-.gabay-chat-composer { padding: 9px; border-radius: 0; grid-template-columns: minmax(0, 1fr) 40px; gap: 6px; }
-.gabay-chat-composer input { min-height: 48px; font-size: 15px; }
+.gabay-chat-composer { flex: 0 0 auto; padding: 9px; border-radius: 0; grid-template-columns: minmax(0, 1fr) 40px; gap: 6px; }
+.gabay-chat-composer input { height: 48px; font-size: 15px; }
 .gabay-chat-composer > button { width: 40px; height: 40px; border-radius: 10px; }
 .gabay-chat-composer > small { padding: 0 3px; color: #a0473d; font-size: 9px; }
 .gabay-draft-intention .gabay-mascot { width: 38px; height: 38px; flex: 0 0 38px; filter: none; }
@@ -1084,7 +1084,7 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
   .notification-panel { position: fixed; top: 72px; right: 10px; left: 10px; width: auto; }
   .gabay-topbar-assistant { width: 44px; min-height: 44px; padding: 3px; justify-content: center; }
   .gabay-topbar-assistant .gabay-mascot { width: 35px; height: 35px; }
-  .gabay-topbar-assistant > span { display: none; }
+  .gabay-topbar-assistant > span:not(.gabay-mascot) { display: none; }
   .gabay-chat-popover { top: 72px; left: 10px; right: 10px; bottom: auto; width: auto; height: min(620px, calc(100dvh - 150px)); min-width: 0; min-height: 0; max-width: none; max-height: calc(100dvh - 150px); border-radius: 15px; resize: none; }
   .gabay-chat-popover > header { border-radius: 14px 14px 0 0; }
   .gabay-chat-popover .gabay-chat-thread { max-height: min(330px, 42dvh); }
@@ -1127,3 +1127,64 @@ h1, h2, h3, p { margin-top: 0; }h1 { margin-bottom: 9px; font-size: clamp(31px, 
   .plan-page.ilaw-print-mode .ilaw-editor { display: none !important; }
   .plan-page.ilaw-print-mode .ilaw-export-document:not(.ilaw-editor) { display: block !important; color: #111; font-family: Arial, sans-serif; font-size: 9pt; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
+
+/* ---- Phone layout ---- */
+@media (max-width: 720px) {
+  /* Attendance: one row of five statuses per learner, and a save bar that follows you down the list. */
+  .student-row { padding: 12px 14px; }
+  .student-attendance-controls { justify-items: stretch; }
+  .status-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+  .status-options button { min-width: 0; min-height: 40px; padding: 6px 2px; font-size: 11px; letter-spacing: -.01em; }
+  .attendance-save-bar { position: sticky; bottom: 78px; z-index: 25; margin: 12px -4px 0; padding: 10px 14px; border: 1px solid #b9dcd5; border-radius: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(247, 244, 238, .97); box-shadow: 0 -6px 24px rgba(40, 34, 26, .12); }
+  .attendance-save-bar span { color: var(--muted); font-size: 11px; font-weight: 700; }
+  .attendance-save-bar .primary-button { min-height: 44px; padding: 0 18px; }
+
+  /* Classes: the card title was sized for a desktop hero. */
+  .class-hub-tabbed .class-workspace-head h2 { font-size: 26px; line-height: 1.1; }
+  .class-workspace-head { flex-wrap: wrap; }
+  .class-workspace-tabs { flex-wrap: wrap; }
+
+  /* Planner setup and toolbar */
+  .plan-setup > footer { flex-direction: column; align-items: stretch; }
+  .plan-setup > footer .toolbar-gabay { justify-content: center; }
+  .plan-toolbar { position: sticky; top: 70px; padding: 8px 10px; }
+  .plan-toolbar > div:first-child { width: 100%; }
+  .plan-toolbar > div:last-child { width: 100%; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr; }
+  .plan-toolbar > div:last-child .primary-button { grid-column: 1 / -1; min-height: 46px; }
+  .plan-toolbar .toolbar-gabay { grid-column: 1 / -1; justify-content: center; }
+  .grade-switcher { position: sticky; top: 150px; z-index: 24; margin: 0 0 12px; padding: 8px 10px 6px; border: 1px solid #b9dcd5; border-radius: 14px; display: flex; flex-wrap: wrap; gap: 6px; background: #eef8f5; }
+  .grade-switcher button { flex: 1 1 auto; min-height: 40px; padding: 6px 10px; border: 1px solid #b9dcd5; border-radius: 10px; background: #fff; color: var(--teal-ink); font: 800 13px var(--font-ui); }
+  .grade-switcher button.active { color: #fff; background: var(--teal-ink); border-color: var(--teal-ink); }
+  .grade-switcher small { flex-basis: 100%; margin-top: 2px; color: #4f6d69; font-size: 10px; line-height: 1.4; }
+
+  /* The document on a phone: one grade column, whole-word labels, stacked header pairs. */
+  .ilaw-export-document.ilaw-export-inline { padding: 18px 12px 24px; font-size: 10pt; }
+  .ilaw-editor .ilaw-title-input { font-size: 17pt; }
+  .ilaw-editor.narrow th, .ilaw-editor.narrow td { overflow-wrap: normal; hyphens: manual; padding: 7px 6px; }
+  .ilaw-editor.narrow .ilaw-print-section table th:first-child { width: 34%; }
+  .ilaw-editor.narrow .ilaw-print-meta { display: block; }
+  .ilaw-editor.narrow .ilaw-print-meta tbody { display: block; }
+  .ilaw-editor.narrow .ilaw-print-meta tr { display: grid; grid-template-columns: 34% 1fr; }
+  .ilaw-editor.narrow .ilaw-print-meta th, .ilaw-editor.narrow .ilaw-print-meta td { display: block; width: auto; }
+  .ilaw-editor.narrow .ilaw-print-notes { grid-template-columns: 1fr; }
+  .ilaw-editor.narrow .ilaw-print-signatures { grid-template-columns: 1fr; gap: 28px; }
+  .ilaw-editor .cell-gabay { font-size: 9pt; }
+
+  /* Lesson flow as a stack of blocks */
+  .flow-blocks { display: grid; gap: 10px; }
+  .flow-block { padding: 10px 12px 8px; border: 1px solid #555; border-radius: 8px; display: grid; gap: 6px; background: #fff; }
+  .flow-block > header { display: flex; align-items: center; gap: 10px; }
+  .flow-block > header b { font-size: 12pt; }
+  .flow-block > header label { display: flex; align-items: center; gap: 4px; color: #444; font-size: 9pt; }
+  .flow-block > header input { width: 46px; padding: 3px 4px; border: 1px solid #d9d3c8; border-radius: 4px; font: inherit; text-align: right; }
+  .flow-block-index { margin-left: auto; color: #8a8378; font-size: 8pt; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+  .flow-block .cell-input { padding: 6px 8px; border: 1px dashed #c9c2b5; }
+  .flow-block-task { display: grid; gap: 4px; margin-top: 2px; }
+  .flow-block-task > span { color: var(--teal-ink); font-size: 9pt; font-weight: 800; }
+  .flow-block-task .edit-cell { min-height: 60px; padding: 6px 8px; border: 1px dashed #c9c2b5; }
+  .flow-block > footer { margin-top: 4px; padding-top: 6px; border-top: 1px solid #eee9df; display: flex; justify-content: space-between; }
+  .flow-block > footer button { border: 0; padding: 4px 0; background: none; color: var(--teal-ink); font: 800 9pt var(--font-ui); }
+  .flow-block > footer button:last-child { color: #96331f; }
+  .flow-block > footer button:disabled { opacity: .4; }
+}
+@media (min-width: 721px) { .attendance-save-bar, .grade-switcher { display: none; } }

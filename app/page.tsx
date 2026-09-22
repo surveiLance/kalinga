@@ -1954,10 +1954,37 @@ function EditCell({ value, onChange, placeholder, label, compact = false }: { va
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
-    node.style.height = "0px";
-    node.style.height = `${node.scrollHeight}px`;
+    const fit = () => {
+      node.style.height = "0px";
+      node.style.height = `${node.scrollHeight}px`;
+    };
+    fit();
+    // Height depends on width: a cell measured before its column settled, or
+    // after the phone rotates, would otherwise keep a stale height.
+    let lastWidth = node.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (Math.abs(node.clientWidth - lastWidth) < 1) return;
+      lastWidth = node.clientWidth;
+      fit();
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [value]);
   return <textarea ref={ref} className={`edit-cell${compact ? " compact" : ""}`} aria-label={label} value={value} placeholder={placeholder} rows={1} onChange={(event) => onChange(event.target.value)} />;
+}
+
+// True below the phone breakpoint. The planner shows one grade at a time there,
+// because three grade columns cannot share a 375px screen.
+function useIsNarrow(query = "(max-width: 720px)") {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+  return narrow;
 }
 
 function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName, onSchoolNameChange, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; teacherName: string; schoolName: string; onSchoolNameChange: (name: string) => void; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
@@ -1993,6 +2020,9 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [saved, setSaved] = useState(false);
   const [setupOpen, setSetupOpen] = useState(!initialPlan);
+  const narrow = useIsNarrow();
+  const [mobileGrade, setMobileGrade] = useState<GradeLevel>((initialPlan?.grades || selectedClass?.grades || [])[0] || "");
+  const shownGrades = narrow ? grades.filter((grade) => grade === (grades.includes(mobileGrade) ? mobileGrade : grades[0])) : grades;
   const [draftingGrade, setDraftingGrade] = useState("");
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [draftingFullPlan, setDraftingFullPlan] = useState(false);
@@ -2255,7 +2285,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
 
   const gradeRow = (label: string, field: keyof typeof gradeSetters, placeholder: string, extra?: (grade: GradeLevel) => React.ReactNode) => {
     const values = { contentStandards, performanceStandards, competencies, competencyCodes, objectives, formativeAssessments, exitTasks, successCriteria, reflectionQuestions, remediations, enrichments }[field];
-    return <tr><th>{label}</th>{grades.map((grade) => <td key={grade}><EditCell label={`${label} for ${gradeLabel(grade)}`} value={values[grade] || ""} placeholder={placeholder} onChange={(value) => gradeSetters[field](grade, value)} />{extra?.(grade)}</td>)}</tr>;
+    return <tr><th>{label}</th>{shownGrades.map((grade) => <td key={grade}><EditCell label={`${label} for ${gradeLabel(grade)}`} value={values[grade] || ""} placeholder={placeholder} onChange={(value) => gradeSetters[field](grade, value)} />{extra?.(grade)}</td>)}</tr>;
   };
 
   const redraftButton = (type: "intentions" | "assessment", grade: GradeLevel) => {
@@ -2310,7 +2340,9 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
       {previousDraft && <p className="draft-restore" role="status">Gabay’s draft replaced what you had written. <button type="button" onClick={restorePreviousDraft}>Restore my previous draft</button></p>}
       {docxError && <p className="gabay-draft-error" role="alert">{docxError}</p>}
 
-      {selectedClass && <article className="ilaw-export-document ilaw-export-inline ilaw-editor" ref={documentRef}>
+      {narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}
+
+      {selectedClass && <article className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
         <header className="ilaw-print-title"><p>DAILY LESSON PLAN FOR {gradeList(grades).toUpperCase()}</p><input className="ilaw-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); touch(); }} /></header>
         <table className="ilaw-print-meta"><tbody>
           <tr><th>School</th><td><input className="cell-input" aria-label="School" value={schoolName} placeholder="School name" onChange={(event) => onSchoolNameChange(event.target.value)} /></td><th>Grade levels</th><td>{gradeList(grades)}</td></tr>
@@ -2322,7 +2354,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
 
         <section className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
           <p><b>Shared theme:</b> <EditCell compact label="Shared theme" value={sharedTheme} placeholder="One theme both grades work under" onChange={(value) => { setSharedTheme(value); touch(); }} /></p>
-          <table><thead><tr><th>Curriculum element</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
+          <table><thead><tr><th>Curriculum element</th>{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
             {gradeRow("Content standard", "contentStandards", "Pamantayang Pangnilalaman")}
             {gradeRow("Performance standard", "performanceStandards", "Pamantayan sa Pagganap")}
             {gradeRow("Learning competency", "competencies", "The competency for this grade", (grade) => <><input className="cell-input code" aria-label={`Competency code for ${gradeLabel(grade)}`} value={competencyCodes[grade] || ""} placeholder="Code, e.g. F3PB-Ia-1" onChange={(event) => gradeSetters.competencyCodes(grade, event.target.value)} />{redraftButton("intentions", grade)}</>)}
@@ -2335,21 +2367,29 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
             <p><b>Learner context:</b> <EditCell compact label="Learner context" value={learnerContext} placeholder="Who these learners are and what they bring" onChange={(value) => { setLearnerContext(value); touch(); }} /></p>
             <p><b>Materials and references:</b> <EditCell compact label="Materials and references" value={materials} placeholder="Materials, then references" onChange={(value) => { setMaterials(value); touch(); }} /></p>
           </div>
-          <table className="ilaw-flow-table"><thead><tr><th>Time</th><th>Stage / teacher focus</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}<th className="row-tools-head" aria-label="Row actions" /></tr></thead><tbody>
+          {narrow ? <div className="flow-blocks">
+            {slots.map((slot, index) => <article className="flow-block" key={slot.id}>
+              <header><b>{slot.time}</b><label><input type="number" min={1} max={240} aria-label="Minutes" value={slot.durationMinutes || 10} onChange={(event) => updateSlot(slot.id, { durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /> min</label><span className="flow-block-index">Block {index + 1}</span></header>
+              <input className="cell-input strong" list="ilaw-stages" aria-label="Stage" value={slot.stage || ""} placeholder="Stage (e.g. Motivation)" onChange={(event) => updateSlot(slot.id, { stage: event.target.value })} />
+              <input className="cell-input" list="ilaw-focus" aria-label="Teacher focus" value={slot.teacherFocus} placeholder="Who the teacher is with" onChange={(event) => updateSlot(slot.id, { teacherFocus: event.target.value })} />
+              {shownGrades.map((grade) => <label className="flow-block-task" key={grade}><span>{gradeLabel(grade)} activity</span><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`What ${gradeLabel(grade)} does in this block`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></label>)}
+              <footer><button type="button" onClick={() => addSlot(slot.id)}>＋ Add block below</button><button type="button" disabled={slots.length === 1} onClick={() => removeSlot(slot.id)}>Remove</button></footer>
+            </article>)}
+          </div> : <table className="ilaw-flow-table"><thead><tr><th>Time</th><th>Stage / teacher focus</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}<th className="row-tools-head" aria-label="Row actions" /></tr></thead><tbody>
             {slots.map((slot) => <tr key={slot.id}>
               <td className="flow-time"><b>{slot.time}</b><label><input type="number" min={1} max={240} aria-label="Minutes" value={slot.durationMinutes || 10} onChange={(event) => updateSlot(slot.id, { durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /> min</label></td>
               <td><input className="cell-input strong" list="ilaw-stages" aria-label="Stage" value={slot.stage || ""} placeholder="Stage" onChange={(event) => updateSlot(slot.id, { stage: event.target.value })} /><input className="cell-input" list="ilaw-focus" aria-label="Teacher focus" value={slot.teacherFocus} placeholder="Who the teacher is with" onChange={(event) => updateSlot(slot.id, { teacherFocus: event.target.value })} /></td>
               {grades.map((grade) => <td key={grade}><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`${gradeLabel(grade)} activity`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></td>)}
               <td className="row-tools"><button type="button" aria-label="Add a block after this one" title="Add block below" onClick={() => addSlot(slot.id)}>＋</button><button type="button" aria-label="Remove this block" title="Remove block" disabled={slots.length === 1} onClick={() => removeSlot(slot.id)}>×</button></td>
             </tr>)}
-          </tbody></table>
+          </tbody></table>}
           <datalist id="ilaw-stages">{ilawStages.map((stage) => <option value={stage} key={stage} />)}</datalist>
           <datalist id="ilaw-focus">{["All grades together", ...grades.map((grade) => `Guide ${gradeLabel(grade)}`), "Independent work", "Peer-led"].map((item) => <option value={item} key={item} />)}</datalist>
           <p className="flow-footer"><button type="button" className="text-button" onClick={() => addSlot()}>＋ Add a block</button><button type="button" className="text-button" onClick={resetTeachingFlow}>Reset to the default rotation</button></p>
         </section>
 
         <section className="ilaw-print-section"><h2><span>A</span> Assessment</h2>
-          <table><thead><tr><th>Learning check</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
+          <table><thead><tr><th>Learning check</th>{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
             {gradeRow("Formative assessment", "formativeAssessments", "How you will check understanding during the lesson", (grade) => redraftButton("assessment", grade))}
             {gradeRow("Exit task", "exitTasks", "What each learner hands in or shows")}
             {gradeRow("Success criteria", "successCriteria", "What good looks like")}
@@ -2357,7 +2397,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
         </section>
 
         <section className="ilaw-print-section ways-forward-print-section"><h2><span>W</span> Ways Forward</h2>
-          <table><thead><tr><th>Next step</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
+          <table><thead><tr><th>Next step</th>{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
             {gradeRow("Reflection question", "reflectionQuestions", "What you will ask yourself after teaching")}
             {gradeRow("Remediation", "remediations", "Support for learners below the target")}
             {gradeRow("Enrichment", "enrichments", "Extension for learners who are ready")}
@@ -2697,6 +2737,7 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
       </section>
       <aside className="attendance-summary"><p className="eyebrow">{gradeFilter === "all" ? "ALL STUDENTS" : gradeLabel(gradeFilter).toUpperCase()} SUMMARY</p><h3>{learnerCountLabel(learners.length)}</h3><div className="summary-ring" style={{ background: `radial-gradient(circle, var(--paper) 55%, transparent 57%), conic-gradient(#46aa95 0 ${attendanceRate}%, #e8e3d9 ${attendanceRate}% 100%)` }}><strong>{attendanceRate}%</strong><span>attended</span></div><p className="attendance-rate-note">Present and late learners count as attended.</p>{attendanceStatuses.map((status) => <div className={`summary-stat ${status.toLowerCase()}`} key={status}><span>{status}</span><strong>{counts[status] || 0}</strong></div>)}<div className="sync-note"><span className="status-dot" /><p><b>Saved locally first</b><small>Records and attendance notes persist on this device and can sync when a connection returns.</small></p></div></aside>
     </div>
+    <div className="attendance-save-bar"><span>{learners.length} learners · {counts.Present || 0} present</span><button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved" : "Save attendance"}</button></div>
   </div>;
 }
 
