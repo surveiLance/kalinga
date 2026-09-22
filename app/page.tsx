@@ -2015,6 +2015,9 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   const [enrichments, setEnrichments] = useState<Record<GradeLevel, string>>(initialPlan?.enrichments || Object.fromEntries((selectedClass?.grades || []).map((grade) => [grade, initialPlan?.enrichment || ""])));
   const [nextSessionNotes, setNextSessionNotes] = useState(initialPlan?.nextSessionNotes || "");
   const [schoolHeadName, setSchoolHeadName] = useState(initialPlan?.schoolHeadName || "");
+  const [draftNotes, setDraftNotes] = useState(initialPlan?.draftNotes || "");
+  const [topicPrompt, setTopicPrompt] = useState("");
+  const topicRef = useRef<HTMLInputElement>(null);
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
   const [saved, setSaved] = useState(false);
   const [setupOpen, setSetupOpen] = useState(!initialPlan);
@@ -2133,6 +2136,18 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     touch();
   }
 
+  const topicReady = Boolean(lessonTitle.trim());
+
+  // Gabay cannot write a specific plan for "Mathematics". Without a topic the
+  // draft buttons lead the teacher to the topic field instead of calling the API.
+  function requireTopic(): boolean {
+    if (topicReady) { setTopicPrompt(""); return true; }
+    setSetupOpen(true);
+    setTopicPrompt("Tell Gabay what this lesson is about first — the more specific, the better the plan.");
+    window.requestAnimationFrame(() => { topicRef.current?.focus(); topicRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); });
+    return false;
+  }
+
   function draftContext(pageStep: string, summary: string[]): GabayPageContext {
     return {
       view: "plan",
@@ -2143,11 +2158,11 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
       subjects: selectedClass?.subjects || [],
       learnerCount: selectedClass?.learners.length || 0,
       subject,
-      lessonTopic: lessonTitle.trim() || sharedTheme.trim() || `${subject} lesson`,
+      lessonTopic: lessonTitle.trim(),
       lessonDuration: `${targetMinutes} minutes starting at ${startTime}`,
       language,
       incompleteSections: incompletePlanSections,
-      currentSummary: summary,
+      currentSummary: [...(draftNotes.trim() ? [`Teacher's notes for this draft: ${draftNotes.trim()}`] : []), ...summary],
       availableActions: ["Edit any field directly", "Redraft again", "Save the lesson"],
       offline: typeof navigator !== "undefined" && !navigator.onLine,
     };
@@ -2160,7 +2175,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   // A single grade's section is redrafted in place; the teacher asked for it and
   // can keep typing over the result.
   async function redraftGrade(type: "intentions" | "assessment", grade: GradeLevel) {
-    if (!selectedClass || draftingGrade) return;
+    if (!selectedClass || draftingGrade || !requireTopic()) return;
     const key = `${type}:${grade}`;
     setDraftingGrade(key);
     setCellErrors((current) => ({ ...current, [key]: "" }));
@@ -2181,7 +2196,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   }
 
   async function draftCompletePlan() {
-    if (!selectedClass || draftingFullPlan) return;
+    if (!selectedClass || draftingFullPlan || !requireTopic()) return;
     setDraftingFullPlan(true);
     setFullPlanDraftError("");
     const result = await requestGabayDraft("full-plan", draftContext("Complete ILAW draft", [`Quarter: ${quarter}`, `Language: ${language}`, `Multigrade approach: ${multigradeModel}`, ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`)]), "");
@@ -2234,7 +2249,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     competencies, competencyCodes, contentStandards, performanceStandards, sharedTheme, multigradeModel, objectives, learnerContext, materials,
     formativeAssessments, exitTasks, successCriteria, reflectionQuestions, remediations, enrichments,
     reflection: Object.values(reflectionQuestions).filter(Boolean).join("\n"), remediation: Object.values(remediations).filter(Boolean).join("\n"), enrichment: Object.values(enrichments).filter(Boolean).join("\n"),
-    nextSessionNotes, schoolHeadName, slots, savedAt: "just now",
+    nextSessionNotes, schoolHeadName, draftNotes, slots, savedAt: "just now",
   } : null;
 
   function saveCurrentPlan(openTeachingView = false) {
@@ -2300,9 +2315,11 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
           <div className="plan-setup-grid">
             <label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
             <label>Subject<input list="plan-subjects" value={subject} onChange={(event) => { setSubject(event.target.value); touch(); }} placeholder="e.g. Filipino" /><datalist id="plan-subjects">{[...new Set([...(selectedClass?.subjects || []), ...commonSubjects])].map((item) => <option value={item} key={item} />)}</datalist></label>
-            <label>Topic <small>Optional</small><input value={lessonTitle} onChange={(event) => { setLessonTitle(event.target.value); touch(); }} placeholder="e.g. Tekstong impormatibo" /></label>
+            <label className={topicPrompt ? "needs-topic" : ""}>Lesson topic <small>Needed for Gabay</small><input ref={topicRef} value={lessonTitle} onChange={(event) => { setLessonTitle(event.target.value); if (event.target.value.trim()) setTopicPrompt(""); touch(); }} placeholder="e.g. Adding fractions with like denominators" /></label>
             <label>Teaching date<input type="date" value={teachingDate} onChange={(event) => { setTeachingDate(event.target.value); touch(); }} /></label>
           </div>
+          {topicPrompt && <p className="topic-prompt" role="alert">{topicPrompt}</p>}
+          <label className="plan-setup-notes">Anything Gabay should know <small>Optional</small><textarea rows={2} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder="e.g. Grade 3 still struggles with regrouping. No printer. We have bottle caps and a chalkboard." /></label>
           <details className="plan-setup-more">
             <summary><span>{quarter} · {startTime} · {targetMinutes} min · {language} · {multigradeModel}</span><b>Change</b></summary>
             <div className="plan-setup-grid">
@@ -2315,7 +2332,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
             </div>
           </details>
           <footer>
-            <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Gabay is drafting the whole plan…" : "Draft the whole plan with Gabay"}</button>
+            <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Gabay is drafting the whole plan…" : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>
             <button className="secondary-button" type="button" onClick={() => setSetupOpen(false)}>I’ll write it myself</button>
           </footer>
         </> : <button type="button" className="plan-setup-summary" onClick={() => setSetupOpen(true)}><span><b>{selectedClass?.name}</b> · {subject || "No subject"} · {printedDate || "No date"} · {quarter} · {startTime} · {targetMinutes} min · {language}</span><b>Change setup</b></button>}
@@ -2328,7 +2345,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
           {plannedMinutes !== targetMinutes && <span className="plan-time-warning">Blocks add up to {plannedMinutes} min; the lesson is {targetMinutes} min.</span>}
         </div>
         <div>
-          {!setupOpen && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : "Draft with Gabay"}</button>}
+          {!setupOpen && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : topicReady ? "Draft with Gabay" : "Add a topic to draft"}</button>}
           <button className="secondary-button" type="button" onClick={exportCurrentPlan}>Print / PDF</button>
           <button className="secondary-button" type="button" disabled={downloadingDocx} onClick={downloadCurrentPlanDocx}>{downloadingDocx ? "Preparing…" : "Download Word"}</button>
           <button className="secondary-button" type="button" onClick={() => saveCurrentPlan(true)}>Teaching guide</button>

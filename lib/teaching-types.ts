@@ -86,6 +86,7 @@ export type SavedPlan = {
   enrichment?: string;
   nextSessionNotes?: string;
   schoolHeadName?: string;
+  draftNotes?: string;
   slots: PlanSlot[];
   savedAt: string;
 };
