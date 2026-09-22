@@ -41,3 +41,6 @@ yarn-error.log*
 /work/
 /supabase/.temp/
 *.tsbuildinfo
+
+# Claude Code local run config
+/.claude/
