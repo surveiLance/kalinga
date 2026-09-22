@@ -47,3 +47,34 @@ export function planTimeRange(plan: SavedPlan) {
   const minutes = Number.parseInt(plan.duration, 10) || 80;
   return `${start}–${formatTime(toMinutes(start) + minutes)} · ${minutes} minutes`;
 }
+
+// DepEd forms write grade levels in Roman numerals: "GRADE III & IV".
+const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+
+export function romanGrade(grade: GradeLevel) {
+  const number = Number(grade);
+  return Number.isInteger(number) && number >= 1 && number <= 12 ? romanNumerals[number] : grade === "Kindergarten" ? "KINDERGARTEN" : grade.toUpperCase();
+}
+
+export function planTitleLine(grades: GradeLevel[]) {
+  const labels = grades.map(romanGrade);
+  const joined = labels.length > 1 ? `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]}` : labels[0] || "";
+  return `DAILY LESSON PLAN FOR GRADE ${joined}`;
+}
+
+// A whole-class block prints as one cell spanning every grade, as the DepEd form
+// does for Motivation and Wrap-Up. Older plans carry no flag, so identical text
+// in every grade column is read as the same intent.
+export function slotIsWholeClass(slot: PlanSlot) {
+  if (typeof slot.wholeClass === "boolean") return slot.wholeClass;
+  const tasks = Object.values(slot.gradeTasks).map((task) => task.trim().toLowerCase());
+  return tasks.length > 1 && tasks.every((task) => task && task === tasks[0]);
+}
+
+export function wholeClassTask(slot: PlanSlot) {
+  return Object.values(slot.gradeTasks).find((task) => task.trim()) || "";
+}
+
+export function withWholeClassTask(slot: PlanSlot, grades: GradeLevel[], task: string): PlanSlot {
+  return { ...slot, wholeClass: true, gradeTasks: Object.fromEntries(grades.map((grade) => [grade, task])) };
+}

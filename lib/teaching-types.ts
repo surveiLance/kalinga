@@ -51,6 +51,7 @@ export type PlanSlot = {
   time: string;
   stage?: string;
   durationMinutes?: number;
+  wholeClass?: boolean;
   teacherFocus: string;
   gradeTasks: Record<GradeLevel, string>;
 };

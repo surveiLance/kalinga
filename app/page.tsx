@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { attendanceStatusLabel, attendanceStatuses, isStoredAttendanceStatus, toStoredAttendanceStatus } from "@/lib/attendance";
-import { ilawStages, learnerCountSummary, planHasTeacherContent, retimeSlots, slotsTotalMinutes } from "@/lib/lesson-plan";
+import { ilawStages, learnerCountSummary, planHasTeacherContent, planTitleLine, retimeSlots, slotIsWholeClass, slotsTotalMinutes, wholeClassTask, withWholeClassTask } from "@/lib/lesson-plan";
 import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGradeLevels } from "@/lib/grades";
 import { createSampleLearners, learnerRosterSummary, learnerSexCounts, normalizeLearnerSex } from "@/lib/learners";
 import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes, weekDays } from "@/lib/schedule";
@@ -1859,7 +1859,7 @@ function createSchedule(grades: GradeLevel[], startTime = "8:00 AM", duration: s
     teacherFocus: `Guide ${gradeLabel(focusGrade)}`,
     gradeTasks: Object.fromEntries(grades.map((grade) => [grade, grade === focusGrade ? "Guided lesson" : "Independent task"])),
   }));
-  return [{ id: "slot-shared", time: startTime, stage: "Motivation", durationMinutes: sharedMinutes, teacherFocus: "All grades together", gradeTasks: sharedTasks }, ...guidedSlots];
+  return [{ id: "slot-shared", time: startTime, stage: "Motivation", durationMinutes: sharedMinutes, wholeClass: true, teacherFocus: "All grades together", gradeTasks: sharedTasks }, ...guidedSlots];
 }
 
 function corePlanTasksReady(plan: SavedPlan) {
@@ -1928,20 +1928,56 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
 
 function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = false }: { plan: SavedPlan; teachingClass: TeachingClass; teacherName: string; schoolName: string; inline?: boolean }) {
   const printedDate = plan.teachingDate ? new Date(`${plan.teachingDate}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" }) : "";
+  const lines = (value?: string) => (value || "—").split(/\r?\n/).map((line, index) => <Fragment key={index}>{index > 0 && <br />}{line}</Fragment>);
+  const gradeRow = (label: string, values?: Record<GradeLevel, string>, extra?: Record<GradeLevel, string>) => <tr><th>{label}</th>{plan.grades.map((grade) => <td key={grade}>{lines(values?.[grade])}{extra?.[grade]?.trim() && <small>{extra[grade]}</small>}</td>)}</tr>;
+  const gradeHead = <thead><tr><th />{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead>;
   return <article className={`ilaw-export-document${inline ? " ilaw-export-inline" : ""}`}>
-    <header className="ilaw-print-title"><p>DAILY LESSON PLAN FOR {gradeList(plan.grades).toUpperCase()}</p><h1>{plan.title}</h1></header>
+    <header className="ilaw-print-title"><p>{planTitleLine(plan.grades)}</p><h1>{plan.title}</h1></header>
     <table className="ilaw-print-meta"><tbody>
-      <tr><th>School</th><td>{schoolName.trim() || "—"}</td><th>Grade levels</th><td>{gradeList(plan.grades)}</td></tr>
-      <tr><th>Teacher</th><td>{teacherName}</td><th>Learning area</th><td>{plan.subject}</td></tr>
-      <tr><th>Teaching date</th><td>{printedDate || "Not set"}</td><th>Quarter / term</th><td>{plan.quarter}</td></tr>
-      <tr><th>Time / sessions</th><td>1 session, {plan.duration} · {plan.startTime}</td><th>No. of learners</th><td>{learnerCountSummary(teachingClass, plan.grades)}</td></tr>
-      <tr><th>Language</th><td>{plan.language || "—"}</td><th>Multigrade model</th><td>{plan.multigradeModel || "—"}</td></tr>
+      <tr><th>School</th><td>{schoolName.trim() || "—"}</td><th>Grade Levels</th><td>{gradeList(plan.grades)}</td></tr>
+      <tr><th>Teacher</th><td>{teacherName}</td><th>Learning Area</th><td>{plan.subject}</td></tr>
+      <tr><th>Teaching Date</th><td>{printedDate || "—"}</td><th>Quarter/Term</th><td>{plan.quarter}</td></tr>
+      <tr><th>Time / Sessions</th><td>1 session, {plan.duration} · {plan.startTime}</td><th>No. of Learners</th><td>{learnerCountSummary(teachingClass, plan.grades)}</td></tr>
+      <tr><th>Multigrade Model</th><td colSpan={3}>{plan.multigradeModel || "—"}</td></tr>
     </tbody></table>
-    <section className="ilaw-print-section"><h2><span>I</span> Intentions</h2>{plan.sharedTheme?.trim() && <p><b>Shared theme:</b> {plan.sharedTheme}</p>}<table><thead><tr><th>Curriculum element</th>{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody><tr><th>Content standard</th>{plan.grades.map((grade) => <td key={grade}>{plan.contentStandards?.[grade] || "—"}</td>)}</tr><tr><th>Performance standard</th>{plan.grades.map((grade) => <td key={grade}>{plan.performanceStandards?.[grade] || "—"}</td>)}</tr><tr><th>Learning competency / code</th>{plan.grades.map((grade) => <td key={grade}>{plan.competencies?.[grade] || "—"}{plan.competencyCodes?.[grade] && <small>{plan.competencyCodes[grade]}</small>}</td>)}</tr><tr><th>Learning objective</th>{plan.grades.map((grade) => <td key={grade}>{plan.objectives?.[grade] || "—"}</td>)}</tr></tbody></table></section>
-    <section className="ilaw-print-section"><h2><span>L</span> Learning Experience</h2><div className="ilaw-print-notes"><p><b>Learner context:</b> {plan.learnerContext || "—"}</p><p><b>Materials and references:</b> {plan.materials || "—"}</p></div><table><thead><tr><th>Time</th><th>Stage / teacher focus</th>{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>{plan.slots.map((slot) => <tr key={slot.id}><td>{slot.time}<small>{slot.durationMinutes ? `${slot.durationMinutes} min` : ""}</small></td><td><b>{slot.stage || "Learning activity"}</b><small>{slot.teacherFocus}</small></td>{plan.grades.map((grade) => <td key={grade}>{slot.gradeTasks[grade] || "—"}</td>)}</tr>)}</tbody></table></section>
-    <section className="ilaw-print-section"><h2><span>A</span> Assessment</h2><table><thead><tr><th>Learning check</th>{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody><tr><th>Formative assessment</th>{plan.grades.map((grade) => <td key={grade}>{plan.formativeAssessments?.[grade] || "—"}</td>)}</tr><tr><th>Exit task</th>{plan.grades.map((grade) => <td key={grade}>{plan.exitTasks?.[grade] || "—"}</td>)}</tr><tr><th>Success criteria</th>{plan.grades.map((grade) => <td key={grade}>{plan.successCriteria?.[grade] || "—"}</td>)}</tr></tbody></table></section>
-    <section className="ilaw-print-section ways-forward-print-section"><h2><span>W</span> Ways Forward</h2><table><thead><tr><th>Next step</th>{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody><tr><th>Reflection question</th>{plan.grades.map((grade) => <td key={grade}>{plan.reflectionQuestions?.[grade] || "—"}</td>)}</tr><tr><th>Remediation</th>{plan.grades.map((grade) => <td key={grade}>{plan.remediations?.[grade] || "—"}</td>)}</tr><tr><th>Enrichment</th>{plan.grades.map((grade) => <td key={grade}>{plan.enrichments?.[grade] || "—"}</td>)}</tr></tbody></table><p><b>Notes for the next session:</b> {plan.nextSessionNotes || "—"}</p></section>
-    <footer className="ilaw-print-signatures"><div><span>Prepared by:</span><b>{teacherName}</b><small>Teacher</small></div><div><span>Checked by:</span><b>{plan.schoolHeadName || " "}</b><small>School Head</small></div></footer>
+    <section className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
+      {plan.sharedTheme?.trim() && <p><b>Shared Sub-theme:</b> {lines(plan.sharedTheme)}</p>}
+      <table>{gradeHead}<tbody>
+        {gradeRow("Pamantayang Pangnilalaman (Content Standard)", plan.contentStandards)}
+        {gradeRow("Pamantayan sa Pagganap (Performance Standard)", plan.performanceStandards)}
+        {gradeRow("Learning Competencies and Codes", plan.competencies, plan.competencyCodes)}
+        {gradeRow("Learning Objectives", plan.objectives)}
+      </tbody></table>
+    </section>
+    <section className="ilaw-print-section"><h2><span>L</span> Learning Experience</h2>
+      <div className="ilaw-print-notes"><p><b>Learner Context:</b> {lines(plan.learnerContext)}</p><p><b>Instructional Materials and Resources:</b> {lines(plan.materials)}</p></div>
+      <p><b>Flow of the Lesson</b></p>
+      <table className="ilaw-flow-table"><thead><tr><th>Time</th><th>Stage</th>{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
+        {plan.slots.map((slot) => <tr key={slot.id}>
+          <td>{slot.durationMinutes ? `${slot.durationMinutes} min` : ""}<small>{slot.time}</small></td>
+          <td><b>{slot.stage || "Learning activity"}</b>{slot.teacherFocus?.trim() && <small>{slot.teacherFocus}</small>}</td>
+          {slotIsWholeClass(slot)
+            ? <td colSpan={plan.grades.length}>{lines(wholeClassTask(slot))}</td>
+            : plan.grades.map((grade) => <td key={grade}>{lines(slot.gradeTasks[grade])}</td>)}
+        </tr>)}
+      </tbody></table>
+    </section>
+    <section className="ilaw-print-section"><h2><span>A</span> Assessment</h2>
+      <table>{gradeHead}<tbody>
+        {gradeRow("Formative", plan.formativeAssessments)}
+        {gradeRow("Exit Task", plan.exitTasks)}
+        {gradeRow("Success Criteria", plan.successCriteria)}
+      </tbody></table>
+    </section>
+    <section className="ilaw-print-section ways-forward-print-section"><h2><span>W</span> Ways Forward</h2>
+      <table>{gradeHead}<tbody>
+        {gradeRow("Reflection Questions", plan.reflectionQuestions)}
+        {gradeRow("Remediation", plan.remediations)}
+        {gradeRow("Enrichment", plan.enrichments)}
+      </tbody></table>
+      <p><b>Notes for Next Session / Whole-School Follow-Up:</b> {lines(plan.nextSessionNotes)}</p>
+    </section>
+    <footer className="ilaw-print-signatures"><div><span>Prepared by:</span><b>{teacherName}</b><small>Classroom Adviser</small></div><div><span>Checked by:</span><b>{plan.schoolHeadName || " "}</b><small>School Head</small></div></footer>
   </article>;
 }
 
@@ -2117,10 +2153,23 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     touch();
   }
 
+  function updateWholeClassTask(slotId: string, value: string) {
+    setSlots((current) => current.map((slot) => slot.id === slotId ? withWholeClassTask(slot, grades, value) : slot));
+    touch();
+  }
+
+  function setSlotWholeClass(slotId: string, wholeClass: boolean) {
+    setSlots((current) => current.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      return wholeClass ? withWholeClassTask(slot, grades, wholeClassTask(slot)) : { ...slot, wholeClass: false };
+    }));
+    touch();
+  }
+
   function addSlot(afterId?: string) {
     setSlots((current) => {
       const index = afterId ? current.findIndex((slot) => slot.id === afterId) : current.length - 1;
-      const fresh: PlanSlot = { id: `slot-${Date.now()}`, time: startTime, stage: "Application", durationMinutes: 10, teacherFocus: "All grades together", gradeTasks: emptyByGrade(grades) };
+      const fresh: PlanSlot = { id: `slot-${Date.now()}`, time: startTime, stage: "Application", durationMinutes: 10, wholeClass: false, teacherFocus: "Independent work", gradeTasks: emptyByGrade(grades) };
       return retimeSlots([...current.slice(0, index + 1), fresh, ...current.slice(index + 1)], startTime);
     });
     touch();
@@ -2240,7 +2289,11 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     setCompetencies(fromDraft("competency")); setCompetencyCodes(fromDraft("competencyCode")); setContentStandards(fromDraft("contentStandard")); setPerformanceStandards(fromDraft("performanceStandard")); setObjectives(fromDraft("objective"));
     setFormativeAssessments(fromDraft("formativeAssessment")); setExitTasks(fromDraft("exitTask")); setSuccessCriteria(fromDraft("successCriteria"));
     setReflectionQuestions(fromDraft("reflectionQuestion")); setRemediations(fromDraft("remediation")); setEnrichments(fromDraft("enrichment"));
-    setSlots(retimeSlots(draft.slots.map((slot, index) => ({ id: `slot-gabay-${Date.now()}-${index}`, time: startTime, stage: slot.stage, durationMinutes: slot.durationMinutes, teacherFocus: slot.teacherFocus, gradeTasks: Object.fromEntries(grades.map((grade) => [grade, slot.gradeTasks[grade] || slot.gradeTasks[gradeLabel(grade)] || ""])) })), startTime));
+    setSlots(retimeSlots(draft.slots.map((slot, index) => {
+      const gradeTasks = Object.fromEntries(grades.map((grade) => [grade, slot.gradeTasks[grade] || slot.gradeTasks[gradeLabel(grade)] || ""]));
+      const built: PlanSlot = { id: `slot-gabay-${Date.now()}-${index}`, time: startTime, stage: slot.stage, durationMinutes: slot.durationMinutes, teacherFocus: slot.teacherFocus, gradeTasks };
+      return { ...built, wholeClass: /all grades|whole[- ]class|buong klase/i.test(slot.teacherFocus + " " + slot.stage) || slotIsWholeClass(built) };
+    }), startTime));
     touch();
   }
 
@@ -2358,69 +2411,74 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
       {narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}
 
       {selectedClass && <article className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
-        <header className="ilaw-print-title"><p>DAILY LESSON PLAN FOR {gradeList(grades).toUpperCase()}</p><input className="ilaw-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); touch(); }} /></header>
+        <header className="ilaw-print-title"><p>{planTitleLine(grades)}</p><input className="ilaw-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); touch(); }} /></header>
         <table className="ilaw-print-meta"><tbody>
-          <tr><th>School</th><td><input className="cell-input" aria-label="School" value={schoolName} placeholder="School name" onChange={(event) => onSchoolNameChange(event.target.value)} /></td><th>Grade levels</th><td>{gradeList(grades)}</td></tr>
-          <tr><th>Teacher</th><td>{teacherName}</td><th>Learning area</th><td>{subject || "—"}</td></tr>
-          <tr><th>Teaching date</th><td>{printedDate || "Not set"}</td><th>Quarter / term</th><td>{quarter}</td></tr>
-          <tr><th>Time / sessions</th><td>1 session, {targetMinutes} minutes · {startTime}</td><th>No. of learners</th><td>{learnerCountSummary(selectedClass, grades)}</td></tr>
-          <tr><th>Language</th><td>{language}</td><th>Multigrade model</th><td>{multigradeModel}</td></tr>
+          <tr><th>School</th><td><input className="cell-input" aria-label="School" value={schoolName} placeholder="School name" onChange={(event) => onSchoolNameChange(event.target.value)} /></td><th>Grade Levels</th><td>{gradeList(grades)}</td></tr>
+          <tr><th>Teacher</th><td>{teacherName}</td><th>Learning Area</th><td>{subject || "—"}</td></tr>
+          <tr><th>Teaching Date</th><td>{printedDate || "Not set"}</td><th>Quarter/Term</th><td>{quarter}</td></tr>
+          <tr><th>Time / Sessions</th><td>1 session, {targetMinutes} minutes · {startTime}</td><th>No. of Learners</th><td>{learnerCountSummary(selectedClass, grades)}</td></tr>
+          <tr><th>Multigrade Model</th><td colSpan={3}><EditCell compact label="Multigrade model" value={multigradeModel} placeholder="e.g. Same Theme, Different Task (STDT) with a Grade 4 peer leader supporting Grade 3" onChange={(value) => { setMultigradeModel(value); touch(); }} /></td></tr>
         </tbody></table>
 
         <section className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
-          <p><b>Shared theme:</b> <EditCell compact label="Shared theme" value={sharedTheme} placeholder="One theme both grades work under" onChange={(value) => { setSharedTheme(value); touch(); }} /></p>
-          <table><thead><tr><th>Curriculum element</th>{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
-            {gradeRow("Content standard", "contentStandards", "Pamantayang Pangnilalaman")}
-            {gradeRow("Performance standard", "performanceStandards", "Pamantayan sa Pagganap")}
-            {gradeRow("Learning competency", "competencies", "The competency for this grade", (grade) => <><input className="cell-input code" aria-label={`Competency code for ${gradeLabel(grade)}`} value={competencyCodes[grade] || ""} placeholder="Code, e.g. F3PB-Ia-1" onChange={(event) => gradeSetters.competencyCodes(grade, event.target.value)} />{redraftButton("intentions", grade)}</>)}
-            {gradeRow("Learning objective", "objectives", "What learners will be able to do")}
+          <p><b>Shared Sub-theme:</b> <EditCell compact label="Shared sub-theme" value={sharedTheme} placeholder="The theme every grade works under this session" onChange={(value) => { setSharedTheme(value); touch(); }} /></p>
+          <table><thead><tr><th />{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
+            {gradeRow("Pamantayang Pangnilalaman (Content Standard)", "contentStandards", "Naipamamalas ng mag-aaral ang…")}
+            {gradeRow("Pamantayan sa Pagganap (Performance Standard)", "performanceStandards", "Nagagamit ng mag-aaral ang…")}
+            {gradeRow("Learning Competencies and Codes", "competencies", "The competency for this grade", (grade) => <><input className="cell-input code" aria-label={`Competency code for ${gradeLabel(grade)}`} value={competencyCodes[grade] || ""} placeholder="Code, e.g. F3PB-Ia-1" onChange={(event) => gradeSetters.competencyCodes(grade, event.target.value)} />{redraftButton("intentions", grade)}</>)}
+            {gradeRow("Learning Objectives", "objectives", "What learners will be able to do by the end")}
           </tbody></table>
         </section>
 
         <section className="ilaw-print-section"><h2><span>L</span> Learning Experience</h2>
           <div className="ilaw-print-notes">
-            <p><b>Learner context:</b> <EditCell compact label="Learner context" value={learnerContext} placeholder="Who these learners are and what they bring" onChange={(value) => { setLearnerContext(value); touch(); }} /></p>
-            <p><b>Materials and references:</b> <EditCell compact label="Materials and references" value={materials} placeholder="Materials, then references" onChange={(value) => { setMaterials(value); touch(); }} /></p>
+            <p><b>Learner Context:</b> <EditCell compact label="Learner context" value={learnerContext} placeholder="Who these learners are and what they bring to this lesson" onChange={(value) => { setLearnerContext(value); touch(); }} /></p>
+            <p><b>Instructional Materials and Resources:</b> <EditCell compact label="Instructional materials and resources" value={materials} placeholder={"Mga Kagamitan: …\nMga Sanggunian: …"} onChange={(value) => { setMaterials(value); touch(); }} /></p>
           </div>
           {narrow ? <div className="flow-blocks">
             {slots.map((slot, index) => <article className="flow-block" key={slot.id}>
               <header><b>{slot.time}</b><label><input type="number" min={1} max={240} aria-label="Minutes" value={slot.durationMinutes || 10} onChange={(event) => updateSlot(slot.id, { durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /> min</label><span className="flow-block-index">Block {index + 1}</span></header>
               <input className="cell-input strong" list="ilaw-stages" aria-label="Stage" value={slot.stage || ""} placeholder="Stage (e.g. Motivation)" onChange={(event) => updateSlot(slot.id, { stage: event.target.value })} />
               <input className="cell-input" list="ilaw-focus" aria-label="Teacher focus" value={slot.teacherFocus} placeholder="Who the teacher is with" onChange={(event) => updateSlot(slot.id, { teacherFocus: event.target.value })} />
-              {shownGrades.map((grade) => <label className="flow-block-task" key={grade}><span>{gradeLabel(grade)} activity</span><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`What ${gradeLabel(grade)} does in this block`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></label>)}
+              <label className="whole-class-toggle"><input type="checkbox" checked={slotIsWholeClass(slot)} onChange={(event) => setSlotWholeClass(slot.id, event.target.checked)} /> Whole class does this together</label>
+              {slotIsWholeClass(slot)
+                ? <label className="flow-block-task"><span>Whole-class activity</span><EditCell label={`Whole-class activity at ${slot.time}`} value={wholeClassTask(slot)} placeholder="What the whole class does together" onChange={(value) => updateWholeClassTask(slot.id, value)} /></label>
+                : shownGrades.map((grade) => <label className="flow-block-task" key={grade}><span>{gradeLabel(grade)} activity</span><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`What ${gradeLabel(grade)} does in this block`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></label>)}
               <footer><button type="button" onClick={() => addSlot(slot.id)}>＋ Add block below</button><button type="button" disabled={slots.length === 1} onClick={() => removeSlot(slot.id)}>Remove</button></footer>
             </article>)}
-          </div> : <table className="ilaw-flow-table"><thead><tr><th>Time</th><th>Stage / teacher focus</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}<th className="row-tools-head" aria-label="Row actions" /></tr></thead><tbody>
+          </div> : <><p className="flow-heading"><b>Flow of the Lesson</b></p><table className="ilaw-flow-table"><thead><tr><th>Time</th><th>Stage</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}<th className="row-tools-head" aria-label="Row actions" /></tr></thead><tbody>
             {slots.map((slot) => <tr key={slot.id}>
               <td className="flow-time"><b>{slot.time}</b><label><input type="number" min={1} max={240} aria-label="Minutes" value={slot.durationMinutes || 10} onChange={(event) => updateSlot(slot.id, { durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /> min</label></td>
-              <td><input className="cell-input strong" list="ilaw-stages" aria-label="Stage" value={slot.stage || ""} placeholder="Stage" onChange={(event) => updateSlot(slot.id, { stage: event.target.value })} /><input className="cell-input" list="ilaw-focus" aria-label="Teacher focus" value={slot.teacherFocus} placeholder="Who the teacher is with" onChange={(event) => updateSlot(slot.id, { teacherFocus: event.target.value })} /></td>
-              {grades.map((grade) => <td key={grade}><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`${gradeLabel(grade)} activity`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></td>)}
+              <td className="flow-stage"><EditCell label="Stage" compact value={slot.stage || ""} placeholder="Stage, e.g. Direct Teaching" onChange={(value) => updateSlot(slot.id, { stage: value })} /><EditCell label="Teacher focus" compact value={slot.teacherFocus} placeholder="Who the teacher is with" onChange={(value) => updateSlot(slot.id, { teacherFocus: value })} /><label className="whole-class-toggle"><input type="checkbox" checked={slotIsWholeClass(slot)} onChange={(event) => setSlotWholeClass(slot.id, event.target.checked)} /> Whole class</label></td>
+              {slotIsWholeClass(slot)
+                ? <td colSpan={grades.length} className="whole-class-cell"><EditCell label={`Whole-class activity at ${slot.time}`} value={wholeClassTask(slot)} placeholder="What the whole class does together" onChange={(value) => updateWholeClassTask(slot.id, value)} /></td>
+                : grades.map((grade) => <td key={grade}><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`${gradeLabel(grade)} activity`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></td>)}
               <td className="row-tools"><button type="button" aria-label="Add a block after this one" title="Add block below" onClick={() => addSlot(slot.id)}>＋</button><button type="button" aria-label="Remove this block" title="Remove block" disabled={slots.length === 1} onClick={() => removeSlot(slot.id)}>×</button></td>
             </tr>)}
-          </tbody></table>}
+          </tbody></table></>}
           <datalist id="ilaw-stages">{ilawStages.map((stage) => <option value={stage} key={stage} />)}</datalist>
           <datalist id="ilaw-focus">{["All grades together", ...grades.map((grade) => `Guide ${gradeLabel(grade)}`), "Independent work", "Peer-led"].map((item) => <option value={item} key={item} />)}</datalist>
           <p className="flow-footer"><button type="button" className="text-button" onClick={() => addSlot()}>＋ Add a block</button><button type="button" className="text-button" onClick={resetTeachingFlow}>Reset to the default rotation</button></p>
         </section>
 
         <section className="ilaw-print-section"><h2><span>A</span> Assessment</h2>
-          <table><thead><tr><th>Learning check</th>{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
-            {gradeRow("Formative assessment", "formativeAssessments", "How you will check understanding during the lesson", (grade) => redraftButton("assessment", grade))}
-            {gradeRow("Exit task", "exitTasks", "What each learner hands in or shows")}
-            {gradeRow("Success criteria", "successCriteria", "What good looks like")}
+          <table><thead><tr><th />{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
+            {gradeRow("Formative", "formativeAssessments", "How you will check understanding during the lesson", (grade) => redraftButton("assessment", grade))}
+            {gradeRow("Exit Task", "exitTasks", "What each learner hands in or shows")}
+            {gradeRow("Success Criteria", "successCriteria", "What a learner can do with this topic when they have got it")}
           </tbody></table>
         </section>
 
         <section className="ilaw-print-section ways-forward-print-section"><h2><span>W</span> Ways Forward</h2>
-          <table><thead><tr><th>Next step</th>{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade)}</th>)}</tr></thead><tbody>
-            {gradeRow("Reflection question", "reflectionQuestions", "What you will ask yourself after teaching")}
+          <table><thead><tr><th />{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
+            {gradeRow("Reflection Questions", "reflectionQuestions", "What you will ask yourself after teaching")}
             {gradeRow("Remediation", "remediations", "Support for learners below the target")}
             {gradeRow("Enrichment", "enrichments", "Extension for learners who are ready")}
           </tbody></table>
-          <p><b>Notes for the next session:</b> <EditCell compact label="Notes for the next session" value={nextSessionNotes} placeholder="What should continue or change next time" onChange={(value) => { setNextSessionNotes(value); touch(); }} /></p>
+          <p><b>Notes for Next Session / Whole-School Follow-Up:</b> <EditCell compact label="Notes for the next session" value={nextSessionNotes} placeholder="What should continue or change next time" onChange={(value) => { setNextSessionNotes(value); touch(); }} /></p>
         </section>
 
-        <footer className="ilaw-print-signatures"><div><span>Prepared by:</span><b>{teacherName}</b><small>Teacher</small></div><div><span>Checked by:</span><input className="cell-input signature" aria-label="School head name" value={schoolHeadName} placeholder="School head name" onChange={(event) => { setSchoolHeadName(event.target.value); touch(); }} /><small>School Head</small></div></footer>
+        <footer className="ilaw-print-signatures"><div><span>Prepared by:</span><b>{teacherName}</b><small>Classroom Adviser</small></div><div><span>Checked by:</span><input className="cell-input signature" aria-label="School head name" value={schoolHeadName} placeholder="School head name" onChange={(event) => { setSchoolHeadName(event.target.value); touch(); }} /><small>School Head</small></div></footer>
       </article>}
 
       {currentPlan && selectedClass && <IlawPlanPrint plan={currentPlan} teachingClass={selectedClass} teacherName={teacherName} schoolName={schoolName} />}

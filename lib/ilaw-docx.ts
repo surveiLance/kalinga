@@ -1,6 +1,6 @@
 import { AlignmentType, BorderStyle, Document, Packer, Paragraph, ShadingType, Table, TableCell, TableRow, TextRun, WidthType } from "docx";
 import { gradeLabel, gradeList } from "@/lib/grades";
-import { learnerCountSummary } from "@/lib/lesson-plan";
+import { learnerCountSummary, planTitleLine, slotIsWholeClass, wholeClassTask } from "@/lib/lesson-plan";
 import type { GradeLevel, SavedPlan, TeachingClass } from "@/lib/teaching-types";
 
 // Builds the DepEd-style multigrade DLP as a real Word document, laid out to match
@@ -31,9 +31,10 @@ function cellParas(value: string, options: { bold?: boolean; color?: string } = 
   return (lines.length ? lines : ["—"]).map((line) => para(line, options));
 }
 
-function cell(value: string, width: number, options: { header?: boolean; label?: boolean } = {}) {
+function cell(value: string, width: number, options: { header?: boolean; label?: boolean; span?: number } = {}) {
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
+    columnSpan: options.span,
     borders,
     margins,
     shading: options.header ? { type: ShadingType.CLEAR, fill: navy, color: "auto" } : options.label ? { type: ShadingType.CLEAR, fill: sand, color: "auto" } : undefined,
@@ -88,14 +89,14 @@ export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass,
   const flowWidths = [timeWidth, stageWidth, ...grades.map(() => flowGradeWidth)];
 
   const children = [
-    para(`DAILY LESSON PLAN FOR ${gradeList(grades).toUpperCase()}`, { bold: true, size: 26, align: AlignmentType.CENTER, after: 60 }),
+    para(planTitleLine(grades), { bold: true, size: 26, align: AlignmentType.CENTER, after: 60 }),
     para(plan.title, { bold: true, size: 32, align: AlignmentType.CENTER, after: 200 }),
     table(metaWidths, [
       metaRow("School", schoolName.trim() || "—", "Grade Levels", gradeList(grades)),
       metaRow("Teacher", teacherName, "Learning Area", plan.subject),
       metaRow("Teaching Date", printedDate || "—", "Quarter/Term", plan.quarter),
       metaRow("Time / Sessions", `1 session, ${plan.duration} · ${plan.startTime || ""}`, "No. of Learners", learnerCountSummary(teachingClass, grades)),
-      metaRow("Language", plan.language || "—", "Multigrade Model", plan.multigradeModel || "—"),
+      new TableRow({ children: [cell("Multigrade Model", metaLabel, { header: true }), cell(plan.multigradeModel || "—", metaValue * 2 + metaLabel, { span: 3 })] }),
     ]),
     gap(),
 
@@ -123,7 +124,9 @@ export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass,
       ...plan.slots.map((slot) => new TableRow({ children: [
         cell([slot.durationMinutes ? `${slot.durationMinutes} min` : "", slot.time].filter(Boolean).join("\n"), timeWidth, { label: true }),
         cell([slot.stage || "Learning activity", slot.teacherFocus].filter((value) => value?.trim()).join("\n"), stageWidth),
-        ...grades.map((grade) => cell(slot.gradeTasks[grade] || "", flowGradeWidth)),
+        ...(slotIsWholeClass(slot)
+          ? [cell(wholeClassTask(slot), flowGradeWidth * grades.length, { span: grades.length })]
+          : grades.map((grade) => cell(slot.gradeTasks[grade] || "", flowGradeWidth))),
       ] })),
     ]),
     gap(),

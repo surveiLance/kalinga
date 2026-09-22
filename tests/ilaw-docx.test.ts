@@ -2,7 +2,7 @@ import { inflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { Packer } from "docx";
 import { buildIlawDocument, ilawDocumentFileName } from "@/lib/ilaw-docx";
-import { learnerCountSummary, planHasTeacherContent } from "@/lib/lesson-plan";
+import { learnerCountSummary, planHasTeacherContent, planTitleLine, slotIsWholeClass, wholeClassTask } from "@/lib/lesson-plan";
 import type { SavedPlan, TeachingClass } from "@/lib/teaching-types";
 
 const teachingClass: TeachingClass = {
@@ -80,7 +80,7 @@ describe("ILAW Word export", () => {
   it("carries every section of the DepEd form", async () => {
     const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, "Jocelyn E. Mallorca", "Kasilayan Elementary School"));
     for (const expected of [
-      "DAILY LESSON PLAN FOR GRADE 3, GRADE 4", "Kasilayan Elementary School", "Jocelyn E. Mallorca", "August 4, 2026",
+      "DAILY LESSON PLAN FOR GRADE III &amp; IV", "Kasilayan Elementary School", "Jocelyn E. Mallorca", "August 4, 2026",
       "INTENTIONS", "LEARNING EXPERIENCE", "ASSESSMENT", "WAYS FORWARD",
       "Pamantayang Pangnilalaman", "Pamantayan sa Pagganap", "Learning Competencies and Codes", "F3PB-Ia-1",
       "Flow of the Lesson", "Whole-Class Motivation", "Bilugan ang mga pangatnig.",
@@ -101,6 +101,13 @@ describe("ILAW Word export", () => {
     expect(xml).toContain("—");
   });
 
+  it("merges a whole-class block across every grade column, as the DepEd form does", async () => {
+    const shared = { ...plan, slots: [{ id: "s1", time: "8:00 AM", stage: "Whole-Class Motivation", durationMinutes: 10, wholeClass: true, teacherFocus: "All grades together", gradeTasks: { "3": "Magpakita ng babala.", "4": "Magpakita ng babala." } }] };
+    const { xml } = await documentXml(buildIlawDocument(shared, teachingClass, "T", "S"));
+    expect(xml).toContain('<w:gridSpan w:val="2"/>');
+    expect(xml.split("Magpakita ng babala.").length - 1).toBe(1);
+  });
+
   it("names the file from the subject and title", () => {
     expect(ilawDocumentFileName(plan)).toBe("filipino-tekstong-impormatibo-at-pangatnig-ilaw-dlp.docx");
     expect(ilawDocumentFileName({ ...plan, title: "", subject: "" })).toBe("lesson-plan-ilaw-dlp.docx");
@@ -114,5 +121,28 @@ describe("planHasTeacherContent", () => {
 
   it("is true once any grade field has text", () => {
     expect(planHasTeacherContent({ ...plan, sharedTheme: "", learnerContext: "", materials: "", nextSessionNotes: "", contentStandards: {}, performanceStandards: {}, competencies: { "3": "  something " }, competencyCodes: {}, objectives: {}, formativeAssessments: {}, exitTasks: {}, successCriteria: {}, reflectionQuestions: {}, remediations: {}, enrichments: {} })).toBe(true);
+  });
+});
+
+describe("DepEd form conventions", () => {
+  it("writes grade levels in Roman numerals", () => {
+    expect(planTitleLine(["3", "4"])).toBe("DAILY LESSON PLAN FOR GRADE III & IV");
+    expect(planTitleLine(["2", "3", "4"])).toBe("DAILY LESSON PLAN FOR GRADE II, III & IV");
+    expect(planTitleLine(["Kindergarten"])).toBe("DAILY LESSON PLAN FOR GRADE KINDERGARTEN");
+  });
+
+  it("reads an older plan's identical grade cells as a whole-class block", () => {
+    const legacy = { id: "s", time: "8:00 AM", teacherFocus: "", gradeTasks: { "3": "Shared introduction", "4": "shared introduction " } };
+    expect(slotIsWholeClass(legacy)).toBe(true);
+    expect(wholeClassTask(legacy)).toBe("Shared introduction");
+  });
+
+  it("does not merge a block whose grades do different work", () => {
+    expect(slotIsWholeClass({ id: "s", time: "8:00 AM", teacherFocus: "", gradeTasks: { "3": "Guided lesson", "4": "Independent task" } })).toBe(false);
+  });
+
+  it("lets an explicit flag override the text heuristic", () => {
+    expect(slotIsWholeClass({ id: "s", time: "8:00 AM", wholeClass: false, teacherFocus: "", gradeTasks: { "3": "Same", "4": "Same" } })).toBe(false);
+    expect(slotIsWholeClass({ id: "s", time: "8:00 AM", wholeClass: true, teacherFocus: "", gradeTasks: { "3": "A", "4": "" } })).toBe(true);
   });
 });
