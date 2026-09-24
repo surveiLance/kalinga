@@ -339,6 +339,7 @@ export default function Home() {
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, Record<string, string>>>({});
   const [attendanceNotes, setAttendanceNotes] = useState<Record<string, Record<string, string>>>({});
   const [editingPlanId, setEditingPlanId] = useState("");
+  const [planListOpen, setPlanListOpen] = useState(false);
   const [classDataReady, setClassDataReady] = useState(false);
   const [hydratedWorkspaceScope, setHydratedWorkspaceScope] = useState("");
   const [teacherAccountId, setTeacherAccountId] = useState("");
@@ -788,9 +789,17 @@ export default function Home() {
     ...(gabayPageContext.currentSummary || []),
   ];
   function beginPlan(planId?: string) {
+    setPlanListOpen(false);
     setEditingPlanId(typeof planId === "string" ? planId : "");
     setView("plan");
     setNotice("");
+  }
+
+  // The Plan lessons tab lands on the list of saved plans when any exist, so a
+  // teacher can find what they already made instead of always starting blank.
+  function openPlanLessons() {
+    if (savedPlans.length) { setPlanListOpen(true); setView("plan"); setNotice(""); }
+    else beginPlan();
   }
 
   function openTeachingPlan(planId: string) {
@@ -1002,7 +1011,7 @@ export default function Home() {
         <nav className="nav-list">
           <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" onClick={() => setView("home")}>Today</button>
           <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}>Classes &amp; learners</button>
-          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => beginPlan()}>Plan lessons</button>
+          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => openPlanLessons()}>Plan lessons</button>
           <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}>Find resources</button>
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}>Ask teachers</button>
           <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" onClick={openTutorial}><span className="nav-icon">?</span> Learn Kalinga{tutorialStatus.completed && <small>✓</small>}</button>
@@ -1060,13 +1069,13 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" || view === "teach" ? "active" : ""} type="button" onClick={() => beginPlan()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button><button className={view === "tutorial" ? "active" : ""} type="button" onClick={openTutorial}><span>?</span>Learn</button>
+          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" || view === "teach" ? "active" : ""} type="button" onClick={() => openPlanLessons()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button><button className={view === "tutorial" ? "active" : ""} type="button" onClick={openTutorial}><span>?</span>Learn</button>
         </nav>
       </section>
     </main>
@@ -2009,6 +2018,23 @@ function EditCell({ value, onChange, placeholder, label, compact = false }: { va
 
 // True below the phone breakpoint. The planner shows one grade at a time there,
 // because three grade columns cannot share a 375px screen.
+function PlanIndex({ plans, classes, onOpen, onNew, onBack }: { plans: SavedPlan[]; classes: TeachingClass[]; onOpen: (planId: string) => void; onNew: () => void; onBack: () => void }) {
+  return (
+    <div className="view-page plan-index">
+      <PageIntro eyebrow="LESSON PLANS" title="Your lesson plans" description="Open a saved plan to keep editing, or start a new one." action={<div className="plan-index-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="primary-button" type="button" onClick={onNew}>＋ New lesson plan</button></div>} />
+      {plans.length ? <div className="plan-index-list">
+        {plans.map((plan) => {
+          const owner = classes.find((item) => item.id === plan.classId);
+          return <button className="plan-index-row" type="button" key={plan.id} onClick={() => onOpen(plan.id)}>
+            <div><b>{plan.title?.trim() || "Untitled lesson"}</b><small>{owner?.name || "Class"} · {plan.subject || "No subject"} · {gradeList(plan.grades)}</small></div>
+            <div className="plan-index-meta"><span>{plan.teachingDate ? displayDate(plan.teachingDate) : plan.savedAt || ""}</span><b aria-hidden="true">→</b></div>
+          </button>;
+        })}
+      </div> : <section className="class-zero-state compact-zero"><span className="zero-icon">＋</span><div><p className="eyebrow">LESSON PLANS</p><h2>No saved plans yet</h2><p>Start one and let Gabay draft it, or write it yourself.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onNew}>Start a lesson plan</button></div></section>}
+    </div>
+  );
+}
+
 function useIsNarrow(query = "(max-width: 720px)") {
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
@@ -2255,7 +2281,8 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     // Apply straight away. The teacher asked for a plan and should see one, not a
     // second button. Their own draft, if they had one, stays one click away.
     if (currentPlan && planHasTeacherContent(currentPlan)) setPreviousDraft(currentPlan);
-    applyCompletePlan(result.draft);
+    const saved = applyCompletePlan(result.draft);
+    if (saved) { onSave(saved); setSaved(true); }
     setSetupOpen(false);
     window.requestAnimationFrame(() => documentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
@@ -2279,22 +2306,38 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     setSlots(retimeSlots(source.slots, startTime));
   }
 
-  function applyCompletePlan(draft: Extract<GabayDraft, { type: "full-plan" }>) {
+  // Builds the plan from a Gabay draft, applies it to the editable form, and
+  // returns the SavedPlan so the caller can persist it immediately. Returns null
+  // only if there is no class to attach it to.
+  function applyCompletePlan(draft: Extract<GabayDraft, { type: "full-plan" }>): SavedPlan | null {
+    if (!selectedClass) return null;
     const gradeDraft = (grade: GradeLevel) => draft.grades[grade] || draft.grades[gradeLabel(grade)];
     const fromDraft = (field: keyof NonNullable<ReturnType<typeof gradeDraft>>) => Object.fromEntries(grades.map((grade) => [grade, gradeDraft(grade)?.[field] || ""]));
+    const built = {
+      competencies: fromDraft("competency"), competencyCodes: fromDraft("competencyCode"), contentStandards: fromDraft("contentStandard"), performanceStandards: fromDraft("performanceStandard"), objectives: fromDraft("objective"),
+      formativeAssessments: fromDraft("formativeAssessment"), exitTasks: fromDraft("exitTask"), successCriteria: fromDraft("successCriteria"),
+      reflectionQuestions: fromDraft("reflectionQuestion"), remediations: fromDraft("remediation"), enrichments: fromDraft("enrichment"),
+    };
+    const builtSlots = retimeSlots(draft.slots.map((slot, index) => {
+      const gradeTasks = Object.fromEntries(grades.map((grade) => [grade, slot.gradeTasks[grade] || slot.gradeTasks[gradeLabel(grade)] || ""]));
+      const slotBase: PlanSlot = { id: `slot-gabay-${Date.now()}-${index}`, time: startTime, stage: slot.stage, durationMinutes: slot.durationMinutes, teacherFocus: slot.teacherFocus, gradeTasks };
+      return { ...slotBase, wholeClass: /all grades|whole[- ]class|buong klase/i.test(slot.teacherFocus + " " + slot.stage) || slotIsWholeClass(slotBase) };
+    }), startTime);
     setSharedTheme(draft.sharedTheme);
     setLearnerContext(draft.learnerContext);
     setMaterials(draft.materials);
     setNextSessionNotes(draft.nextSessionNotes);
-    setCompetencies(fromDraft("competency")); setCompetencyCodes(fromDraft("competencyCode")); setContentStandards(fromDraft("contentStandard")); setPerformanceStandards(fromDraft("performanceStandard")); setObjectives(fromDraft("objective"));
-    setFormativeAssessments(fromDraft("formativeAssessment")); setExitTasks(fromDraft("exitTask")); setSuccessCriteria(fromDraft("successCriteria"));
-    setReflectionQuestions(fromDraft("reflectionQuestion")); setRemediations(fromDraft("remediation")); setEnrichments(fromDraft("enrichment"));
-    setSlots(retimeSlots(draft.slots.map((slot, index) => {
-      const gradeTasks = Object.fromEntries(grades.map((grade) => [grade, slot.gradeTasks[grade] || slot.gradeTasks[gradeLabel(grade)] || ""]));
-      const built: PlanSlot = { id: `slot-gabay-${Date.now()}-${index}`, time: startTime, stage: slot.stage, durationMinutes: slot.durationMinutes, teacherFocus: slot.teacherFocus, gradeTasks };
-      return { ...built, wholeClass: /all grades|whole[- ]class|buong klase/i.test(slot.teacherFocus + " " + slot.stage) || slotIsWholeClass(built) };
-    }), startTime));
+    setCompetencies(built.competencies); setCompetencyCodes(built.competencyCodes); setContentStandards(built.contentStandards); setPerformanceStandards(built.performanceStandards); setObjectives(built.objectives);
+    setFormativeAssessments(built.formativeAssessments); setExitTasks(built.exitTasks); setSuccessCriteria(built.successCriteria);
+    setReflectionQuestions(built.reflectionQuestions); setRemediations(built.remediations); setEnrichments(built.enrichments);
+    setSlots(builtSlots);
     touch();
+    return {
+      id: planId, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${targetMinutes} minutes`, startTime, language, teachingDate,
+      ...built, sharedTheme: draft.sharedTheme, multigradeModel, learnerContext: draft.learnerContext, materials: draft.materials,
+      reflection: Object.values(built.reflectionQuestions).filter(Boolean).join("\n"), remediation: Object.values(built.remediations).filter(Boolean).join("\n"), enrichment: Object.values(built.enrichments).filter(Boolean).join("\n"),
+      nextSessionNotes: draft.nextSessionNotes, schoolHeadName, draftNotes, slots: builtSlots, savedAt: "just now",
+    };
   }
 
   const currentPlan: SavedPlan | null = selectedClass ? {
@@ -2442,8 +2485,8 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
               <input className="cell-input" list="ilaw-focus" aria-label="Teacher focus" value={slot.teacherFocus} placeholder="Who the teacher is with" onChange={(event) => updateSlot(slot.id, { teacherFocus: event.target.value })} />
               <label className="whole-class-toggle"><input type="checkbox" checked={slotIsWholeClass(slot)} onChange={(event) => setSlotWholeClass(slot.id, event.target.checked)} /> Whole class does this together</label>
               {slotIsWholeClass(slot)
-                ? <label className="flow-block-task"><span>Whole-class activity</span><EditCell label={`Whole-class activity at ${slot.time}`} value={wholeClassTask(slot)} placeholder="What the whole class does together" onChange={(value) => updateWholeClassTask(slot.id, value)} /></label>
-                : shownGrades.map((grade) => <label className="flow-block-task" key={grade}><span>{gradeLabel(grade)} activity</span><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`What ${gradeLabel(grade)} does in this block`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></label>)}
+                ? <div className="flow-block-task"><span>Whole-class activity</span><EditCell label={`Whole-class activity at ${slot.time}`} value={wholeClassTask(slot)} placeholder="What the whole class does together" onChange={(value) => updateWholeClassTask(slot.id, value)} /></div>
+                : shownGrades.map((grade) => <div className="flow-block-task" key={grade}><span>{gradeLabel(grade)} activity</span><EditCell label={`${gradeLabel(grade)} activity at ${slot.time}`} value={slot.gradeTasks[grade] || ""} placeholder={`What ${gradeLabel(grade)} does in this block`} onChange={(value) => updateGradeTask(slot.id, grade, value)} /></div>)}
               <footer><button type="button" onClick={() => addSlot(slot.id)}>＋ Add block below</button><button type="button" disabled={slots.length === 1} onClick={() => removeSlot(slot.id)}>Remove</button></footer>
             </article>)}
           </div> : <><p className="flow-heading"><b>Flow of the Lesson</b></p><table className="ilaw-flow-table"><thead><tr><th>Time</th><th>Stage</th>{grades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}<th className="row-tools-head" aria-label="Row actions" /></tr></thead><tbody>
