@@ -300,7 +300,7 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
         ],
         ...(draftTask ? { response_format: { type: "json_object" } } : {}),
         temperature: draftTask ? 0.35 : 0.55,
-        max_completion_tokens: draftTask?.type === "full-plan" ? 3_200 : draftTask ? 420 : 240,
+        max_completion_tokens: draftTask?.type === "full-plan" ? 8_000 : draftTask ? 520 : 260,
       }),
     },
   );
@@ -354,7 +354,7 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
         const durationMinutes = typeof input.durationMinutes === "number" && Number.isFinite(input.durationMinutes) ? Math.max(1, Math.min(240, Math.round(input.durationMinutes))) : 10;
         return [{ stage: cleanText(input.stage, 100) || "Learning activity", durationMinutes, teacherFocus: cleanText(input.teacherFocus, 200) || "All grades together", gradeTasks }];
       }) : [];
-      if (Object.keys(grades).length !== (pageContext.gradeLevels || []).length || !slots.length) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
+      if (!Object.keys(grades).length || !slots.length) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
       return json({ draft: {
         type: "full-plan",
         sharedTheme: cleanText(parsed.sharedTheme, 500),

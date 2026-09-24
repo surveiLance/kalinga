@@ -1904,7 +1904,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
     <PageIntro eyebrow="TEACH · MULTIGRADE LESSON" title={plan.title} description={`${teachingClass.name} · ${plan.subject} · ${planStart}–${planEnd}`} action={<div className="teaching-page-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="secondary-button" type="button" onClick={onEdit}>Edit plan</button><button className="primary-button" type="button" onClick={() => window.print()}>Print or save PDF</button></div>} />
 
     <section className="teaching-guide-summary">
-      <div><p className="eyebrow">CLASSROOM TEACHING GUIDE</p><h2>{plan.slots.length ? `${plan.slots.length} teaching ${plan.slots.length === 1 ? "block" : "blocks"}` : "Add a teaching flow"}</h2><p>{gradeList(plan.grades)} · {plan.duration} · {plan.multigradeModel || "Multigrade lesson"}</p></div>
+      <div><p className="eyebrow">CLASSROOM TEACHING GUIDE</p><h2>{plan.slots.length ? `${plan.slots.length} teaching ${plan.slots.length === 1 ? "block" : "blocks"}` : "Add a teaching flow"}</h2><p>{gradeList(plan.grades)} · {plan.duration} · {plan.multigradeModel || "Multigrade lesson"}</p><p className="teaching-guide-hint">Step through the lesson block by block while you teach — each block shows what every grade is doing and who is with you.</p></div>
       <div className={`teaching-readiness ${readyTasks === 3 ? "ready" : "draft"}`}><b>{readyTasks === 3 ? "Ready to teach" : "Usable draft"}</b><span>{readyTasks}/3 core tasks prepared</span></div>
     </section>
 
@@ -2401,7 +2401,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
           {!setupOpen && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : topicReady ? "Draft with Gabay" : "Add a topic to draft"}</button>}
           <button className="secondary-button" type="button" onClick={exportCurrentPlan}>Print / PDF</button>
           <button className="secondary-button" type="button" disabled={downloadingDocx} onClick={downloadCurrentPlanDocx}>{downloadingDocx ? "Preparing…" : "Download Word"}</button>
-          <button className="secondary-button" type="button" onClick={() => saveCurrentPlan(true)}>Teaching guide</button>
+          <button className="feature-button" type="button" onClick={() => saveCurrentPlan(true)}><span className="feature-icon" aria-hidden="true">▷</span> Teach this lesson</button>
           <button className="primary-button" type="button" onClick={() => saveCurrentPlan()}>{saved ? "✓ Saved" : "Save lesson"}</button>
         </div>
       </div>
