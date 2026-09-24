@@ -585,6 +585,10 @@ export default function Home() {
           checkSession();
           if (item.kind === "class") await saveClassToCloud(supabase!, teacherAccountId, item.value, controller.signal, checkSession);
           if (item.kind === "plan") await savePlanToCloud(supabase!, teacherAccountId, item.value, controller.signal);
+          if (item.kind === "delete-plan") {
+            const { error } = await supabase!.from("lesson_plans").delete().eq("teacher_id", teacherAccountId).eq("id", item.planId).abortSignal(controller.signal);
+            if (error) throw error;
+          }
           if (item.kind === "delete-class") {
             const { error } = await supabase!.from("classes").delete().eq("teacher_id", teacherAccountId).eq("id", item.classId).abortSignal(controller.signal);
             if (error) throw error;
@@ -965,6 +969,15 @@ export default function Home() {
     }
   }
 
+  function deletePlan(planId: string) {
+    const removed = savedPlans.find((item) => item.id === planId);
+    if (!removed) return;
+    setSavedPlans((current) => current.filter((item) => item.id !== planId));
+    setEditingPlanId((current) => current === planId ? "" : current);
+    setNotice(`${removed.title?.trim() || "Lesson plan"} was deleted.`);
+    queueChanges([{ kind: "delete-plan", classId: removed.classId, planId }], `${removed.title?.trim() || "Lesson plan"} was removed on this device. The cloud copy is deleted when your connection returns.`);
+  }
+
   function savePlan(plan: SavedPlan) {
     setSavedPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)]);
     // Not setEditingPlanId: that id is part of the planner's key, and changing it
@@ -1069,7 +1082,7 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
@@ -2018,19 +2031,50 @@ function EditCell({ value, onChange, placeholder, label, compact = false }: { va
 
 // True below the phone breakpoint. The planner shows one grade at a time there,
 // because three grade columns cannot share a 375px screen.
-function PlanIndex({ plans, classes, onOpen, onNew, onBack }: { plans: SavedPlan[]; classes: TeachingClass[]; onOpen: (planId: string) => void; onNew: () => void; onBack: () => void }) {
+function PlanIndex({ plans, classes, onOpen, onNew, onBack, onDelete }: { plans: SavedPlan[]; classes: TeachingClass[]; onOpen: (planId: string) => void; onNew: () => void; onBack: () => void; onDelete: (planId: string) => void }) {
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function toggle(planId: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(planId)) next.delete(planId); else next.add(planId);
+      return next;
+    });
+  }
+  function exitSelect() { setSelecting(false); setSelected(new Set()); }
+  function deleteSelected() {
+    const ids = [...selected].filter((id) => plans.some((plan) => plan.id === id));
+    if (!ids.length) return;
+    if (!window.confirm(`Delete ${ids.length} lesson plan${ids.length > 1 ? "s" : ""}? This cannot be undone.`)) return;
+    ids.forEach(onDelete);
+    exitSelect();
+  }
+  function activate(planId: string) { if (selecting) toggle(planId); else onOpen(planId); }
+
   return (
     <div className="view-page plan-index">
-      <PageIntro eyebrow="LESSON PLANS" title="Your lesson plans" description="Open a saved plan to keep editing, or start a new one." action={<div className="plan-index-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="primary-button" type="button" onClick={onNew}>＋ New lesson plan</button></div>} />
+      <PageIntro eyebrow="LESSON PLANS" title="Your lesson plans" description="Open a saved plan to keep editing, start a new one, or select plans to delete." action={<div className="plan-index-actions">
+        {plans.length > 0 && (selecting
+          ? <button className="secondary-button" type="button" onClick={exitSelect}>Cancel</button>
+          : <button className="secondary-button" type="button" onClick={() => setSelecting(true)}>Select</button>)}
+        <button className="secondary-button" type="button" onClick={onBack}>← Today</button>
+        <button className="primary-button" type="button" onClick={onNew}>＋ New lesson plan</button>
+      </div>} />
       {plans.length ? <div className="plan-index-list">
         {plans.map((plan) => {
           const owner = classes.find((item) => item.id === plan.classId);
-          return <button className="plan-index-row" type="button" key={plan.id} onClick={() => onOpen(plan.id)}>
+          const isSelected = selected.has(plan.id);
+          return <div className={`plan-index-row${selecting ? " selecting" : ""}${isSelected ? " selected" : ""}`} role="button" tabIndex={0} aria-pressed={selecting ? isSelected : undefined} key={plan.id}
+            onClick={() => activate(plan.id)}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(plan.id); } }}>
+            {selecting && <span className={`plan-index-check${isSelected ? " on" : ""}`} aria-hidden="true">{isSelected ? "✓" : ""}</span>}
             <div><b>{plan.title?.trim() || "Untitled lesson"}</b><small>{owner?.name || "Class"} · {plan.subject || "No subject"} · {gradeList(plan.grades)}</small></div>
-            <div className="plan-index-meta"><span>{plan.teachingDate ? displayDate(plan.teachingDate) : plan.savedAt || ""}</span><b aria-hidden="true">→</b></div>
-          </button>;
+            <div className="plan-index-meta"><span>{plan.teachingDate ? displayDate(plan.teachingDate) : plan.savedAt || ""}</span>{!selecting && <b aria-hidden="true">→</b>}</div>
+          </div>;
         })}
       </div> : <section className="class-zero-state compact-zero"><span className="zero-icon">＋</span><div><p className="eyebrow">LESSON PLANS</p><h2>No saved plans yet</h2><p>Start one and let Gabay draft it, or write it yourself.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onNew}>Start a lesson plan</button></div></section>}
+      {selecting && <div className="plan-index-selectbar"><span>{selected.size} selected</span><button className="danger-outline-button" type="button" disabled={!selected.size} onClick={deleteSelected}>Delete selected</button></div>}
     </div>
   );
 }

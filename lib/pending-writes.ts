@@ -9,6 +9,7 @@ export type PendingChange<C = SyncClass, P = SyncPlan> =
   | { kind: "class"; classId: string; value: C }
   | { kind: "delete-class"; classId: string }
   | { kind: "plan"; classId: string; value: P }
+  | { kind: "delete-plan"; classId: string; planId: string }
   | { kind: "attendance"; classId: string; date: string; records: AttendanceRow[] };
 
 export type PendingWrite<C = SyncClass, P = SyncPlan> = PendingChange<C, P> & {
@@ -41,6 +42,7 @@ export function readPendingWrites<C extends SyncClass, P extends SyncPlan>(store
     if (item.kind === "delete-class") return true;
     if (item.kind === "class") return record(item.value) && item.value.id === item.classId && Array.isArray(item.value.learners) && item.value.learners.every((learner: unknown) => record(learner) && typeof learner.id === "string" && typeof learner.grade === "string");
     if (item.kind === "plan") return record(item.value) && typeof item.value.id === "string" && item.value.classId === item.classId;
+    if (item.kind === "delete-plan") return typeof item.planId === "string";
     return item.kind === "attendance" && typeof item.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date) && Array.isArray(item.records) && item.records.every(validAttendanceRow);
   })) throw new Error("This workspace’s pending changes could not be read safely.");
   return parsed as PendingWrite<C, P>[];
@@ -48,6 +50,7 @@ export function readPendingWrites<C extends SyncClass, P extends SyncPlan>(store
 
 function changeKey<C extends SyncClass, P extends SyncPlan>(change: PendingChange<C, P>) {
   if (change.kind === "plan") return `plan:${change.value.id}`;
+  if (change.kind === "delete-plan") return `plan:${change.planId}`;
   if (change.kind === "attendance") return `attendance:${change.classId}:${change.date}`;
   return `class:${change.classId}`;
 }
@@ -121,6 +124,7 @@ export function reconcilePendingWrites<C extends SyncClass, P extends SyncPlan, 
   for (const item of queue.filter((entry) => entry.scope === scope)) {
     if (item.kind === "class") classes.set(item.classId, item.value);
     if (item.kind === "plan") plans.set(item.value.id, item.value);
+    if (item.kind === "delete-plan") plans.delete(item.planId);
     if (item.kind === "delete-class") {
       classes.delete(item.classId);
       for (const plan of plans.values()) if (plan.classId === item.classId) plans.delete(plan.id);
