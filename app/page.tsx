@@ -583,6 +583,10 @@ export default function Home() {
         let failed = false;
         try {
           checkSession();
+          if (item.kind === "profile") {
+            const { error } = await supabase!.from("profiles").upsert({ id: teacherAccountId, school_name: item.schoolName.trim() || null }).abortSignal(controller.signal);
+            if (error) throw error;
+          }
           if (item.kind === "class") await saveClassToCloud(supabase!, teacherAccountId, item.value, controller.signal, checkSession);
           if (item.kind === "plan") await savePlanToCloud(supabase!, teacherAccountId, item.value, controller.signal);
           if (item.kind === "delete-plan") {
@@ -961,12 +965,7 @@ export default function Home() {
 
   function updateSchoolName(name: string) {
     setSchoolName(name);
-    const supabase = getSupabaseBrowserClient();
-    if (entryMode === "authenticated" && teacherAccountId && supabase) {
-      void supabase.from("profiles").upsert({ id: teacherAccountId, school_name: name.trim() || null }).then(({ error }) => {
-        if (error) setNotice("Your school name is saved on this device, but could not sync yet.");
-      });
-    }
+    queueChanges([{ kind: "profile", schoolName: name }], "Your school name is saved on this device and will sync when your connection returns.");
   }
 
   function deletePlan(planId: string) {
@@ -2356,11 +2355,11 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   function applyCompletePlan(draft: Extract<GabayDraft, { type: "full-plan" }>): SavedPlan | null {
     if (!selectedClass) return null;
     const gradeDraft = (grade: GradeLevel) => draft.grades[grade] || draft.grades[gradeLabel(grade)];
-    const fromDraft = (field: keyof NonNullable<ReturnType<typeof gradeDraft>>) => Object.fromEntries(grades.map((grade) => [grade, gradeDraft(grade)?.[field] || ""]));
+    const fromDraft = (field: keyof NonNullable<ReturnType<typeof gradeDraft>>, previous: Record<GradeLevel, string>) => Object.fromEntries(grades.map((grade) => [grade, gradeDraft(grade)?.[field]?.trim() || previous[grade] || ""]));
     const built = {
-      competencies: fromDraft("competency"), competencyCodes: fromDraft("competencyCode"), contentStandards: fromDraft("contentStandard"), performanceStandards: fromDraft("performanceStandard"), objectives: fromDraft("objective"),
-      formativeAssessments: fromDraft("formativeAssessment"), exitTasks: fromDraft("exitTask"), successCriteria: fromDraft("successCriteria"),
-      reflectionQuestions: fromDraft("reflectionQuestion"), remediations: fromDraft("remediation"), enrichments: fromDraft("enrichment"),
+      competencies: fromDraft("competency", competencies), competencyCodes: fromDraft("competencyCode", competencyCodes), contentStandards: fromDraft("contentStandard", contentStandards), performanceStandards: fromDraft("performanceStandard", performanceStandards), objectives: fromDraft("objective", objectives),
+      formativeAssessments: fromDraft("formativeAssessment", formativeAssessments), exitTasks: fromDraft("exitTask", exitTasks), successCriteria: fromDraft("successCriteria", successCriteria),
+      reflectionQuestions: fromDraft("reflectionQuestion", reflectionQuestions), remediations: fromDraft("remediation", remediations), enrichments: fromDraft("enrichment", enrichments),
     };
     const builtSlots = retimeSlots(draft.slots.map((slot, index) => {
       const gradeTasks = Object.fromEntries(grades.map((grade) => [grade, slot.gradeTasks[grade] || slot.gradeTasks[gradeLabel(grade)] || ""]));
@@ -2459,7 +2458,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
             <label>Teaching date<input type="date" value={teachingDate} onChange={(event) => { setTeachingDate(event.target.value); touch(); }} /></label>
           </div>
           {topicPrompt && <p className="topic-prompt" role="alert">{topicPrompt}</p>}
-          <label className="plan-setup-notes">Anything Gabay should know <small>Optional</small><textarea rows={2} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder="e.g. Grade 3 still struggles with regrouping. No printer. We have bottle caps and a chalkboard." /></label>
+          <label className="plan-setup-notes">Anything Gabay should know <small>Optional · do not include learner names or sensitive details</small><textarea rows={2} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder="e.g. Grade 3 still struggles with regrouping. No printer. We have bottle caps and a chalkboard." /></label>
           <details className="plan-setup-more">
             <summary><span>{quarter} · {startTime} · {targetMinutes} min · {language} · {multigradeModel}</span><b>Change</b></summary>
             <div className="plan-setup-grid">

@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { redactGabayPII } from "../_shared/gabay-privacy.ts";
 
 type PageContext = {
   view?: string;
@@ -193,14 +194,14 @@ Deno.serve(async (request) => {
     return json({ error: "Invalid JSON" }, 400, origin);
   }
 
-  const message = cleanText(payload.message, MAX_MESSAGE_LENGTH);
-  if (!message) return json({ error: "A message is required" }, 400, origin);
+  const rawMessage = cleanText(payload.message, MAX_MESSAGE_LENGTH);
+  if (!rawMessage) return json({ error: "A message is required" }, 400, origin);
   const pageContext = safeContext(payload.pageContext);
   pageContext.teacherName = cleanText(userData.user.user_metadata?.display_name || userData.user.user_metadata?.full_name || pageContext.teacherName, 80);
 
   const [{ data: ownedClassRows, error: ownedClassesError }, { data: ownedLearnerRows, error: ownedLearnersError }] = await Promise.all([
     supabase.from("classes").select("id,name,grade_levels,subjects,schedule").order("created_at").limit(24),
-    supabase.from("learners").select("class_id").limit(10_000),
+    supabase.from("learners").select("class_id,display_name").limit(10_000),
   ]);
   const learnerCounts = new Map<string, number>();
   for (const learner of ownedLearnerRows || []) learnerCounts.set(learner.class_id, (learnerCounts.get(learner.class_id) || 0) + 1);
@@ -237,7 +238,12 @@ Deno.serve(async (request) => {
       verifiedClassSummary = "The requested class was not available to this authenticated teacher. Do not rely on client-supplied class details.";
     }
   }
-  const history = safeHistory(payload.history);
+  const learnerNames = (ownedLearnerRows || []).map((learner) => cleanText(learner.display_name, 160)).filter(Boolean);
+  const redact = (value: string) => redactGabayPII(value, learnerNames);
+  const message = redact(rawMessage);
+  pageContext.lessonTopic = redact(pageContext.lessonTopic || "");
+  pageContext.currentSummary = (pageContext.currentSummary || []).map(redact);
+  const history = safeHistory(payload.history).map((item) => ({ ...item, content: redact(item.content) }));
   const draftTask = safeDraftTask(payload.task);
   // A draft with no topic can only be generic, so refuse before any tokens are spent.
   if (draftTask && !pageContext.lessonTopic) return json({ error: "A lesson topic is required before Gabay can draft." }, 400, origin);
@@ -354,13 +360,24 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
         const durationMinutes = typeof input.durationMinutes === "number" && Number.isFinite(input.durationMinutes) ? Math.max(1, Math.min(240, Math.round(input.durationMinutes))) : 10;
         return [{ stage: cleanText(input.stage, 100) || "Learning activity", durationMinutes, teacherFocus: cleanText(input.teacherFocus, 200) || "All grades together", gradeTasks }];
       }) : [];
-      if (!Object.keys(grades).length || !slots.length) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
+      const requestedGrades = pageContext.gradeLevels || [];
+      const sharedTheme = cleanText(parsed.sharedTheme, 500);
+      const learnerContext = cleanText(parsed.learnerContext, 1_500);
+      const materials = cleanText(parsed.materials, 1_500);
+      const nextSessionNotes = cleanText(parsed.nextSessionNotes, 1_000);
+      const requiredGradeFields = ["competency", "contentStandard", "performanceStandard", "objective", "formativeAssessment", "exitTask", "successCriteria", "reflectionQuestion", "remediation", "enrichment"] as const;
+      const gradesComplete = requestedGrades.length > 0 && requestedGrades.every((grade) => {
+        const item = grades[grade];
+        return item && requiredGradeFields.every((field) => item[field]);
+      });
+      const slotsComplete = slots.length > 0 && slots.every((slot) => requestedGrades.every((grade) => slot.gradeTasks[grade]));
+      if (!sharedTheme || !learnerContext || !materials || !gradesComplete || !slotsComplete) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
       return json({ draft: {
         type: "full-plan",
-        sharedTheme: cleanText(parsed.sharedTheme, 500),
-        learnerContext: cleanText(parsed.learnerContext, 1_500),
-        materials: cleanText(parsed.materials, 1_500),
-        nextSessionNotes: cleanText(parsed.nextSessionNotes, 1_000),
+        sharedTheme,
+        learnerContext,
+        materials,
+        nextSessionNotes,
         grades,
         slots,
       }, connected: true }, 200, origin);

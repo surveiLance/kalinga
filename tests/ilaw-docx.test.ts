@@ -77,6 +77,12 @@ describe("ILAW Word export", () => {
     expect(buffer.subarray(0, 2).toString()).toBe("PK");
   });
 
+  it("uses the A4 page and half-inch margins of the teachers' reference form", async () => {
+    const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, "Jocelyn E. Mallorca", "Kasilayan Elementary School"));
+    expect(xml).toMatch(/<w:pgSz[^>]*w:w="11906"[^>]*w:h="16838"/);
+    expect(xml).toMatch(/<w:pgMar[^>]*w:top="720"[^>]*w:right="720"[^>]*w:bottom="720"[^>]*w:left="720"/);
+  });
+
   it("carries every section of the DepEd form", async () => {
     const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, "Jocelyn E. Mallorca", "Kasilayan Elementary School"));
     for (const expected of [

@@ -13,7 +13,7 @@
 
 ## 1. What Kalinga is, in one paragraph
 
-Kalinga is a teacher's assistant for **multigrade classrooms in last-mile Philippine public schools** — the one-teacher, several-grades-in-one-room setting that Teacher Sab works in. It carries the teacher through the work that repeats every day: keeping class and learner records, taking attendance, planning a standards-aligned lesson that differentiates across grades, running that lesson block by block, and drawing on shared teaching resources. Its distinguishing bet is that these teachers are **offline more than they are online** and are **overworked**, so every function works on a phone without a signal and an AI companion named **Gabay** removes the blank-page problem from the hardest task — lesson planning — without ever taking the teacher out of control.
+Kalinga is a teacher's assistant for **multigrade classrooms in last-mile Philippine public schools** — the one-teacher, several-grades-in-one-room setting that Teacher Sab works in. It carries the teacher through the work that repeats every day: keeping class and learner records, taking attendance, planning a standards-aligned lesson that differentiates across grades, running that lesson block by block, and drawing on shared teaching resources. Its distinguishing bet is that these teachers are **offline more than they are online** and are **overworked**, so core records and edits persist locally when connectivity drops, while an AI companion named **Gabay** removes the blank-page problem from the hardest task — lesson planning — whenever connectivity is available, without taking the teacher out of control.
 
 The name *kalinga* is Filipino for care.
 
@@ -58,7 +58,7 @@ We scoped to the responsibilities that (a) recur daily or weekly, (b) are paperw
 
 ## 4. Insertion points for AI
 
-AI is **inserted where the blank page is most expensive and the teacher can still verify the output** — never where it would fabricate records or make decisions the teacher owns. Gabay runs on an LLM (currently Groq's `openai/gpt-oss-20b`) called through a server-side function so the model never sees learner personal data.
+AI is **inserted where the blank page is most expensive and the teacher can still verify the output** — never where it would fabricate records or make decisions the teacher owns. Gabay runs on an LLM (currently Groq's `openai/gpt-oss-20b`) through a server-side function. Kalinga supplies aggregate classroom context rather than roster records; the server also redacts known learner names and LRN-like identifiers from teacher-entered text before calling the model.
 
 | # | Insertion point | What the AI does | Human-in-the-loop guardrail |
 |---|---|---|---|
@@ -69,7 +69,7 @@ AI is **inserted where the blank page is most expensive and the teacher can stil
 | 5 | **Resource matching** (design) | Surface library resources that match the active class's grade levels and subjects. | Teacher chooses; matching is a filter, not an action. |
 
 **Ethical design already built in (expanded in Part 2):**
-- **No learner PII to the model.** The server strips and never forwards learner names, LRNs, attendance notes, or health details. Only aggregate context (grade levels, subject, topic, counts) is sent.
+- **Minimise learner PII.** Automatic app context contains aggregate information only. The server redacts names found in the teacher's roster and LRN-like identifiers from teacher-entered messages and planning notes. The interface still tells teachers not to paste attendance, health, or other sensitive details because no free-text detector can guarantee removal of every possible identifier.
 - **Draft, not authority.** AI output is always framed as an editable starting point; competencies are never presented as official unless a verified source is supplied.
 - **The teacher stays in control.** Every AI action lands in an editable field, with restore.
 - **Key safety.** The model key lives only in the server function, never in the browser; requests are rate-limited per teacher and fail open so a limiter fault never blocks teaching.
@@ -99,14 +99,14 @@ Framed for the rubric ("clarity of teaching and learning goals"):
 
 ## 8. Platform and general architecture
 
-**Clear platform identification (rubric item):** Kalinga is a **web application that is installable on phones (PWA)**, with a **native Android wrapper (Capacitor) on the roadmap** for Play Store distribution. Android-first, because last-mile Philippine schools are overwhelmingly Android.
+**Clear platform identification (rubric item):** Kalinga is currently a **responsive web application** for desktop and phone browsers. An installable PWA with offline boot, followed by a possible native Android wrapper (Capacitor) for Play Store distribution, is on the roadmap. The mobile design is Android-first because that is the expected device context for last-mile Philippine schools.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  CLIENTS                                                      │
-│  • Web (desktop browser)      • Phone (installable PWA)       │
+│  • Web (desktop browser)      • Phone (responsive web)        │
 │  • Same React codebase, responsive; one-grade-at-a-time on    │
-│    phones, offline-capable                                    │
+│    phones; local edits persist while the app is available      │
 └───────────────┬─────────────────────────────────────────────┘
                 │ HTTPS
 ┌───────────────▼─────────────────────────────────────────────┐
@@ -121,7 +121,7 @@ Framed for the rubric ("clarity of teaching and learning goals"):
         │  • Postgres    │        │  • Deno function on        │
         │    (+ RLS)     │◄──────►│    Supabase               │
         │  • Auth        │        │  • Verifies the teacher,   │
-        │  • Storage     │        │    strips learner PII,     │
+        │  • Storage     │        │    minimises learner PII,  │
         │    (resources) │        │    calls the LLM           │
         │  • Realtime    │        │  • Holds the model key      │
         └────────────────┘        └───────────┬──────────────┘
@@ -132,11 +132,11 @@ Framed for the rubric ("clarity of teaching and learning goals"):
                                      └───────────────────┘
 ```
 
-**Web and mobile (rubric: "they will need both a web and a mobile version").** One responsive React codebase serves both. On a phone the lesson document shows one grade at a time behind a switcher, attendance is one tap per learner, and the app is installable to the home screen. The mobile-specific hardening (service worker for true offline boot, native share of the exported plan, Play Store APK via Capacitor) is the near-term roadmap named for the funder.
+**Web and mobile (rubric: "they will need both a web and a mobile version").** One responsive React codebase serves desktop and phone browsers. On a phone the lesson document shows one grade at a time behind a switcher and attendance is one tap per learner. Installability, a service worker for true offline boot, native sharing of the exported plan, and a Play Store APK via Capacitor remain roadmap work rather than current capabilities.
 
 **Data shared among teachers (rubric requirement).** Private classroom data (classes, learners, attendance, plans) is isolated per teacher by Postgres **row-level security** — each teacher reads and writes only their own rows. Deliberately shared data — **resources marked "shared"** and the **Ask-teachers community** — is readable by any signed-in teacher. Sharing is always an explicit teacher action, never automatic, and learner records are never shareable.
 
-**Last-mile circumstances (check-in rubric).** Offline-first: every screen works with no signal, edits queue locally and sync with retry/backoff when connectivity returns, and the UI shows sync state honestly. Resources are chosen to be no-printer and low-cost. Gabay speaks Taglish. Costs are near-zero per teacher (the AI call is a fraction of a centavo), so the model is fundable at scale.
+**Last-mile circumstances (check-in rubric).** Local-first while the app is already loaded: class, plan, attendance, and profile edits persist on the device, queue durably, and sync with retry/backoff when connectivity returns; the UI shows sync state honestly. A service worker is still needed before Kalinga can promise that the application itself will open offline. Gabay, teacher discussions, uploads, and uncached files require connectivity. Resources are chosen to be no-printer and low-cost. AI cost and latency must be measured during testing against the deployed model and real token usage before making a per-teacher cost claim.
 
 **Security posture.** Per-teacher RLS; the LLM key confined to the server function; per-teacher rate limiting that fails open; explicit sharing only.
 
@@ -149,7 +149,7 @@ Framed for the rubric ("clarity of teaching and learning goals"):
 | High clarity of teaching and learning goals | §5 |
 | Appropriate selection of teaching and evaluation methods | §6 |
 | Appropriate methods of remediation | §7 |
-| Clear identification of platform | §8 (web + installable mobile, Android-first, Vercel + Supabase + Groq) |
+| Clear identification of platform | §8 (responsive web now; installable PWA and Android wrapper as roadmap, Vercel + Supabase + Groq) |
 | Scope of functions defined | §2, §3 |
 | Insertion points for AI identified | §4 |
 | Architecture (web + mobile, shared data) | §8 |

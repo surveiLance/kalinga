@@ -6,6 +6,7 @@ type AttendanceMap = Record<string, Record<string, string>>;
 type AttendanceRow = { learnerId: string; grade: string; status: string; note: string };
 
 export type PendingChange<C = SyncClass, P = SyncPlan> =
+  | { kind: "profile"; schoolName: string }
   | { kind: "class"; classId: string; value: C }
   | { kind: "delete-class"; classId: string }
   | { kind: "plan"; classId: string; value: P }
@@ -38,7 +39,9 @@ export function readPendingWrites<C extends SyncClass, P extends SyncPlan>(store
   if (stored === null) return [];
   const parsed: unknown = JSON.parse(stored);
   if (!Array.isArray(parsed) || !parsed.every((item: unknown) => {
-    if (!record(item) || item.scope !== scope || typeof item.id !== "string" || typeof item.classId !== "string" || !Number.isInteger(item.attempts) || Number(item.attempts) < 0 || typeof item.nextAttemptAt !== "number" || !Number.isFinite(item.nextAttemptAt) || typeof item.error !== "string") return false;
+    if (!record(item) || item.scope !== scope || typeof item.id !== "string" || !Number.isInteger(item.attempts) || Number(item.attempts) < 0 || typeof item.nextAttemptAt !== "number" || !Number.isFinite(item.nextAttemptAt) || typeof item.error !== "string") return false;
+    if (item.kind === "profile") return typeof item.schoolName === "string";
+    if (typeof item.classId !== "string") return false;
     if (item.kind === "delete-class") return true;
     if (item.kind === "class") return record(item.value) && item.value.id === item.classId && Array.isArray(item.value.learners) && item.value.learners.every((learner: unknown) => record(learner) && typeof learner.id === "string" && typeof learner.grade === "string");
     if (item.kind === "plan") return record(item.value) && typeof item.value.id === "string" && item.value.classId === item.classId;
@@ -49,6 +52,7 @@ export function readPendingWrites<C extends SyncClass, P extends SyncPlan>(store
 }
 
 function changeKey<C extends SyncClass, P extends SyncPlan>(change: PendingChange<C, P>) {
+  if (change.kind === "profile") return "profile:school-name";
   if (change.kind === "plan") return `plan:${change.value.id}`;
   if (change.kind === "delete-plan") return `plan:${change.planId}`;
   if (change.kind === "attendance") return `attendance:${change.classId}:${change.date}`;
@@ -58,11 +62,15 @@ function changeKey<C extends SyncClass, P extends SyncPlan>(change: PendingChang
 export function enqueuePendingWrite<C extends SyncClass, P extends SyncPlan>(queue: PendingWrite<C, P>[], scope: string, change: PendingChange<C, P>, id: string, now: number): PendingWrite<C, P>[] {
   if (queue.some((item) => item.scope !== scope)) throw new Error("Workspace scope mismatch.");
   let next = queue;
-  if (change.kind === "delete-class") next = next.filter((item) => item.classId !== change.classId);
+  if (change.kind === "delete-class") {
+    const deletedClassId = change.classId;
+    next = next.filter((item) => item.kind === "profile" || item.classId !== deletedClassId);
+  }
   if (change.kind === "class") {
+    const classId = change.classId;
     const learners = new Map(change.value.learners.map((learner) => [learner.id, learner.grade]));
     next = next.flatMap((item) => {
-      if (item.kind !== "attendance" || item.classId !== change.classId) return [item];
+      if (item.kind !== "attendance" || item.classId !== classId) return [item];
       const records = item.records.filter((row) => learners.has(row.learnerId)).map((row) => ({ ...row, grade: learners.get(row.learnerId)! }));
       return records.length ? [{ ...item, id: `${id}:${item.id}`, records, attempts: 0, nextAttemptAt: now, error: "" }] : [];
     });
@@ -93,8 +101,12 @@ export function retryPendingWrites<C, P>(queue: PendingWrite<C, P>[], scope: str
 }
 
 export function pendingCandidates<C, P>(queue: PendingWrite<C, P>[], scope: string) {
-  const parents = new Set(queue.filter((item) => item.scope === scope && (item.kind === "class" || item.kind === "delete-class")).map((item) => item.classId));
-  return queue.filter((item) => item.scope === scope && item.attempts < maxSyncAttempts && (item.kind === "class" || item.kind === "delete-class" || !parents.has(item.classId)));
+  const parents = new Set(queue.flatMap((item) => item.scope === scope && (item.kind === "class" || item.kind === "delete-class") ? [item.classId] : []));
+  return queue.filter((item) => {
+    if (item.scope !== scope || item.attempts >= maxSyncAttempts) return false;
+    if (item.kind === "profile" || item.kind === "class" || item.kind === "delete-class") return true;
+    return !parents.has(item.classId);
+  });
 }
 
 export function attendanceChanges<C extends SyncClass>(classes: C[], updates: AttendanceMap, notes: AttendanceMap): Extract<PendingChange, { kind: "attendance" }>[] {

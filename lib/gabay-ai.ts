@@ -34,6 +34,31 @@ export type GabayDraft =
   | { type: "assessment"; formativeAssessment: string; exitTask: string; successCriteria: string }
   | { type: "full-plan"; sharedTheme: string; learnerContext: string; materials: string; nextSessionNotes: string; grades: Record<string, { competency: string; competencyCode: string; contentStandard: string; performanceStandard: string; objective: string; formativeAssessment: string; exitTask: string; successCriteria: string; reflectionQuestion: string; remediation: string; enrichment: string }>; slots: Array<{ stage: string; durationMinutes: number; teacherFocus: string; gradeTasks: Record<string, string> }> };
 
+const requiredFullPlanGradeFields = ["competency", "contentStandard", "performanceStandard", "objective", "formativeAssessment", "exitTask", "successCriteria", "reflectionQuestion", "remediation", "enrichment"] as const;
+
+function record(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function nonemptyString(value: unknown) {
+  return typeof value === "string" && Boolean(value.trim());
+}
+
+export function isCompleteGabayFullPlan(value: unknown, expectedGrades: string[]): value is Extract<GabayDraft, { type: "full-plan" }> {
+  if (!record(value) || value.type !== "full-plan" || !nonemptyString(value.sharedTheme) || !nonemptyString(value.learnerContext) || !nonemptyString(value.materials) || !record(value.grades) || !Array.isArray(value.slots) || !value.slots.length || !expectedGrades.length) return false;
+  const gradeDrafts = value.grades;
+  const slots = value.slots;
+  if (!expectedGrades.every((grade) => {
+    const item = gradeDrafts[grade];
+    return record(item) && requiredFullPlanGradeFields.every((field) => nonemptyString(item[field])) && (item.competencyCode === undefined || typeof item.competencyCode === "string");
+  })) return false;
+  return slots.every((slot) => {
+    if (!record(slot) || !nonemptyString(slot.stage) || !nonemptyString(slot.teacherFocus) || typeof slot.durationMinutes !== "number" || !Number.isFinite(slot.durationMinutes) || slot.durationMinutes <= 0 || !record(slot.gradeTasks)) return false;
+    const gradeTasks = slot.gradeTasks;
+    return expectedGrades.every((grade) => nonemptyString(gradeTasks[grade]));
+  });
+}
+
 type GabayDraftResult =
   | { connected: true; draft: GabayDraft }
   | { connected: false; reason: "not-configured" | "not-signed-in" | "busy" | "unavailable" };
@@ -100,8 +125,8 @@ export async function requestGabayDraft(type: GabayDraft["type"], pageContext: G
     if (type === "assessment" && typeof draft.formativeAssessment === "string" && typeof draft.exitTask === "string" && typeof draft.successCriteria === "string" && draft.formativeAssessment.trim() && draft.exitTask.trim() && draft.successCriteria.trim()) {
       return { connected: true, draft: { type, formativeAssessment: draft.formativeAssessment.trim(), exitTask: draft.exitTask.trim(), successCriteria: draft.successCriteria.trim() } };
     }
-    if (type === "full-plan" && typeof draft.sharedTheme === "string" && typeof draft.learnerContext === "string" && typeof draft.materials === "string" && draft.grades && typeof draft.grades === "object" && Array.isArray(draft.slots)) {
-      return { connected: true, draft: draft as GabayDraft };
+    if (type === "full-plan" && isCompleteGabayFullPlan(draft, pageContext.gradeLevels)) {
+      return { connected: true, draft };
     }
     return { connected: false, reason: "unavailable" };
   } catch {

@@ -26,6 +26,15 @@ function entryOfKind<K extends PendingChange["kind"]>(queue: TestQueue, kind: K,
 }
 
 describe("enqueuePendingWrite", () => {
+  it("collapses repeated school-name edits into the latest profile change", () => {
+    const queue = queueWith(
+      { kind: "profile", schoolName: "Old School" },
+      { kind: "profile", schoolName: "Dinagat Elementary" },
+    );
+    expect(queue).toHaveLength(1);
+    expect(entryOfKind(queue, "profile").schoolName).toBe("Dinagat Elementary");
+  });
+
   it("collapses repeated saves of one class into a single latest entry", () => {
     const queue = queueWith(
       { kind: "class", classId: "c1", value: classA },
@@ -102,6 +111,11 @@ describe("reconcilePendingWrites", () => {
 });
 
 describe("durability", () => {
+  it("round-trips a queued profile change without requiring a class id", () => {
+    const queue = queueWith({ kind: "profile", schoolName: "Dinagat Elementary" });
+    expect(readPendingWrites(JSON.stringify(queue), scope)).toEqual(queue);
+  });
+
   it("survives a round trip through localStorage", () => {
     const queue = queueWith({ kind: "class", classId: "c1", value: classA });
     expect(readPendingWrites(JSON.stringify(queue), scope)).toEqual(queue);
@@ -123,6 +137,14 @@ describe("durability", () => {
 });
 
 describe("retry budget", () => {
+  it("can sync a profile change without waiting for a class write", () => {
+    const queue = queueWith(
+      { kind: "class", classId: "c1", value: classA },
+      { kind: "profile", schoolName: "Dinagat Elementary" },
+    );
+    expect(pendingCandidates(queue, scope).map((item) => item.kind)).toEqual(["class", "profile"]);
+  });
+
   it("backs off further on each attempt", () => {
     let queue = queueWith({ kind: "class", classId: "c1", value: classA });
     queue = startPendingWrite(queue, scope, "w0", now);

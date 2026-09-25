@@ -11,7 +11,7 @@ import type { GradeLevel, SavedPlan, TeachingClass } from "@/lib/teaching-types"
 
 const navy = "1F3864";
 const sand = "EEE9DF";
-const pageWidth = 10_080; // US Letter, 0.75in margins, in DXA
+const pageWidth = 10_466; // A4, 0.5in margins, in DXA
 const border = { style: BorderStyle.SINGLE, size: 6, color: "555555" };
 const borders = { top: border, bottom: border, left: border, right: border };
 const margins = { top: 80, bottom: 80, left: 100, right: 100 };
@@ -167,7 +167,7 @@ export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass,
     title: plan.title,
     styles: { default: { document: { run: { font: "Arial", size: 20 } } } },
     sections: [{
-      properties: { page: { size: { width: 12_240, height: 15_840 }, margin: { top: 1_080, right: 1_080, bottom: 1_080, left: 1_080 } } },
+      properties: { page: { size: { width: 11_906, height: 16_838 }, margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
       children,
     }],
   });
