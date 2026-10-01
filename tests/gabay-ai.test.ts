@@ -12,17 +12,35 @@ const complete = {
   slots: [{ stage: "Guided Practice", durationMinutes: 20, teacherFocus: "Guide Grade 3", gradeTasks: { "3": "Build 1/4 + 2/4 with caps", "4": "Solve and explain 2/5 + 1/5" } }],
 };
 
-describe("isCompleteGabayFullPlan", () => {
-  it("accepts a complete draft even when an unverified competency code is blank", () => {
+describe("isCompleteGabayFullPlan (usable-draft gate)", () => {
+  it("accepts a complete draft", () => {
     expect(isCompleteGabayFullPlan(complete, ["3", "4"])).toBe(true);
+  });
+
+  it("accepts a usable but partial draft — the teacher fills the gaps on apply", () => {
+    // One grade keeps only an objective (competency blank), the other only a competency;
+    // one slot has a task for just one grade. All still usable.
+    const partial = {
+      ...complete,
+      grades: {
+        "3": { ...gradeDraft, competency: "", reflectionQuestion: "", remediation: "" },
+        "4": { ...gradeDraft, objective: "", contentStandard: "", enrichment: "" },
+      },
+      slots: [{ ...complete.slots[0], gradeTasks: { "3": "Build 1/4 + 2/4 with caps", "4": "" } }],
+      sharedTheme: "",
+    };
+    expect(isCompleteGabayFullPlan(partial, ["3", "4"])).toBe(true);
   });
 
   it("rejects a draft that omits a requested grade", () => {
     expect(isCompleteGabayFullPlan({ ...complete, grades: { "3": gradeDraft } }, ["3", "4"])).toBe(false);
   });
 
-  it("rejects blank grade fields or a slot with no task for one grade", () => {
-    expect(isCompleteGabayFullPlan({ ...complete, grades: { ...complete.grades, "4": { ...gradeDraft, objective: "" } } }, ["3", "4"])).toBe(false);
-    expect(isCompleteGabayFullPlan({ ...complete, slots: [{ ...complete.slots[0], gradeTasks: { "3": "Do the task", "4": "" } }] }, ["3", "4"])).toBe(false);
+  it("rejects an empty husk — a grade with neither competency nor objective", () => {
+    expect(isCompleteGabayFullPlan({ ...complete, grades: { ...complete.grades, "4": { ...gradeDraft, competency: "", objective: "" } } }, ["3", "4"])).toBe(false);
+  });
+
+  it("rejects a slot with no task for any grade", () => {
+    expect(isCompleteGabayFullPlan({ ...complete, slots: [{ ...complete.slots[0], gradeTasks: { "3": "", "4": "" } }] }, ["3", "4"])).toBe(false);
   });
 });

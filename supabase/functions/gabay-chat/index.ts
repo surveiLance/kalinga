@@ -365,13 +365,16 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
       const learnerContext = cleanText(parsed.learnerContext, 1_500);
       const materials = cleanText(parsed.materials, 1_500);
       const nextSessionNotes = cleanText(parsed.nextSessionNotes, 1_000);
-      const requiredGradeFields = ["competency", "contentStandard", "performanceStandard", "objective", "formativeAssessment", "exitTask", "successCriteria", "reflectionQuestion", "remediation", "enrichment"] as const;
-      const gradesComplete = requestedGrades.length > 0 && requestedGrades.every((grade) => {
+      // Accept a usable draft rather than demanding every field: each grade must carry
+      // at least a competency or objective, and each slot at least one grade's task.
+      // The client fills any remaining gaps (keeping prior text), so partial drafts are
+      // completed by the teacher instead of thrown away whole.
+      const gradesUsable = requestedGrades.length > 0 && requestedGrades.every((grade) => {
         const item = grades[grade];
-        return item && requiredGradeFields.every((field) => item[field]);
+        return item && (item.competency || item.objective);
       });
-      const slotsComplete = slots.length > 0 && slots.every((slot) => requestedGrades.every((grade) => slot.gradeTasks[grade]));
-      if (!sharedTheme || !learnerContext || !materials || !gradesComplete || !slotsComplete) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
+      const slotsUsable = slots.length > 0 && slots.every((slot) => requestedGrades.some((grade) => slot.gradeTasks[grade]));
+      if (!gradesUsable || !slotsUsable) return json({ error: "Gabay returned an incomplete draft" }, 502, origin);
       return json({ draft: {
         type: "full-plan",
         sharedTheme,
