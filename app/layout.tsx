@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Chonburi, Domine } from "next/font/google";
+import { Nunito, PT_Sans } from "next/font/google";
 import "./globals.css";
 
-const chonburi = Chonburi({
-  weight: "400",
+const nunito = Nunito({
+  weight: "variable",
   subsets: ["latin"],
-  variable: "--font-chonburi",
+  variable: "--font-nunito",
   display: "swap",
 });
 
-const domine = Domine({
-  weight: "variable",
+const ptSans = PT_Sans({
+  weight: ["400", "700"],
   subsets: ["latin"],
-  variable: "--font-domine",
+  variable: "--font-pt-sans",
   display: "swap",
 });
 
@@ -26,5 +26,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${chonburi.variable} ${domine.variable}`}><body>{children}</body></html>;
+  return <html lang="en" className={`${nunito.variable} ${ptSans.variable}`}><body>{children}</body></html>;
 }

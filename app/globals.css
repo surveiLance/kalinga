@@ -32,21 +32,21 @@
   --blue: #dce8f2;
   --line: var(--border);
   --shadow: var(--shadow-sm);
-  --font-display: var(--font-chonburi), Georgia, "Times New Roman", serif;
-  --font-reading: var(--font-domine), Georgia, "Times New Roman", serif;
-  --font-ui: "Avenir Next", Avenir, "Segoe UI", Arial, sans-serif;
+  --font-display: var(--font-nunito), "Trebuchet MS", Arial, sans-serif;
+  --font-reading: var(--font-pt-sans), "Segoe UI", Arial, sans-serif;
+  --font-ui: var(--font-pt-sans), "Segoe UI", Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
 html { background: var(--cream); }
-body { margin: 0; color: var(--ink); background: var(--cream); font-family: var(--font-ui); font-weight: 500; line-height: 1.45; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body { margin: 0; color: var(--ink); background: var(--cream); font-family: var(--font-ui); font-weight: 400; line-height: 1.45; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 button, input, select, textarea { transition: border-color .18s ease, background-color .18s ease, color .18s ease, box-shadow .18s ease, opacity .18s ease, transform .18s ease; }
 button:disabled, input:disabled, select:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
 :focus-visible { outline: 3px solid #0b5f59; outline-offset: 3px; }
 ::selection { color: var(--ink); background: #f4c9b8; }
-h1, h2 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; }
+h1, h2 { font-family: var(--font-display); font-weight: 800; text-wrap: balance; }
 p { text-wrap: pretty; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 
@@ -1706,9 +1706,9 @@ html { scroll-behavior: smooth; }
 .resource-workspace-surface .resource-submission,
 .plan-workspace-surface .plan-setup { scroll-margin-top: 92px; }
 
-/* Editorial reading voice without sacrificing dense UI scanability */
+/* Friendly display hierarchy without sacrificing dense UI scanability */
 .page-intro-copy h1,
-.classes-page .class-page-heading h1 { font-family: var(--font-display); font-weight: 400; }
+.classes-page .class-page-heading h1 { font-family: var(--font-display); font-weight: 800; }
 .gabay-briefing-copy > p:not(.eyebrow),
 .page-intro-copy > p:not(.eyebrow),
 .home-action-heading > div > p:last-child,
