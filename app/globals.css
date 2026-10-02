@@ -1582,6 +1582,8 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 }
 
 /* Restrained palette and sharper structural hierarchy */
+html { scroll-behavior: smooth; }
+.workspace { background: radial-gradient(circle at 88% 8%, rgba(43, 107, 103, .075), transparent 30%), radial-gradient(circle at 12% 92%, rgba(170, 71, 38, .055), transparent 27%), var(--surface); }
 .home-guided-day .gabay-today-briefing { border-radius: 8px; background: linear-gradient(132deg, #263247 0%, #245653 72%, #2b6b67 100%); }
 .home-quick-actions .today-schedule-summary,
 .home-quick-actions .home-action-card,
@@ -1636,6 +1638,54 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 .class-workspace-surface .class-next-step,
 .teaching-workspace-surface .teaching-guide-summary { border-color: #bfd5d1; background: linear-gradient(145deg, #f4f8f7, var(--support-soft)); }
 .tutorial-workspace-surface .tutorial-complete { border-color: #c5d8d4; background: linear-gradient(145deg, #f5f8f7, var(--surface-raised)); }
+
+/* Native motion and selective color energy */
+@keyframes kalinga-surface-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-intro-copy::before { content: ""; width: 48px; height: 4px; margin-bottom: 12px; display: block; background: linear-gradient(90deg, var(--brand), var(--support)); }
+.home-quick-actions .today-schedule-summary { box-shadow: inset 0 3px 0 rgba(170, 71, 38, .9), var(--shadow-sm); animation: kalinga-surface-in .46s .08s cubic-bezier(.22, 1, .36, 1) both; }
+.home-quick-actions .home-action-card { box-shadow: inset 0 3px 0 rgba(43, 107, 103, .9), var(--shadow-sm); animation: kalinga-surface-in .46s .15s cubic-bezier(.22, 1, .36, 1) both; }
+.home-quick-actions .today-schedule-list article { background: linear-gradient(105deg, #f2faf8, var(--surface-raised) 68%); }
+.home-quick-actions .home-essential-actions > button { background: linear-gradient(105deg, var(--surface-raised), #faf5ec); }
+.home-quick-actions .home-essential-actions > button:nth-child(odd) { border-left: 3px solid var(--brand); }
+.home-quick-actions .home-essential-actions > button:nth-child(even) { border-left: 3px solid var(--support); }
+
+.home-quick-actions .today-schedule-list article,
+.home-quick-actions .home-essential-actions > button,
+.plan-workspace-surface .plan-index-row,
+.teaching-workspace-surface .teaching-reference-grid > article,
+.resource-workspace-surface .starter-resource-card,
+.community-workspace-surface .discussion-list button,
+.tutorial-workspace-surface .tutorial-missions button { transition: transform .2s cubic-bezier(.22, 1, .36, 1), box-shadow .2s ease, border-color .2s ease, background-color .2s ease; }
+
+.home-quick-actions .today-schedule-list article:hover,
+.home-quick-actions .home-essential-actions > button:hover,
+.plan-workspace-surface .plan-index-row:hover,
+.teaching-workspace-surface .teaching-reference-grid > article:hover,
+.resource-workspace-surface .starter-resource-card:hover,
+.community-workspace-surface .discussion-list button:hover,
+.tutorial-workspace-surface .tutorial-missions button:hover { transform: translateY(-2px); border-color: #8bb8b1; box-shadow: 0 12px 25px rgba(39, 49, 58, .09); }
+
+.class-page-layout > *,
+.attendance-grid > *,
+.plan-workspace-surface .plan-index-row,
+.resource-workspace-surface .starter-resource-card,
+.discussion-layout > *,
+.tutorial-layout > * { animation: kalinga-surface-in .42s cubic-bezier(.22, 1, .36, 1) both; }
+.class-page-layout > :nth-child(2),
+.attendance-grid > :nth-child(2),
+.discussion-layout > :nth-child(2),
+.tutorial-layout > :nth-child(2) { animation-delay: .08s; }
+.plan-workspace-surface .plan-index-row:nth-child(2),
+.resource-workspace-surface .starter-resource-card:nth-child(2) { animation-delay: .06s; }
+.plan-workspace-surface .plan-index-row:nth-child(3),
+.resource-workspace-surface .starter-resource-card:nth-child(3) { animation-delay: .12s; }
+.class-workspace-surface .class-setup-card,
+.resource-workspace-surface .resource-submission,
+.plan-workspace-surface .plan-setup { scroll-margin-top: 92px; }
 
 /* Final responsive and content-safety polish */
 .view-page { min-width: 0; }
