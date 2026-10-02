@@ -1305,3 +1305,64 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .mobile-nav button.active { color: var(--brand-strong); background: #fff0e9; }
   .storage-alert { padding-inline: 16px; }
 }
+
+/* Guided Day — Today */
+.home-guided-day { display: grid; gap: 20px; }
+.home-primary-context { display: grid; gap: 12px; }
+.home-primary-context .notice { margin: 0; }
+.home-guided-day .gabay-today-briefing {
+  position: relative;
+  min-height: 230px;
+  padding: 28px 30px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  grid-template-columns: 98px minmax(0, 1fr) auto;
+  gap: 24px;
+  color: #fff;
+  background: linear-gradient(128deg, #243148 0%, #215f5c 68%, #1e716a 100%);
+  box-shadow: 0 18px 38px rgba(28, 48, 57, .16);
+  overflow: hidden;
+}
+.home-guided-day .gabay-today-briefing::after { content: ""; position: absolute; right: -92px; bottom: -128px; width: 330px; height: 330px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 50%; box-shadow: 0 0 0 58px rgba(255, 255, 255, .025), 0 0 0 116px rgba(255, 255, 255, .018); pointer-events: none; }
+.home-guided-day .gabay-today-briefing.is-empty { width: 100%; max-width: none; min-height: 250px; margin: 0; padding: 32px; grid-template-columns: 112px minmax(0, 1fr) auto; }
+.home-guided-day .gabay-briefing-mascot { position: relative; z-index: 1; border-radius: 50%; background: rgba(255, 255, 255, .1); }
+.home-guided-day .gabay-briefing-copy, .home-guided-day .gabay-briefing-actions { position: relative; z-index: 1; }
+.home-guided-day .gabay-briefing-copy > p { color: #ffc5aa; font-size: 10px; letter-spacing: .15em; }
+.home-guided-day .gabay-briefing-copy h1 { max-width: 700px; color: #fff; font-size: clamp(28px, 3.4vw, 42px); line-height: 1.08; }
+.home-guided-day .gabay-briefing-copy > span { max-width: 650px; margin-top: 10px; color: #d9e7e6; font-size: 14px; }
+.home-guided-day .gabay-briefing-updates { margin-top: 18px; gap: 8px; }
+.home-guided-day .gabay-briefing-updates > span { padding: 8px 11px; border-color: rgba(255, 255, 255, .16); color: #e6f2f1; background: rgba(255, 255, 255, .08); font-size: 10px; }
+.home-guided-day .gabay-briefing-updates b { color: #fff; }
+.home-guided-day .gabay-briefing-updates .needs-attention { border-color: rgba(255, 185, 151, .34); color: #ffd6c3; background: rgba(177, 71, 34, .23); }
+.home-guided-day .gabay-briefing-updates .needs-attention b { color: #fff; }
+.home-guided-day .gabay-briefing-latest { border-left-color: #92c9c0; color: #d9e7e6; }
+.home-guided-day .gabay-briefing-action { min-height: 46px; padding-inline: 16px; background: var(--brand); box-shadow: 0 8px 18px rgba(174, 56, 20, .26); }
+.home-guided-day .gabay-today-briefing .primary-button { min-height: 48px; background: var(--brand); }
+.home-guided-day .gabay-sample-link { min-height: 38px; color: #d9e7e6; }
+.home-quick-actions { margin-top: 0; grid-template-columns: minmax(0, 1.12fr) minmax(350px, .88fr); gap: 20px; }
+.home-quick-actions .today-schedule-summary, .home-quick-actions .home-action-card { padding: 24px; border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.home-quick-actions .today-schedule-summary h2, .home-quick-actions .home-action-heading h2 { margin-top: 3px; font-size: 25px; }
+.home-quick-actions .today-schedule-summary > header > span { color: var(--support); background: var(--support-soft); }
+.home-quick-actions .today-schedule-list { gap: 10px; }
+.home-quick-actions .today-schedule-list article { min-height: 94px; border-color: #e5ddd1; border-radius: var(--radius-md); background: #fff; }
+.home-quick-actions .today-schedule-list article:first-child { border-color: #8fc2b9; background: #f0f8f6; box-shadow: inset 4px 0 0 var(--support); }
+.home-quick-actions .today-schedule-list article > button { border-color: #cbded9; color: var(--support); }
+.home-quick-actions .home-essential-actions > button { min-height: 78px; border-color: #e5ddd1; border-radius: var(--radius-md); background: #fff; }
+.home-quick-actions .home-essential-actions > button:hover { border-color: #d9a58e; }
+.home-quick-actions .home-essential-actions > button > b { color: var(--brand-strong); }
+
+@media (max-width: 1020px) {
+  .home-quick-actions { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .home-guided-day { gap: 14px; }
+  .home-guided-day .gabay-today-briefing, .home-guided-day .gabay-today-briefing.is-empty { min-height: 0; padding: 20px; grid-template-columns: 60px minmax(0, 1fr); gap: 14px; }
+  .home-guided-day .gabay-briefing-copy h1 { font-size: 25px; }
+  .home-guided-day .gabay-briefing-copy > span { font-size: 12px; }
+  .home-guided-day .gabay-briefing-updates > span { padding: 7px 9px; }
+  .home-guided-day .gabay-briefing-actions { grid-column: 1 / -1; }
+  .home-quick-actions { gap: 14px; }
+  .home-quick-actions .today-schedule-summary, .home-quick-actions .home-action-card { padding: 18px; }
+  .home-quick-actions .today-schedule-summary h2, .home-quick-actions .home-action-heading h2 { font-size: 22px; }
+}
