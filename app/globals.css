@@ -6,10 +6,12 @@
   --text: #202a3d;
   --text-muted: #657083;
   --border: #d5d0c7;
-  --brand: #aa4726;
-  --brand-strong: #87351d;
-  --support: #2b6b67;
-  --support-soft: #e3efed;
+  --brand: #c34f28;
+  --brand-strong: #96391f;
+  --support: #19766f;
+  --support-soft: #d8f0eb;
+  --accent-peach: #ffe1d4;
+  --accent-teal: #d7f2ec;
   --success: #318b79;
   --warning: #a96718;
   --danger: #a64432;
@@ -1583,7 +1585,17 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 
 /* Restrained palette and sharper structural hierarchy */
 html { scroll-behavior: smooth; }
-.workspace { background: radial-gradient(circle at 88% 8%, rgba(43, 107, 103, .075), transparent 30%), radial-gradient(circle at 12% 92%, rgba(170, 71, 38, .055), transparent 27%), var(--surface); }
+@media screen {
+  html, body { overscroll-behavior-y: none; }
+  .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+  .sidebar { position: relative; top: auto; height: 100dvh; overflow-y: auto; overscroll-behavior-y: contain; }
+  .workspace { height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { position: relative; top: auto; flex: 0 0 auto; }
+  .content { flex: 1 1 auto; min-height: 0; overflow-x: clip; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
+}
+.workspace { background: radial-gradient(circle at 88% 8%, rgba(25, 118, 111, .12), transparent 31%), radial-gradient(circle at 12% 92%, rgba(195, 79, 40, .09), transparent 29%), var(--surface); }
+.sidebar { background: linear-gradient(180deg, #fff8ee 0%, #fffdf8 58%, #edf8f5 145%); }
+.topbar { background: rgba(255, 254, 250, .96); }
 .home-guided-day .gabay-today-briefing { border-radius: 8px; background: linear-gradient(132deg, #263247 0%, #245653 72%, #2b6b67 100%); }
 .home-quick-actions .today-schedule-summary,
 .home-quick-actions .home-action-card,
@@ -1634,10 +1646,16 @@ html { scroll-behavior: smooth; }
 .tags span,
 .home-quick-actions .today-schedule-summary > header > span { border-radius: 999px; }
 .mobile-account-button { border-radius: 50%; }
-.mobile-nav button.active { color: var(--brand-strong); background: #f7e7e0; }
+.mobile-nav button.active { color: var(--brand-strong); background: var(--accent-peach); }
 .class-workspace-surface .class-next-step,
 .teaching-workspace-surface .teaching-guide-summary { border-color: #bfd5d1; background: linear-gradient(145deg, #f4f8f7, var(--support-soft)); }
 .tutorial-workspace-surface .tutorial-complete { border-color: #c5d8d4; background: linear-gradient(145deg, #f5f8f7, var(--surface-raised)); }
+.class-workspace-surface .class-setup-card,
+.attendance-workspace-surface .attendance-main,
+.plan-workspace-surface .plan-setup,
+.resource-workspace-surface .resource-submission { box-shadow: inset 0 3px 0 var(--brand), var(--shadow-md); }
+.class-workspace-surface .stepper { background: linear-gradient(90deg, #fff3ec, #edf9f6); }
+.notice, .storage-alert { border-color: #8fcfc5; background: var(--accent-teal); }
 
 /* Native motion and selective color energy */
 @keyframes kalinga-surface-in {
@@ -1646,8 +1664,8 @@ html { scroll-behavior: smooth; }
 }
 
 .page-intro-copy::before { content: ""; width: 48px; height: 4px; margin-bottom: 12px; display: block; background: linear-gradient(90deg, var(--brand), var(--support)); }
-.home-quick-actions .today-schedule-summary { box-shadow: inset 0 3px 0 rgba(170, 71, 38, .9), var(--shadow-sm); animation: kalinga-surface-in .46s .08s cubic-bezier(.22, 1, .36, 1) both; }
-.home-quick-actions .home-action-card { box-shadow: inset 0 3px 0 rgba(43, 107, 103, .9), var(--shadow-sm); animation: kalinga-surface-in .46s .15s cubic-bezier(.22, 1, .36, 1) both; }
+.home-quick-actions .today-schedule-summary { box-shadow: inset 0 3px 0 rgba(195, 79, 40, .95), var(--shadow-sm); animation: kalinga-surface-in .46s .08s cubic-bezier(.22, 1, .36, 1) both; }
+.home-quick-actions .home-action-card { box-shadow: inset 0 3px 0 rgba(25, 118, 111, .95), var(--shadow-sm); animation: kalinga-surface-in .46s .15s cubic-bezier(.22, 1, .36, 1) both; }
 .home-quick-actions .today-schedule-list article { background: linear-gradient(105deg, #f2faf8, var(--surface-raised) 68%); }
 .home-quick-actions .home-essential-actions > button { background: linear-gradient(105deg, var(--surface-raised), #faf5ec); }
 .home-quick-actions .home-essential-actions > button:nth-child(odd) { border-left: 3px solid var(--brand); }

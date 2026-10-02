@@ -360,6 +360,7 @@ export default function Home() {
   const [tutorialStatus, setTutorialStatus] = useState<TutorialStatus>(emptyTutorialStatus);
   const [tutorialStatusKnown, setTutorialStatusKnown] = useState(false);
   const [tutorialStatusReady, setTutorialStatusReady] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const sessionTeacherId = useRef("");
   const wakeSync = useRef<(refresh?: boolean) => void>(() => {});
   const syncRun = useRef<Promise<void> | null>(null);
@@ -368,6 +369,10 @@ export default function Home() {
     : entryMode === "prototype"
       ? "prototype"
       : "";
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [view]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -1066,7 +1071,7 @@ export default function Home() {
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
         {showTutorialOffer && <TutorialOffer teacherName={teacherName} onStart={() => { saveTutorialProgress(emptyTutorialStatus); setView("tutorial"); }} onDismiss={() => saveTutorialProgress({ ...emptyTutorialStatus, dismissed: true })} />}
 
-        <div className="content">
+        <div className="content" ref={contentRef}>
           {view === "home" ? <div className="view-page home-page home-guided-day">
             <div className="home-primary-context">
               <GabayTodayBriefing teacherName={teacherName} activeClass={activeClass} blocks={todayTeachingBlocks} nextBlock={nextTeachingBlock} missingPlanCount={missingPlanCount} attendanceSavedCount={attendanceSavedCount} latestUpdate={gabayEventMessage} motion={gabayMotion} onOpen={() => setGabayOpen(true)} onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} />
