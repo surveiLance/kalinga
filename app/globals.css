@@ -32,7 +32,8 @@
   --blue: #dce8f2;
   --line: var(--border);
   --shadow: var(--shadow-sm);
-  --font-display: Georgia, "Times New Roman", serif;
+  --font-display: var(--font-chonburi), Georgia, "Times New Roman", serif;
+  --font-reading: var(--font-domine), Georgia, "Times New Roman", serif;
   --font-ui: "Avenir Next", Avenir, "Segoe UI", Arial, sans-serif;
 }
 
@@ -45,7 +46,7 @@ button, input, select, textarea { transition: border-color .18s ease, background
 button:disabled, input:disabled, select:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
 :focus-visible { outline: 3px solid #0b5f59; outline-offset: 3px; }
 ::selection { color: var(--ink); background: #f4c9b8; }
-h1, h2 { font-family: var(--font-display); font-weight: 700; text-wrap: balance; }
+h1, h2 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; }
 p { text-wrap: pretty; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 
@@ -1705,6 +1706,21 @@ html { scroll-behavior: smooth; }
 .resource-workspace-surface .resource-submission,
 .plan-workspace-surface .plan-setup { scroll-margin-top: 92px; }
 
+/* Editorial reading voice without sacrificing dense UI scanability */
+.page-intro-copy h1,
+.classes-page .class-page-heading h1 { font-family: var(--font-display); font-weight: 400; }
+.gabay-briefing-copy > p:not(.eyebrow),
+.page-intro-copy > p:not(.eyebrow),
+.home-action-heading > div > p:last-child,
+.class-workspace-head > div > p:not(.eyebrow),
+.class-next-step > p:not(.eyebrow),
+.teaching-guide-summary p:not(.eyebrow),
+.teaching-focus-card > header p:not(.eyebrow),
+.discussion-card > p,
+.community-side > p:not(.eyebrow),
+.tutorial-gabay div > p:not(.eyebrow),
+.login-copy { font-family: var(--font-reading); font-weight: 400; line-height: 1.65; }
+
 /* Final responsive and content-safety polish */
 .view-page { min-width: 0; }
 .view-page h1, .view-page h2, .view-page h3, .view-page .lead, .view-page .library-description, .view-page .discussion-card, .view-page .reply-item { overflow-wrap: anywhere; }
@@ -1718,7 +1734,7 @@ html { scroll-behavior: smooth; }
   .mobile-nav button { min-height: 50px; touch-action: manipulation; }
   .topbar button, .page-intro-action button, .class-workspace-tabs button, .community-tabs button, .starter-library-toolbar button, .tutorial-missions button { min-height: 44px; }
   .status-options button, .grade-picker button { min-height: 44px; touch-action: manipulation; }
-  .view-page h1, .view-page h2, .view-page h3 { hyphens: auto; }
+  .view-page h1, .view-page h2, .view-page h3 { overflow-wrap: break-word; word-break: normal; hyphens: none; }
   .content { overflow-x: clip; }
 }
 

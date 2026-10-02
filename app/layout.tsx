@@ -1,5 +1,20 @@
 import type { Metadata } from "next";
+import { Chonburi, Domine } from "next/font/google";
 import "./globals.css";
+
+const chonburi = Chonburi({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-chonburi",
+  display: "swap",
+});
+
+const domine = Domine({
+  weight: "variable",
+  subsets: ["latin"],
+  variable: "--font-domine",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Kalinga — Teachers’ Assistant",
@@ -11,5 +26,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en" className={`${chonburi.variable} ${domine.variable}`}><body>{children}</body></html>;
 }
