@@ -1021,15 +1021,15 @@ export default function Home() {
         </button>
 
         <nav className="nav-list">
-          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" onClick={() => setView("home")}>Today</button>
-          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}>Classes &amp; learners</button>
-          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => openPlanLessons()}>Plan lessons</button>
-          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}>Find resources</button>
-          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}>Ask teachers</button>
-          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" onClick={openTutorial}><span className="nav-icon">?</span> Learn Kalinga{tutorialStatus.completed && <small>✓</small>}</button>
+          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" onClick={() => setView("home")}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
+          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
+          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => openPlanLessons()}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
+          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
+          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
+          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" onClick={openTutorial}><span className="nav-icon" aria-hidden="true">?</span><span>Learn Kalinga</span>{tutorialStatus.completed && <small>✓</small>}</button>
         </nav>
 
-        <div className="offline-card">
+        <div className="offline-card sidebar-status">
           <span className="status-dot" />
           <div><strong>Teaching kit</strong><small>2 starter PDFs ready</small></div>
         </div>

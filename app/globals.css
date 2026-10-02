@@ -1243,3 +1243,65 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .flow-block > footer button:disabled { opacity: .4; }
 }
 @media (min-width: 721px) { .attendance-save-bar, .grade-switcher { display: none; } }
+
+/* Guided Day application shell */
+.app-shell { grid-template-columns: 236px minmax(0, 1fr); background: var(--surface); }
+.sidebar { z-index: 48; padding: 24px 16px 18px; border-color: var(--border); background: #fffaf2; }
+.brand { height: 72px; padding: 0 10px 20px; }
+.brand img { width: 150px; }
+.nav-list { gap: 5px; }
+.nav-item { min-height: 46px; padding: 7px 10px; border-radius: var(--radius-sm); gap: 10px; color: var(--text-muted); font-size: 13px; font-weight: 750; }
+.nav-item > span:not(.nav-icon) { min-width: 0; }
+.nav-item .nav-icon { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; display: grid; place-items: center; color: #777f8e; background: transparent; font-family: var(--font-ui); font-size: 18px; font-weight: 750; line-height: 1; }
+.nav-item:hover { color: var(--text); background: #f2eadf; }
+.nav-item.active { color: #fff; background: var(--brand); box-shadow: 0 8px 18px rgba(190, 66, 27, .16); }
+.nav-item.active .nav-icon { color: #fff; background: rgba(255, 255, 255, .14); }
+.nav-item small { margin-left: auto; }
+.sidebar-status { margin-top: auto; padding: 12px; border-color: #bedbd5; border-radius: var(--radius-md); background: #e6f3ef; }
+.sidebar-status strong { font-size: 12px; }
+.sidebar-status small { color: #5f817c; font-size: 10px; }
+.desktop-account { margin-top: 10px; }
+.profile { min-height: 52px; padding: 7px; border-radius: var(--radius-sm); }
+.profile:hover, .profile[aria-expanded="true"] { background: #f2eadf; }
+.profile small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace { min-width: 0; background: var(--surface); }
+.topbar { min-height: 72px; height: 72px; padding: 0 30px; border-color: var(--border); justify-content: flex-end; background: rgba(255, 253, 248, .92); box-shadow: 0 5px 20px rgba(43, 35, 27, .04); }
+.top-actions { gap: 9px; }
+.connection { min-height: 38px; padding: 7px 11px; border: 1px solid #c7dfda; color: var(--support); background: #edf7f4; }
+.gabay-topbar-assistant { min-height: 44px; padding: 4px 10px 4px 5px; border-color: #bdd9d3; border-radius: 12px; background: #edf7f4; box-shadow: none; }
+.gabay-topbar-assistant .gabay-mascot { width: 34px; height: 34px; }
+.gabay-topbar-assistant b { font-size: 11px; }
+.gabay-topbar-assistant small { color: #607f7a; font-size: 9px; }
+.notification { width: 42px; height: 42px; border-color: var(--border); border-radius: 11px; background: var(--surface-raised); }
+.content { width: 100%; max-width: 1220px; padding: 30px 30px 72px; }
+.account-menu, .notification-panel { border-color: var(--border); background: var(--surface-raised); box-shadow: var(--shadow-md); }
+
+@media (max-width: 1020px) and (min-width: 721px) {
+  .app-shell { grid-template-columns: 214px minmax(0, 1fr); }
+  .sidebar { padding-inline: 13px; }
+  .content, .topbar { padding-left: 24px; padding-right: 24px; }
+}
+
+@media (max-width: 720px) {
+  .app-shell { display: block; }
+  .sidebar { display: none; }
+  .workspace { padding-bottom: 82px; }
+  .topbar { min-height: 68px; height: 68px; padding: 11px 16px; flex-wrap: nowrap; gap: 10px; justify-content: space-between; }
+  .mobile-brand { display: block; }
+  .mobile-brand img { width: 102px; }
+  .top-actions { min-width: 0; margin-left: auto; gap: 7px; }
+  .connection { display: none; }
+  .gabay-topbar-assistant { width: 44px; min-height: 44px; padding: 3px; justify-content: center; }
+  .gabay-topbar-assistant .gabay-mascot { width: 35px; height: 35px; }
+  .gabay-topbar-assistant > span:not(.gabay-mascot) { display: none; }
+  .notification { width: 44px; height: 44px; }
+  .mobile-account { display: block; }
+  .mobile-account-button { width: 44px; height: 44px; }
+  .mobile-account .account-menu { left: auto; right: 0; top: calc(100% + 10px); bottom: auto; }
+  .content { max-width: none; padding: 22px 16px 34px; }
+  .mobile-nav { z-index: 60; height: calc(72px + env(safe-area-inset-bottom)); padding: 7px 7px max(7px, env(safe-area-inset-bottom)); border-color: var(--border); grid-template-columns: repeat(6, minmax(0, 1fr)); background: rgba(255, 253, 248, .96); box-shadow: 0 -8px 26px rgba(39, 31, 24, .08); }
+  .mobile-nav button { min-width: 0; min-height: 50px; padding: 3px 1px; border-radius: 9px; color: #727a86; font-size: 9px; font-weight: 750; }
+  .mobile-nav button span { font-size: 18px; }
+  .mobile-nav button.active { color: var(--brand-strong); background: #fff0e9; }
+  .storage-alert { padding-inline: 16px; }
+}
