@@ -1,27 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #182138;
-  --muted: #6f788c;
-  --cream: #f7efe2;
-  --paper: #fffdf9;
-  --orange: #ec5822;
-  --orange-dark: #cb4315;
-  --teal: #d8eeeb;
-  --teal-ink: #237b78;
-  --blue: #d9e7f2;
-  --line: #dfd7ca;
-  --shadow: 0 12px 30px rgba(37, 31, 24, 0.06);
+  --surface: #f5efe5;
+  --surface-raised: #fffdf8;
+  --text: #192238;
+  --text-muted: #667084;
+  --border: #ddd5c8;
+  --brand: #e45b2d;
+  --brand-strong: #bd421b;
+  --support: #24756f;
+  --support-soft: #dcefeb;
+  --success: #318b79;
+  --warning: #a96718;
+  --danger: #a64432;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 8px 22px rgba(37, 31, 24, 0.055);
+  --shadow-md: 0 18px 46px rgba(37, 31, 24, 0.09);
+  --ink: var(--text);
+  --muted: var(--text-muted);
+  --cream: var(--surface);
+  --paper: var(--surface-raised);
+  --orange: var(--brand);
+  --orange-dark: var(--brand-strong);
+  --teal: var(--support-soft);
+  --teal-ink: var(--support);
+  --blue: #dce8f2;
+  --line: var(--border);
+  --shadow: var(--shadow-sm);
   --font-display: Georgia, "Times New Roman", serif;
   --font-ui: "Avenir Next", Avenir, "Segoe UI", Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
 html { background: var(--cream); }
-body { margin: 0; color: var(--ink); background: var(--cream); font-family: var(--font-ui); font-weight: 500; }
+body { margin: 0; color: var(--ink); background: var(--cream); font-family: var(--font-ui); font-weight: 500; line-height: 1.45; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
-h1, h2 { font-family: var(--font-display); font-weight: 700; }
+button, input, select, textarea { transition: border-color .18s ease, background-color .18s ease, color .18s ease, box-shadow .18s ease, opacity .18s ease, transform .18s ease; }
+button:disabled, input:disabled, select:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 3px solid rgba(36, 117, 111, .28); outline-offset: 3px; }
+::selection { color: var(--ink); background: #f4c9b8; }
+h1, h2 { font-family: var(--font-display); font-weight: 700; text-wrap: balance; }
+p { text-wrap: pretty; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 258px 1fr; }
