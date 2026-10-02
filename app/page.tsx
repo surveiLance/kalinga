@@ -1923,7 +1923,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
 
   if (!teachingClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>This lesson’s class is unavailable</h2><p>Return to Today and choose another saved lesson.</p></div><button className="secondary-button" type="button" onClick={onBack}>Back to Today</button></section>;
 
-  return <div className="view-page teaching-page">
+  return <div className="view-page teaching-page teaching-workspace-surface">
     <PageIntro eyebrow="TEACH · MULTIGRADE LESSON" title={plan.title} description={`${teachingClass.name} · ${plan.subject} · ${planStart}–${planEnd}`} action={<div className="teaching-page-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="secondary-button" type="button" onClick={onEdit}>Edit plan</button><button className="primary-button" type="button" onClick={() => window.print()}>Print or save PDF</button></div>} />
 
     <section className="teaching-guide-summary">
@@ -2054,7 +2054,7 @@ function PlanIndex({ plans, classes, onOpen, onNew, onBack, onDelete }: { plans:
   function activate(planId: string) { if (selecting) toggle(planId); else onOpen(planId); }
 
   return (
-    <div className="view-page plan-index">
+    <div className="view-page plan-index plan-workspace-surface">
       <PageIntro eyebrow="LESSON PLANS" title="Your lesson plans" description="Open a saved plan to keep editing, start a new one, or select plans to delete." action={<div className="plan-index-actions">
         {plans.length > 0 && (selecting
           ? <button className="secondary-button" type="button" onClick={exitSelect}>Cancel</button>
@@ -2448,7 +2448,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   };
 
   return (
-    <div className={`view-page plan-page${printingPlan ? " ilaw-print-mode" : ""}`}>
+    <div className={`view-page plan-page plan-workspace-surface${printingPlan ? " ilaw-print-mode" : ""}`}>
       <PageIntro eyebrow="MULTIGRADE LESSON PLAN" title={lessonTitle.trim() || "New lesson plan"} description="Set four things, let Gabay draft, then edit the plan exactly where it prints." action={<button className="secondary-button" type="button" onClick={onBack}>← Today</button>} />
 
       <section className={`plan-setup${setupOpen ? " open" : ""}`}>

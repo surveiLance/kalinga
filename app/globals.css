@@ -1479,3 +1479,50 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .attendance-workspace-surface .status-options { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .attendance-workspace-surface .attendance-summary { padding: 18px; }
 }
+
+/* Lesson planning and classroom teaching */
+.plan-workspace-surface .plan-index-list { margin-top: 20px; gap: 12px; }
+.plan-workspace-surface .plan-index-row { min-height: 82px; padding: 18px 20px; border-color: var(--border); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.plan-workspace-surface .plan-index-row:hover { border-color: #78afa6; box-shadow: var(--shadow-md); }
+.plan-workspace-surface .plan-index-row small { overflow-wrap: anywhere; }
+.plan-workspace-surface .plan-index-row.selected { border-color: var(--support); background: var(--support-soft); }
+.plan-workspace-surface .plan-setup { margin-top: 20px; border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.plan-workspace-surface .plan-setup-grid input, .plan-workspace-surface .plan-setup-grid select, .plan-workspace-surface .plan-setup-notes textarea { border-color: var(--border); border-radius: var(--radius-sm); }
+.plan-workspace-surface .plan-setup-more { border-top: 1px solid var(--border); }
+.plan-workspace-surface .plan-toolbar { top: 82px; border-color: var(--border); border-radius: var(--radius-md); background: rgba(255, 253, 248, .96); box-shadow: var(--shadow-md); }
+.plan-workspace-surface .plan-time-warning { overflow-wrap: anywhere; }
+.plan-workspace-surface .gabay-draft-button { border-radius: var(--radius-sm); }
+.plan-workspace-surface .grade-switcher { border-color: #b6d8d1; background: var(--support-soft); }
+/* The editable lesson document retains its DepEd/ILAW print geometry. Only its screen frame changes. */
+.plan-workspace-surface .ilaw-editor { border-color: #cfc6b9; box-shadow: 0 12px 30px rgba(44, 35, 25, .08); }
+.plan-workspace-surface .ilaw-editor .edit-cell:focus, .plan-workspace-surface .ilaw-editor .cell-input:focus, .plan-workspace-surface .ilaw-editor .ilaw-title-input:focus { background: #edf8f5; box-shadow: 0 0 0 2px rgba(31, 123, 114, .16); }
+.teaching-workspace-surface .teaching-guide-summary { margin-top: 20px; border-color: #acd4cd; border-radius: var(--radius-lg); background: linear-gradient(145deg, #edf8f5, #dcefeb); box-shadow: var(--shadow-sm); }
+.teaching-workspace-surface .teaching-readiness { border-radius: var(--radius-sm); }
+.teaching-workspace-surface .teaching-block-nav { border-color: var(--border); border-radius: var(--radius-md); background: #f3ede4; }
+.teaching-workspace-surface .teaching-block-nav button.active { border-color: #79b9ae; background: #fff; box-shadow: var(--shadow-sm); }
+.teaching-workspace-surface .teaching-block-nav button.active > span { background: var(--support); }
+.teaching-workspace-surface .teaching-focus-card { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-md); }
+.teaching-workspace-surface .teaching-focus-card > header { background: linear-gradient(128deg, #243148, #215f5c); }
+.teaching-workspace-surface .teaching-focus-card > footer { border-color: var(--border); background: #f7f1e8; }
+.teaching-workspace-surface .teaching-focus-card > footer button.next { border-color: var(--support); background: var(--support); }
+.teaching-workspace-surface .teaching-reference-grid > article { border-color: var(--border); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.teaching-workspace-surface .teaching-reference-list > div { background: #f7f1e8; }
+
+@media (max-width: 720px) {
+  .plan-workspace-surface .plan-index-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .plan-workspace-surface .plan-index-actions .primary-button { grid-column: 1 / -1; }
+  .plan-workspace-surface .plan-index-row { min-height: 0; padding: 16px; }
+  .plan-workspace-surface .plan-setup { margin-top: 16px; }
+  .plan-workspace-surface .plan-setup-grid { padding: 18px 16px 6px; }
+  .plan-workspace-surface .plan-setup-notes { margin-inline: 16px; }
+  .plan-workspace-surface .plan-setup-more { margin-inline: 16px; }
+  .plan-workspace-surface .plan-setup > footer { padding-inline: 16px; }
+  .plan-workspace-surface .plan-toolbar { top: 68px; }
+  .teaching-workspace-surface .teaching-guide-summary { padding: 18px; }
+  .teaching-workspace-surface .teaching-focus-card > header { padding: 20px 18px; }
+  .teaching-workspace-surface .teaching-reference-grid { gap: 12px; }
+}
+
+@media print {
+  .plan-workspace-surface .ilaw-export-document, .plan-workspace-surface .ilaw-editor { box-shadow: none !important; }
+}
