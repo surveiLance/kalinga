@@ -1598,9 +1598,9 @@ html { scroll-behavior: smooth; }
 .login-screen {
   background-color: #f7f1e8;
   background-image:
-    radial-gradient(105% 72% at -8% 108%, rgba(25, 132, 123, .24) 0%, rgba(25, 132, 123, .1) 37%, transparent 67%),
-    radial-gradient(88% 64% at 108% -8%, rgba(202, 78, 38, .19) 0%, rgba(202, 78, 38, .07) 42%, transparent 71%),
-    radial-gradient(72% 58% at 52% 48%, rgba(38, 62, 83, .09) 0%, transparent 72%),
+    radial-gradient(105% 72% at -8% 108%, rgba(25, 132, 123, .32) 0%, rgba(25, 132, 123, .14) 34%, transparent 60%),
+    radial-gradient(88% 64% at 108% -8%, rgba(202, 78, 38, .25) 0%, rgba(202, 78, 38, .1) 38%, transparent 64%),
+    radial-gradient(72% 58% at 52% 48%, rgba(38, 62, 83, .13) 0%, transparent 64%),
     linear-gradient(138deg, #fffaf2 0%, #f0f7f4 52%, #fff2e8 100%);
   background-repeat: no-repeat;
 }
