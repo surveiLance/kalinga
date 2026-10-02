@@ -1761,7 +1761,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   }
 
   return (
-    <div className="view-page classes-page">
+    <div className="view-page classes-page class-workspace-surface">
       {!!classes.length && selectedClass && <>
         <section className="class-page-heading">
           <div><p className="eyebrow">CLASSES & LEARNERS</p><h1>Your classes</h1></div>
@@ -2875,7 +2875,7 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
 
   if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><div><p className="eyebrow">RECORD ATTENDANCE</p><h2>Set up a class first</h2><p>Attendance needs a saved learner list and class schedule before there is anything to record.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
-  return <div className="view-page attendance-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
+  return <div className="view-page attendance-page attendance-workspace-surface"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
     <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div className="attendance-date-picker"><button type="button" aria-label="Previous day" onClick={() => chooseDate(moveDate(selectedDate, -1))}>←</button><label>Date<input type="date" value={selectedDate} onChange={(event) => chooseDate(event.target.value)} /></label><button type="button" aria-label="Next day" onClick={() => chooseDate(moveDate(selectedDate, 1))}>→</button><button type="button" onClick={() => chooseDate(dateInputValue())}>Today</button></div><span>{selectedClass.meetings.map((meeting) => `${meeting.days} · ${meeting.startTime}`).join("  |  ")}</span></section>
     <div className="attendance-grid">
       <section className="attendance-main">

@@ -1424,3 +1424,58 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .login-panel { padding: 22px 20px 26px; }
   .login-copy h1 { font-size: 32px; }
 }
+
+/* Classes, learners, and attendance workspaces */
+.class-workspace-surface .class-page-heading { min-height: 88px; padding: 0 0 20px; border-bottom: 1px solid var(--border); align-items: end; }
+.class-workspace-surface .class-page-heading h1 { font-size: clamp(38px, 5vw, 54px); line-height: 1; letter-spacing: -.035em; }
+.class-workspace-surface .class-page-heading select { border-color: var(--border); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.class-workspace-surface .class-page-heading > button { min-height: 44px; padding: 0 10px; color: var(--support); }
+.class-workspace-surface .class-page-layout { margin-top: 20px; gap: 18px; }
+.class-workspace-surface .class-hub-tabbed { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.class-workspace-surface .class-workspace-head h2 { overflow-wrap: anywhere; }
+.class-workspace-surface .class-workspace-tabs { scrollbar-width: thin; }
+.class-workspace-surface .class-workspace-tabs button.active { color: var(--support); }
+.class-workspace-surface .class-workspace-tabs button.active::after { background: var(--support); }
+.class-workspace-surface .class-overview-panel > button { border-color: var(--border); }
+.class-workspace-surface .class-overview-panel > button:hover { background: #faf5ed; }
+.class-workspace-surface .class-next-step { border-color: #acd4cd; border-radius: var(--radius-lg); background: linear-gradient(150deg, #edf8f5, #dcefeb); box-shadow: var(--shadow-sm); }
+.class-workspace-surface .class-next-step h2 { overflow-wrap: anywhere; }
+.class-workspace-surface .class-setup-card { scroll-margin-top: 92px; border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-md); }
+.class-workspace-surface .class-wizard-progress { border-color: var(--border); background: #f6f0e7; }
+.class-workspace-surface .class-wizard-progress > div.current { border-color: #efaa8c; background: #fff4ee; }
+.class-workspace-surface .class-wizard-progress > div.current > span { border-color: var(--brand); background: var(--brand); }
+.class-workspace-surface .class-wizard-progress > div.complete > span { border-color: var(--support); background: var(--support); }
+.attendance-workspace-surface .attendance-class-picker { margin-top: 20px; border-color: var(--border); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.attendance-workspace-surface .attendance-date-picker button { border-color: var(--border); background: #fff; }
+.attendance-workspace-surface .attendance-grid { margin-top: 18px; gap: 18px; }
+.attendance-workspace-surface .attendance-main, .attendance-workspace-surface .attendance-summary { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.attendance-workspace-surface .attendance-toolbar, .attendance-workspace-surface .student-row { border-color: var(--border); }
+.attendance-workspace-surface .student-head { background: #f5efe6; }
+.attendance-workspace-surface .student-row:hover { background: #fffcf7; }
+.attendance-workspace-surface .student-avatar { color: var(--support); background: var(--support-soft); }
+.attendance-workspace-surface .grade-tabs button { border-color: var(--border); border-radius: var(--radius-sm); }
+.attendance-workspace-surface .grade-tabs button.active { border-color: #ed9c7a; color: var(--brand-strong); background: #fff0e9; }
+.attendance-workspace-surface .status-options button { border-radius: 9px; }
+.attendance-workspace-surface .attendance-summary { position: sticky; top: 92px; align-self: start; }
+.attendance-workspace-surface .sync-note { border-color: var(--border); }
+
+@media (max-width: 1020px) {
+  .class-workspace-surface .class-page-layout { grid-template-columns: 1fr; }
+  .attendance-workspace-surface .attendance-grid { grid-template-columns: 1fr; }
+  .attendance-workspace-surface .attendance-summary { position: static; }
+}
+
+@media (max-width: 720px) {
+  .class-workspace-surface .class-page-heading { min-height: 0; padding-bottom: 18px; align-items: stretch; }
+  .class-workspace-surface .class-page-heading h1 { font-size: 38px; }
+  .class-workspace-surface .class-page-heading > button { width: 100%; justify-content: center; border: 1px solid #b8d6d0; border-radius: var(--radius-sm); background: var(--support-soft); }
+  .class-workspace-surface .class-hub-tabbed .class-workspace { padding: 20px 16px; }
+  .class-workspace-surface .class-workspace-tabs { flex-wrap: nowrap; }
+  .class-workspace-surface .class-next-step { padding: 22px 18px; }
+  .attendance-workspace-surface .attendance-class-picker { margin-top: 16px; }
+  .attendance-workspace-surface .attendance-toolbar { padding: 14px; }
+  .attendance-workspace-surface .grade-tabs { width: 100%; padding-bottom: 4px; }
+  .attendance-workspace-surface .student-row { padding: 14px; }
+  .attendance-workspace-surface .status-options { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .attendance-workspace-surface .attendance-summary { padding: 18px; }
+}
