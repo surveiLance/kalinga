@@ -1136,7 +1136,7 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
         <div className="auth-mode-switch" role="tablist" aria-label="Account access"><button className={formMode === "sign-in" ? "active" : ""} type="button" role="tab" aria-selected={formMode === "sign-in"} onClick={() => switchMode("sign-in")}>Sign in</button><button className={formMode === "create" ? "active" : ""} type="button" role="tab" aria-selected={formMode === "create"} onClick={() => switchMode("create")}>Create account</button></div>
         <form className="login-form" onSubmit={submitLogin}>
           {formMode === "create" && <label>Teacher name<input type="text" value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Your name" autoComplete="name" required /></label>}
-          <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="teacher@school.edu.ph" required /></label>
+          <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="teacher@school.edu.ph" autoComplete="email" required /></label>
           <label>Password<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} autoComplete={formMode === "sign-in" ? "current-password" : "new-password"} required /><button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? "Hide" : "Show"}</button></span></label>
           <div className="login-options"><span>{formMode === "sign-in" ? "Your session stays securely signed in on this device." : "Use at least 6 characters."}</span></div>
           {formError && <p className="auth-feedback error" role="alert">{formError}</p>}
@@ -1225,8 +1225,8 @@ function NotificationPanel({ notifications, readIds, authenticated, onOpen, onMa
 function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
   return (
     <header className="page-intro">
-      <div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lead">{description}</p></div>
-      {action}
+      <div className="page-intro-copy"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lead">{description}</p></div>
+      {action && <div className="page-intro-action">{action}</div>}
     </header>
   );
 }
