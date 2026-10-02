@@ -11,6 +11,7 @@ import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGrad
 import { createSampleLearners, learnerRosterSummary, learnerSexCounts, normalizeLearnerSex } from "@/lib/learners";
 import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes, weekDays } from "@/lib/schedule";
 import { teacherInitials, teacherLabel, teacherMention } from "@/lib/teachers";
+import { parseSidebarPinned, serializeSidebarPinned, sidebarPreferenceKey } from "@/lib/sidebar-preference";
 import { dateInputValue, displayDate, moveDate } from "@/lib/dates";
 import { normalizeClass, normalizeSavedPlan, remoteSchedule } from "@/lib/normalize";
 import { decodeCommunityMessage, encodeCommunityMessage } from "@/lib/community-message";
@@ -360,6 +361,7 @@ export default function Home() {
   const [tutorialStatus, setTutorialStatus] = useState<TutorialStatus>(emptyTutorialStatus);
   const [tutorialStatusKnown, setTutorialStatusKnown] = useState(false);
   const [tutorialStatusReady, setTutorialStatusReady] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
   const sessionTeacherId = useRef("");
   const wakeSync = useRef<(refresh?: boolean) => void>(() => {});
@@ -373,6 +375,23 @@ export default function Home() {
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [view]);
+
+  useEffect(() => {
+    const restoreSidebarPreference = (event?: StorageEvent) => {
+      if (event?.key && event.key !== sidebarPreferenceKey) return;
+      try {
+        setSidebarPinned(parseSidebarPinned(window.localStorage.getItem(sidebarPreferenceKey)));
+      } catch {
+        setSidebarPinned(true);
+      }
+    };
+    const restoreTimer = window.setTimeout(restoreSidebarPreference, 0);
+    window.addEventListener("storage", restoreSidebarPreference);
+    return () => {
+      window.clearTimeout(restoreTimer);
+      window.removeEventListener("storage", restoreSidebarPreference);
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -1006,6 +1025,18 @@ export default function Home() {
     queueChanges(changes, "Attendance is saved on this device and will sync when your connection returns.");
   }
 
+  function toggleSidebarPinned() {
+    setSidebarPinned((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(sidebarPreferenceKey, serializeSidebarPinned(next));
+      } catch {
+        // The rail still works for this session when device storage is unavailable.
+      }
+      return next;
+    });
+  }
+
   if (entryMode === "loading") {
     return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening your teaching space…</p></section><KalingaFooterArtwork /></main>;
   }
@@ -1019,29 +1050,35 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${sidebarPinned ? "sidebar-pinned" : "sidebar-rail"}`}>
       <aside className="sidebar" aria-label="Main navigation">
-        <button className="brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}>
+        <button className="brand" type="button" aria-label="Kalinga home" title={sidebarPinned ? undefined : "Kalinga home"} onClick={() => setView("home")}>
           <Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority />
         </button>
 
         <nav className="nav-list">
-          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" onClick={() => setView("home")}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
-          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
-          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => openPlanLessons()}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
-          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
-          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
-          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" onClick={openTutorial}><span className="nav-icon" aria-hidden="true">?</span><span>Learn Kalinga</span>{tutorialStatus.completed && <small>✓</small>}</button>
+          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" aria-label="Today" title={sidebarPinned ? undefined : "Today"} onClick={() => setView("home")}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
+          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" aria-label="Classes &amp; learners" title={sidebarPinned ? undefined : "Classes & learners"} onClick={() => setView("classes")}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
+          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" aria-label="Plan lessons" title={sidebarPinned ? undefined : "Plan lessons"} onClick={() => openPlanLessons()}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
+          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" aria-label="Find resources" title={sidebarPinned ? undefined : "Find resources"} onClick={() => setView("library")}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
+          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" aria-label="Ask teachers" title={sidebarPinned ? undefined : "Ask teachers"} onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
+          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" aria-label="Learn Kalinga" title={sidebarPinned ? undefined : "Learn Kalinga"} onClick={openTutorial}><span className="nav-icon" aria-hidden="true">?</span><span>Learn Kalinga</span>{tutorialStatus.completed && <small>✓</small>}</button>
         </nav>
 
-        <div className="offline-card sidebar-status">
+        <button className="sidebar-pin-toggle" type="button" aria-pressed={sidebarPinned} aria-label={sidebarPinned ? "Keep sidebar open. Collapse to icon rail" : "Keep sidebar open. Expand sidebar"} title={sidebarPinned ? undefined : "Keep sidebar open"} onClick={toggleSidebarPinned}>
+          <span className="sidebar-pin-direction" aria-hidden="true">{sidebarPinned ? "‹" : "›"}</span>
+          <span className="sidebar-pin-copy"><b>Keep sidebar open</b><small>{sidebarPinned ? "Pinned" : "Icon rail"}</small></span>
+          <span className="sidebar-pin-switch" aria-hidden="true"><i /></span>
+        </button>
+
+        <div className="offline-card sidebar-status" title={sidebarPinned ? undefined : "Teaching kit: 2 starter PDFs ready"}>
           <span className="status-dot" />
           <div><strong>Teaching kit</strong><small>2 starter PDFs ready</small></div>
         </div>
 
         <div className="account-anchor desktop-account">
           {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
-          <button className="profile" type="button" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
+          <button className="profile" type="button" aria-label={`Account options for ${teacherLabel(teacherName)}`} title={sidebarPinned ? undefined : teacherLabel(teacherName)} aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
             <span className="avatar">{teacherInitials(teacherName)}</span>
             <span><strong>{teacherLabel(teacherName)}</strong><small>{schoolName.trim() || "Add your school in a lesson plan"}</small></span>
             <span aria-hidden="true">···</span>
