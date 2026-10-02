@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --surface: #f5efe5;
-  --surface-raised: #fffdf8;
-  --text: #192238;
-  --text-muted: #667084;
-  --border: #ddd5c8;
-  --brand: #bd421b;
-  --brand-strong: #9f3414;
-  --support: #24756f;
-  --support-soft: #dcefeb;
+  --surface: #f3f0ea;
+  --surface-raised: #fffefa;
+  --text: #202a3d;
+  --text-muted: #657083;
+  --border: #d5d0c7;
+  --brand: #aa4726;
+  --brand-strong: #87351d;
+  --support: #2b6b67;
+  --support-soft: #e3efed;
   --success: #318b79;
   --warning: #a96718;
   --danger: #a64432;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --shadow-sm: 0 8px 22px rgba(37, 31, 24, 0.055);
-  --shadow-md: 0 18px 46px rgba(37, 31, 24, 0.09);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-structure: 4px;
+  --shadow-sm: 0 6px 18px rgba(37, 31, 24, 0.045);
+  --shadow-md: 0 16px 40px rgba(37, 31, 24, 0.08);
   --ink: var(--text);
   --muted: var(--text-muted);
   --cream: var(--surface);
@@ -1579,6 +1580,62 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .tutorial-workspace-surface .tutorial-missions { grid-template-columns: repeat(6, minmax(118px, 1fr)); overflow-x: auto; }
   .tutorial-workspace-surface .tutorial-practice > footer { grid-template-columns: 1fr 1fr; }
 }
+
+/* Restrained palette and sharper structural hierarchy */
+.home-guided-day .gabay-today-briefing { border-radius: 8px; background: linear-gradient(132deg, #263247 0%, #245653 72%, #2b6b67 100%); }
+.home-quick-actions .today-schedule-summary,
+.home-quick-actions .home-action-card,
+.class-zero-state,
+.saved-class-grid article,
+.class-workspace-surface .class-hub-tabbed,
+.class-workspace-surface .class-next-step,
+.class-workspace-surface .class-setup-card,
+.attendance-workspace-surface .attendance-class-picker,
+.attendance-workspace-surface .attendance-main,
+.attendance-workspace-surface .attendance-summary,
+.plan-workspace-surface .plan-index-row,
+.plan-workspace-surface .plan-setup,
+.plan-workspace-surface .plan-toolbar,
+.teaching-workspace-surface .teaching-guide-summary,
+.teaching-workspace-surface .teaching-block-nav,
+.teaching-workspace-surface .teaching-focus-card,
+.teaching-workspace-surface .teaching-reference-grid > article,
+.resource-workspace-surface .starter-library-toolbar,
+.resource-workspace-surface .starter-resource-card,
+.resource-workspace-surface .resource-submission,
+.resource-reader,
+.community-workspace-surface .community-signin,
+.community-workspace-surface .community-toolbar,
+.community-workspace-surface .discussion-card,
+.community-workspace-surface .community-side,
+.tutorial-workspace-surface .tutorial-safety,
+.tutorial-workspace-surface .tutorial-missions,
+.tutorial-workspace-surface .tutorial-gabay,
+.tutorial-workspace-surface .tutorial-practice,
+.tutorial-workspace-surface .tutorial-complete { border-radius: var(--radius-structure); }
+
+.home-quick-actions .today-schedule-list article,
+.home-quick-actions .home-essential-actions > button,
+.resource-card,
+.attached-resource,
+.reply-item { border-radius: var(--radius-structure); }
+
+.view-page button,
+.view-page input,
+.view-page select,
+.view-page textarea,
+.topbar button:not(.connection):not(.mobile-account-button),
+.nav-item,
+.mobile-nav button { border-radius: var(--radius-sm); }
+
+.connection,
+.tags span,
+.home-quick-actions .today-schedule-summary > header > span { border-radius: 999px; }
+.mobile-account-button { border-radius: 50%; }
+.mobile-nav button.active { color: var(--brand-strong); background: #f7e7e0; }
+.class-workspace-surface .class-next-step,
+.teaching-workspace-surface .teaching-guide-summary { border-color: #bfd5d1; background: linear-gradient(145deg, #f4f8f7, var(--support-soft)); }
+.tutorial-workspace-surface .tutorial-complete { border-color: #c5d8d4; background: linear-gradient(145deg, #f5f8f7, var(--surface-raised)); }
 
 /* Final responsive and content-safety polish */
 .view-page { min-width: 0; }
