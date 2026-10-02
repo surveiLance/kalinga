@@ -6,8 +6,8 @@
   --text: #192238;
   --text-muted: #667084;
   --border: #ddd5c8;
-  --brand: #e45b2d;
-  --brand-strong: #bd421b;
+  --brand: #bd421b;
+  --brand-strong: #9f3414;
   --support: #24756f;
   --support-soft: #dcefeb;
   --success: #318b79;
@@ -40,7 +40,7 @@ button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 button, input, select, textarea { transition: border-color .18s ease, background-color .18s ease, color .18s ease, box-shadow .18s ease, opacity .18s ease, transform .18s ease; }
 button:disabled, input:disabled, select:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
-:focus-visible { outline: 3px solid rgba(36, 117, 111, .28); outline-offset: 3px; }
+:focus-visible { outline: 3px solid #0b5f59; outline-offset: 3px; }
 ::selection { color: var(--ink); background: #f4c9b8; }
 h1, h2 { font-family: var(--font-display); font-weight: 700; text-wrap: balance; }
 p { text-wrap: pretty; }
@@ -1290,7 +1290,8 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .mobile-brand { display: block; }
   .mobile-brand img { width: 102px; }
   .top-actions { min-width: 0; margin-left: auto; gap: 7px; }
-  .connection { display: none; }
+  .connection { width: 44px; min-width: 44px; min-height: 44px; padding: 0; display: inline-flex; justify-content: center; font-size: 0; }
+  .connection i { width: 10px; height: 10px; flex: 0 0 10px; }
   .gabay-topbar-assistant { width: 44px; min-height: 44px; padding: 3px; justify-content: center; }
   .gabay-topbar-assistant .gabay-mascot { width: 35px; height: 35px; }
   .gabay-topbar-assistant > span:not(.gabay-mascot) { display: none; }
@@ -1585,10 +1586,13 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 .view-page img, .view-page iframe, .view-page table { max-width: 100%; }
 .view-page input, .view-page select, .view-page textarea, .view-page button { max-width: 100%; }
 .page-intro-copy, .class-workspace, .library-body, .discussion-card, .teaching-focus-card, .tutorial-stage { min-width: 0; }
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid #0b5f59 !important; outline-offset: 3px; }
+.plan-workspace-surface .ilaw-editor .edit-cell:focus-visible, .plan-workspace-surface .ilaw-editor .cell-input:focus-visible, .plan-workspace-surface .ilaw-editor .ilaw-title-input:focus-visible { outline: 3px solid #0b5f59 !important; outline-offset: 2px; background: #edf8f5; box-shadow: 0 0 0 5px rgba(11, 95, 89, .15); }
 
 @media (max-width: 720px) {
   .mobile-nav button { min-height: 50px; touch-action: manipulation; }
   .topbar button, .page-intro-action button, .class-workspace-tabs button, .community-tabs button, .starter-library-toolbar button, .tutorial-missions button { min-height: 44px; }
+  .status-options button, .grade-picker button { min-height: 44px; touch-action: manipulation; }
   .view-page h1, .view-page h2, .view-page h3 { hyphens: auto; }
   .content { overflow-x: clip; }
 }
