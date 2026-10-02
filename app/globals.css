@@ -1594,7 +1594,16 @@ html { scroll-behavior: smooth; }
   .topbar { position: relative; top: auto; flex: 0 0 auto; }
   .content { flex: 1 1 auto; min-height: 0; overflow-x: clip; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
 }
-.workspace { background: radial-gradient(circle at 88% 8%, rgba(25, 118, 111, .12), transparent 31%), radial-gradient(circle at 12% 92%, rgba(195, 79, 40, .09), transparent 29%), var(--surface); }
+.workspace,
+.login-screen {
+  background-color: #f7f1e8;
+  background-image:
+    radial-gradient(105% 72% at -8% 108%, rgba(25, 132, 123, .24) 0%, rgba(25, 132, 123, .1) 37%, transparent 67%),
+    radial-gradient(88% 64% at 108% -8%, rgba(202, 78, 38, .19) 0%, rgba(202, 78, 38, .07) 42%, transparent 71%),
+    radial-gradient(72% 58% at 52% 48%, rgba(38, 62, 83, .09) 0%, transparent 72%),
+    linear-gradient(138deg, #fffaf2 0%, #f0f7f4 52%, #fff2e8 100%);
+  background-repeat: no-repeat;
+}
 .sidebar { background: linear-gradient(180deg, #fff8ee 0%, #fffdf8 58%, #edf8f5 145%); }
 .topbar { background: rgba(255, 254, 250, .96); }
 .home-guided-day .gabay-today-briefing { border-radius: 8px; background: linear-gradient(132deg, #263247 0%, #245653 72%, #2b6b67 100%); }
