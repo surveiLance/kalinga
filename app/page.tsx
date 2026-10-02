@@ -1284,9 +1284,9 @@ function TutorialView({ teacherName, status, onProgress, onExit, onAskGabay, onG
     onProgress(emptyTutorialStatus);
   }
 
-  if (selectedStep >= tutorialStepCount) return <div className="view-page tutorial-page"><section className="tutorial-complete"><GabayMascot size="hero" motion={false} speaking /><p className="eyebrow">ALL SIX MISSIONS COMPLETE</p><h1>You’re ready to use Kalinga.</h1><p>You practiced the full flow without changing any real records. Return to Today when you are ready, or replay the tour whenever you want.</p><div><button className="primary-button" type="button" onClick={onExit}>Go to Today →</button><button className="secondary-button" type="button" onClick={restart}>Replay tutorial</button></div></section></div>;
+  if (selectedStep >= tutorialStepCount) return <div className="view-page tutorial-page tutorial-workspace-surface"><section className="tutorial-complete"><GabayMascot size="hero" motion={false} speaking /><p className="eyebrow">ALL SIX MISSIONS COMPLETE</p><h1>You’re ready to use Kalinga.</h1><p>You practiced the full flow without changing any real records. Return to Today when you are ready, or replay the tour whenever you want.</p><div><button className="primary-button" type="button" onClick={onExit}>Go to Today →</button><button className="secondary-button" type="button" onClick={restart}>Replay tutorial</button></div></section></div>;
 
-  return <div className="view-page tutorial-page">
+  return <div className="view-page tutorial-page tutorial-workspace-surface">
     <PageIntro eyebrow="LEARN KALINGA" title={`Practice with Gabay, ${teacherLabel(teacherName)}`} description="A safe, guided workspace. Every class, learner, lesson, and message shown here is only a demo." action={<button className="secondary-button" type="button" onClick={onExit}>Exit tutorial</button>} />
     <div className="tutorial-safety"><span>✓</span><p><b>Practice mode is on</b><small>Your real workspace will not be changed.</small></p><strong>{Math.round((status.step / tutorialStepCount) * 100)}% complete</strong></div>
     <div className="tutorial-layout">
@@ -2769,7 +2769,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     setCommentInput(""); setLibraryError("");
   }
 
-  return <div className="view-page resource-library-page">
+  return <div className="view-page resource-library-page resource-workspace-surface">
     <PageIntro eyebrow="TEACHER RESOURCE LIBRARY" title="Open it. Teach it. Improve it together." description="Use the two Kalinga starters or submit a PDF of your own with clear classroom details." action={<button className="primary-button" type="button" onClick={() => authenticated ? setSubmissionOpen((open) => !open) : onRequestSignIn()}>＋ Upload a resource</button>} />
     {submissionOpen && <form className="resource-submission" onSubmit={submitResource}>
       <header><div><p className="eyebrow">RESOURCE SUBMISSION</p><h2>Tell teachers exactly what they are opening</h2><p>Your name, classroom fit, and sharing status stay visible. Uploading does not mean Kalinga has reviewed or approved the material.</p></div><button type="button" aria-label="Close resource submission" onClick={() => setSubmissionOpen(false)}>×</button></header>
@@ -3060,9 +3060,9 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     setDeleteTarget(undefined); setCommunityError("");
   }
 
-  if (!authenticated) return <div className="view-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
+  if (!authenticated) return <div className="view-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
-  return <div className="view-page community-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
+  return <div className="view-page community-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
     <aside className="community-explainer"><span>@</span><p><b>Your tag is {teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><button type="button" onClick={onOpenLibrary}>Upload or manage resources →</button></aside>
     {composerOpen && <form className="community-composer" onSubmit={submitQuestion}>
       <header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header>

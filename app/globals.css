@@ -1526,3 +1526,55 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 @media print {
   .plan-workspace-surface .ilaw-export-document, .plan-workspace-surface .ilaw-editor { box-shadow: none !important; }
 }
+
+/* Resources, teacher community, and guided onboarding */
+.resource-workspace-surface .starter-library-toolbar { border-color: var(--border); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.resource-workspace-surface .starter-library-toolbar [role="tab"] { min-height: 42px; }
+.resource-workspace-surface .starter-library-toolbar [role="tab"].active { border-color: var(--brand); color: var(--brand-strong); background: #fff0e9; }
+.resource-workspace-surface .starter-resource-grid { gap: 18px; }
+.resource-workspace-surface .starter-resource-card { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.resource-workspace-surface .starter-resource-card:hover { box-shadow: var(--shadow-md); }
+.resource-workspace-surface .library-body h2 { overflow-wrap: anywhere; }
+.resource-workspace-surface .library-description { line-height: 1.55; }
+.resource-workspace-surface .resource-submission { border-color: #add2cb; border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-md); }
+.resource-workspace-surface .resource-submission > header { background: var(--support-soft); }
+.resource-workspace-surface .resource-submission fieldset { border-color: var(--border); border-radius: var(--radius-md); }
+.resource-workspace-surface .resource-visibility.private { color: #7a5a2c; background: #fff3d9; }
+.resource-preview-backdrop { z-index: 120; }
+.resource-reader { border-color: #acd1ca; border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: 0 28px 90px rgba(22, 39, 38, .3); }
+.resource-reader > header { border-color: var(--border); background: var(--support-soft); }
+.community-workspace-surface .community-signin { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.community-workspace-surface .community-toolbar, .community-workspace-surface .discussion-card, .community-workspace-surface .community-side { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.community-workspace-surface .community-tabs button { min-height: 42px; }
+.community-workspace-surface .community-tabs button.active { border-color: var(--brand); color: var(--brand-strong); background: #fff0e9; }
+.community-workspace-surface .discussion-list button { border-color: var(--border); }
+.community-workspace-surface .discussion-list button.active { border-color: #7fbcb2; background: var(--support-soft); }
+.community-workspace-surface .reply-item { background: #f7f1e8; }
+.community-workspace-surface .reply-box { border-color: var(--border); border-radius: var(--radius-sm); }
+.community-workspace-surface .teacher-mention { color: var(--support); }
+.tutorial-workspace-surface .tutorial-safety { border-color: #abd1ca; border-radius: var(--radius-md); background: var(--support-soft); }
+.tutorial-workspace-surface .tutorial-layout { gap: 18px; }
+.tutorial-workspace-surface .tutorial-missions { border-color: var(--border); border-radius: var(--radius-md); background: #f3ede4; }
+.tutorial-workspace-surface .tutorial-missions button.active { border-color: #79b9ae; background: #fff; }
+.tutorial-workspace-surface .tutorial-missions button.active > span { background: var(--support); }
+.tutorial-workspace-surface .tutorial-gabay { border-color: #acd2cb; border-radius: var(--radius-md); background: var(--support-soft); }
+.tutorial-workspace-surface .tutorial-practice { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.tutorial-workspace-surface .tutorial-practice > header, .tutorial-workspace-surface .tutorial-practice > footer { border-color: var(--border); }
+.tutorial-workspace-surface .tutorial-practice > footer { background: #f7f1e8; }
+.tutorial-workspace-surface .tutorial-complete { border-color: #acd2cb; border-radius: var(--radius-lg); background: linear-gradient(145deg, #edf8f5, #fffdf8); box-shadow: var(--shadow-md); }
+
+@media (max-width: 720px) {
+  .resource-workspace-surface .starter-library-toolbar { align-items: stretch; }
+  .resource-workspace-surface .starter-library-toolbar > div { display: flex; overflow-x: auto; }
+  .resource-workspace-surface .starter-library-toolbar [role="tab"] { flex: 0 0 auto; }
+  .resource-workspace-surface .starter-resource-grid { grid-template-columns: 1fr; }
+  .resource-workspace-surface .starter-resource-card { grid-template-columns: 86px minmax(0, 1fr); }
+  .resource-workspace-surface .library-actions { display: grid; grid-template-columns: 1fr; }
+  .resource-workspace-surface .resource-submission-sections { padding-inline: 16px; }
+  .resource-reader { height: calc(100dvh - 20px); border-radius: var(--radius-md); }
+  .community-workspace-surface .community-signin { margin-top: 20px; padding: 38px 20px; }
+  .community-workspace-surface .discussion-layout { grid-template-columns: 1fr; }
+  .tutorial-workspace-surface .tutorial-layout { grid-template-columns: 1fr; }
+  .tutorial-workspace-surface .tutorial-missions { grid-template-columns: repeat(6, minmax(118px, 1fr)); overflow-x: auto; }
+  .tutorial-workspace-surface .tutorial-practice > footer { grid-template-columns: 1fr 1fr; }
+}
