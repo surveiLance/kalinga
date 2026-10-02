@@ -1272,7 +1272,7 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 .topbar { min-height: 72px; height: 72px; padding: 0 30px; border-color: var(--border); justify-content: flex-end; background: rgba(255, 253, 248, .92); box-shadow: 0 5px 20px rgba(43, 35, 27, .04); }
 .top-actions { gap: 9px; }
 .connection { min-height: 38px; padding: 7px 11px; border: 1px solid #c7dfda; color: var(--support); background: #edf7f4; }
-.gabay-topbar-assistant { min-height: 44px; padding: 4px 10px 4px 5px; border-color: #bdd9d3; border-radius: 12px; background: #edf7f4; box-shadow: none; }
+.gabay-topbar-assistant { width: 194px; min-height: 44px; padding: 4px 10px 4px 5px; border-color: #bdd9d3; border-radius: 12px; background: #edf7f4; box-shadow: none; }
 .gabay-topbar-assistant .gabay-mascot { width: 34px; height: 34px; }
 .gabay-topbar-assistant b { font-size: 11px; }
 .gabay-topbar-assistant small { color: #607f7a; font-size: 9px; }
