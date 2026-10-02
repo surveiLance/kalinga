@@ -1578,3 +1578,21 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .tutorial-workspace-surface .tutorial-missions { grid-template-columns: repeat(6, minmax(118px, 1fr)); overflow-x: auto; }
   .tutorial-workspace-surface .tutorial-practice > footer { grid-template-columns: 1fr 1fr; }
 }
+
+/* Final responsive and content-safety polish */
+.view-page { min-width: 0; }
+.view-page h1, .view-page h2, .view-page h3, .view-page .lead, .view-page .library-description, .view-page .discussion-card, .view-page .reply-item { overflow-wrap: anywhere; }
+.view-page img, .view-page iframe, .view-page table { max-width: 100%; }
+.view-page input, .view-page select, .view-page textarea, .view-page button { max-width: 100%; }
+.page-intro-copy, .class-workspace, .library-body, .discussion-card, .teaching-focus-card, .tutorial-stage { min-width: 0; }
+
+@media (max-width: 720px) {
+  .mobile-nav button { min-height: 50px; touch-action: manipulation; }
+  .topbar button, .page-intro-action button, .class-workspace-tabs button, .community-tabs button, .starter-library-toolbar button, .tutorial-missions button { min-height: 44px; }
+  .view-page h1, .view-page h2, .view-page h3 { hyphens: auto; }
+  .content { overflow-x: clip; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-page, .page-intro, .home-essentials-grid, .class-page-layout, .attendance-grid, .resource-grid, .discussion-layout, .tutorial-layout { animation: none !important; }
+}
