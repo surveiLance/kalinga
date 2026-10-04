@@ -34,8 +34,6 @@ export type GabayDraft =
   | { type: "assessment"; formativeAssessment: string; exitTask: string; successCriteria: string }
   | { type: "full-plan"; sharedTheme: string; learnerContext: string; materials: string; nextSessionNotes: string; grades: Record<string, { competency: string; competencyCode: string; contentStandard: string; performanceStandard: string; objective: string; formativeAssessment: string; exitTask: string; successCriteria: string; reflectionQuestion: string; remediation: string; enrichment: string }>; slots: Array<{ stage: string; durationMinutes: number; teacherFocus: string; gradeTasks: Record<string, string> }> };
 
-const requiredFullPlanGradeFields = ["competency", "contentStandard", "performanceStandard", "objective", "formativeAssessment", "exitTask", "successCriteria", "reflectionQuestion", "remediation", "enrichment"] as const;
-
 function record(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -44,18 +42,21 @@ function nonemptyString(value: unknown) {
   return typeof value === "string" && Boolean(value.trim());
 }
 
+// A draft is usable — not necessarily complete. Each requested grade must carry at
+// least a competency or objective, and each slot at least one grade's task. Missing
+// fields are filled by the teacher on apply (prior text is kept), so a mostly-complete
+// draft from the model is accepted and finished rather than rejected whole.
 export function isCompleteGabayFullPlan(value: unknown, expectedGrades: string[]): value is Extract<GabayDraft, { type: "full-plan" }> {
-  if (!record(value) || value.type !== "full-plan" || !nonemptyString(value.sharedTheme) || !nonemptyString(value.learnerContext) || !nonemptyString(value.materials) || !record(value.grades) || !Array.isArray(value.slots) || !value.slots.length || !expectedGrades.length) return false;
-  const gradeDrafts = value.grades;
-  const slots = value.slots;
+  if (!record(value) || value.type !== "full-plan" || !record(value.grades) || !Array.isArray(value.slots) || !value.slots.length || !expectedGrades.length) return false;
+  const gradeDrafts = value.grades as Record<string, unknown>;
   if (!expectedGrades.every((grade) => {
     const item = gradeDrafts[grade];
-    return record(item) && requiredFullPlanGradeFields.every((field) => nonemptyString(item[field])) && (item.competencyCode === undefined || typeof item.competencyCode === "string");
+    return record(item) && (nonemptyString(item.competency) || nonemptyString(item.objective));
   })) return false;
-  return slots.every((slot) => {
-    if (!record(slot) || !nonemptyString(slot.stage) || !nonemptyString(slot.teacherFocus) || typeof slot.durationMinutes !== "number" || !Number.isFinite(slot.durationMinutes) || slot.durationMinutes <= 0 || !record(slot.gradeTasks)) return false;
-    const gradeTasks = slot.gradeTasks;
-    return expectedGrades.every((grade) => nonemptyString(gradeTasks[grade]));
+  return value.slots.every((slot) => {
+    if (!record(slot) || !record(slot.gradeTasks)) return false;
+    const gradeTasks = slot.gradeTasks as Record<string, unknown>;
+    return expectedGrades.some((grade) => nonemptyString(gradeTasks[grade]));
   });
 }
 

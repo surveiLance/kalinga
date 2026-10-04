@@ -90,7 +90,7 @@ describe("ILAW Word export", () => {
       "INTENTIONS", "LEARNING EXPERIENCE", "ASSESSMENT", "WAYS FORWARD",
       "Pamantayang Pangnilalaman", "Pamantayan sa Pagganap", "Learning Competencies and Codes", "F3PB-Ia-1",
       "Flow of the Lesson", "Whole-Class Motivation", "Bilugan ang mga pangatnig.",
-      "Exit Task", "Success Criteria", "Reflection Questions", "Remediation", "Enrichment",
+      "Exit Task", "Rubrics", "Reflection Questions", "Remediation", "Enrichment",
       "Prepared by:", "Checked by:", "JOCELYN E. MALLORCA", "DEXTER T. ORLANDEZ", "School Head",
     ]) {
       expect(xml, `missing: ${expected}`).toContain(expected);

@@ -136,7 +136,7 @@ export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass,
     gradeTable(grades, [
       ["Formative", plan.formativeAssessments],
       ["Exit Task", plan.exitTasks],
-      ["Success Criteria", plan.successCriteria],
+      ["Rubrics", plan.successCriteria],
     ]),
     gap(),
 

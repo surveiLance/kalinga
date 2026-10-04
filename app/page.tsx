@@ -2086,7 +2086,7 @@ function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = 
       <table>{gradeHead}<tbody>
         {gradeRow("Formative", plan.formativeAssessments)}
         {gradeRow("Exit Task", plan.exitTasks)}
-        {gradeRow("Success Criteria", plan.successCriteria)}
+        {gradeRow("Rubrics", plan.successCriteria)}
       </tbody></table>
     </section>
     <section className="ilaw-print-section ways-forward-print-section"><h2><span>W</span> Ways Forward</h2>
@@ -2650,7 +2650,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
           <table><thead><tr><th />{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
             {gradeRow("Formative", "formativeAssessments", "How you will check understanding during the lesson", (grade) => redraftButton("assessment", grade))}
             {gradeRow("Exit Task", "exitTasks", "What each learner hands in or shows")}
-            {gradeRow("Success Criteria", "successCriteria", "What a learner can do with this topic when they have got it")}
+            {gradeRow("Rubrics", "successCriteria", "What a learner can do with this topic when they have got it")}
           </tbody></table>
         </section>
 
