@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { GabayMascot } from "@/components/gabay-mascot";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { attendanceStatusLabel, attendanceStatuses, isStoredAttendanceStatus, toStoredAttendanceStatus } from "@/lib/attendance";
@@ -1422,20 +1423,6 @@ function BellIcon() {
     <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
     <path d="M10 21h4" />
   </svg>;
-}
-
-function GabayMascot({ size = "medium", motion = true, speaking = false }: { size?: "small" | "medium" | "large" | "hero" | "companion"; motion?: boolean; speaking?: boolean }) {
-  return <span className={`gabay-mascot gabay-mascot-${size} ${motion ? "" : "motion-paused"} ${speaking ? "is-speaking" : ""}`} aria-hidden="true">
-    <svg viewBox="0 0 96 96" role="img">
-      <path className="gabay-arm gabay-arm-left" d="M28 57c-8 2-12 8-13 14" />
-      <path className="gabay-arm gabay-arm-right" d="M68 57c9-1 13-7 15-13" />
-      <path className="gabay-body" d="M22 55c0-17 11-28 26-28s26 11 26 28v18c0 8-7 14-15 14H37c-8 0-15-6-15-14z" />
-      <ellipse className="gabay-face" cx="48" cy="51" rx="19" ry="17" />
-      <g className="gabay-eyes"><circle cx="41" cy="49" r="2.4" /><circle cx="55" cy="49" r="2.4" /></g>
-      <path className="gabay-smile" d="M41 57c4 4 10 4 14 0" />
-      <path className="gabay-cape" d="M31 69c5 4 11 6 17 6s12-2 17-6v9c-5 4-11 6-17 6s-12-2-17-6z" />
-    </svg>
-  </span>;
 }
 
 type GabayChatMessage = { id: string; conversationId: string; role: "teacher" | "gabay"; text: string; view: View; createdAt: string };
