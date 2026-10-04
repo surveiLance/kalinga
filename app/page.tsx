@@ -11,7 +11,7 @@ import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGrad
 import { createSampleLearners, learnerRosterSummary, learnerSexCounts, normalizeLearnerSex } from "@/lib/learners";
 import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes, weekDays } from "@/lib/schedule";
 import { teacherInitials, teacherLabel, teacherMention } from "@/lib/teachers";
-import { parseSidebarPinned, serializeSidebarPinned, sidebarPreferenceKey } from "@/lib/sidebar-preference";
+import { sidebarLayoutMode, sidebarStateFromPreference, sidebarToggleFocusTarget, serializeSidebarPinned, transitionSidebar, sidebarPreferenceKey, type SidebarAction, type SidebarFocusTarget } from "@/lib/sidebar-preference";
 import { dateInputValue, displayDate, moveDate } from "@/lib/dates";
 import { normalizeClass, normalizeSavedPlan, remoteSchedule } from "@/lib/normalize";
 import { decodeCommunityMessage, encodeCommunityMessage } from "@/lib/community-message";
@@ -361,7 +361,10 @@ export default function Home() {
   const [tutorialStatus, setTutorialStatus] = useState<TutorialStatus>(emptyTutorialStatus);
   const [tutorialStatusKnown, setTutorialStatusKnown] = useState(false);
   const [tutorialStatusReady, setTutorialStatusReady] = useState(false);
-  const [sidebarPinned, setSidebarPinned] = useState(true);
+  const [sidebarState, setSidebarState] = useState(() => sidebarStateFromPreference(null));
+  const sidebarCloseTimer = useRef<number | null>(null);
+  const pendingSidebarFocus = useRef<SidebarFocusTarget | null>(null);
+  const topbarSidebarToggleRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const sessionTeacherId = useRef("");
   const wakeSync = useRef<(refresh?: boolean) => void>(() => {});
@@ -377,12 +380,34 @@ export default function Home() {
   }, [view]);
 
   useEffect(() => {
+    if (!sidebarState.open || sidebarState.pinned) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarState((current) => transitionSidebar(current, "dismiss"));
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [sidebarState.open, sidebarState.pinned]);
+
+  useEffect(() => () => {
+    if (sidebarCloseTimer.current !== null) window.clearTimeout(sidebarCloseTimer.current);
+  }, []);
+
+  useEffect(() => {
+    const target = pendingSidebarFocus.current;
+    if (!target) return;
+    const button = topbarSidebarToggleRef.current;
+    if (!button) return;
+    button.focus();
+    pendingSidebarFocus.current = null;
+  }, [sidebarState.open, sidebarState.pinned]);
+
+  useEffect(() => {
     const restoreSidebarPreference = (event?: StorageEvent) => {
       if (event?.key && event.key !== sidebarPreferenceKey) return;
       try {
-        setSidebarPinned(parseSidebarPinned(window.localStorage.getItem(sidebarPreferenceKey)));
+        setSidebarState(sidebarStateFromPreference(window.localStorage.getItem(sidebarPreferenceKey)));
       } catch {
-        setSidebarPinned(true);
+        setSidebarState(sidebarStateFromPreference(null));
       }
     };
     const restoreTimer = window.setTimeout(restoreSidebarPreference, 0);
@@ -1025,16 +1050,51 @@ export default function Home() {
     queueChanges(changes, "Attendance is saved on this device and will sync when your connection returns.");
   }
 
-  function toggleSidebarPinned() {
-    setSidebarPinned((current) => {
-      const next = !current;
+  function updateSidebar(action: SidebarAction) {
+    if (action !== "edge-leave" && sidebarCloseTimer.current !== null) {
+      window.clearTimeout(sidebarCloseTimer.current);
+      sidebarCloseTimer.current = null;
+    }
+    setSidebarState((current) => {
+      const next = transitionSidebar(current, action);
       try {
-        window.localStorage.setItem(sidebarPreferenceKey, serializeSidebarPinned(next));
+        if (next.pinned !== current.pinned) {
+          window.localStorage.setItem(sidebarPreferenceKey, serializeSidebarPinned(next.pinned));
+        }
       } catch {
-        // The rail still works for this session when device storage is unavailable.
+        // The sidebar still works for this session when device storage is unavailable.
       }
       return next;
     });
+  }
+
+  function revealSidebarFromEdge() {
+    updateSidebar("edge-enter");
+  }
+
+  function keepSidebarRevealed() {
+    if (sidebarCloseTimer.current !== null) {
+      window.clearTimeout(sidebarCloseTimer.current);
+      sidebarCloseTimer.current = null;
+    }
+  }
+
+  function scheduleSidebarClose() {
+    keepSidebarRevealed();
+    sidebarCloseTimer.current = window.setTimeout(() => {
+      sidebarCloseTimer.current = null;
+      updateSidebar("edge-leave");
+    }, 160);
+  }
+
+  function toggleSidebar() {
+    pendingSidebarFocus.current = sidebarToggleFocusTarget(sidebarState);
+    updateSidebar("toggle");
+  }
+
+  function navigateFromSidebar(action: () => void) {
+    action();
+    updateSidebar("navigate");
   }
 
   if (entryMode === "loading") {
@@ -1049,36 +1109,32 @@ export default function Home() {
     return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening this teacher’s workspace…</p></section><KalingaFooterArtwork /></main>;
   }
 
+  const sidebarToggleLabel = sidebarState.pinned ? "Close sidebar" : "Keep sidebar open";
+
   return (
-    <main className={`app-shell ${sidebarPinned ? "sidebar-pinned" : "sidebar-rail"}`}>
-      <aside className="sidebar" aria-label="Main navigation">
-        <button className="brand" type="button" aria-label="Kalinga home" title={sidebarPinned ? undefined : "Kalinga home"} onClick={() => setView("home")}>
+    <main className={`app-shell sidebar-${sidebarLayoutMode(sidebarState)}`}>
+      <aside id="kalinga-sidebar" className="sidebar" aria-label="Main navigation" aria-hidden={!sidebarState.open} inert={!sidebarState.open ? true : undefined} onMouseEnter={keepSidebarRevealed} onMouseLeave={scheduleSidebarClose}>
+        <button className="brand" type="button" aria-label="Kalinga home" onClick={() => navigateFromSidebar(() => setView("home"))}>
           <Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority />
         </button>
 
         <nav className="nav-list">
-          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" aria-label="Today" title={sidebarPinned ? undefined : "Today"} onClick={() => setView("home")}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
-          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" aria-label="Classes &amp; learners" title={sidebarPinned ? undefined : "Classes & learners"} onClick={() => setView("classes")}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
-          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" aria-label="Plan lessons" title={sidebarPinned ? undefined : "Plan lessons"} onClick={() => openPlanLessons()}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
-          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" aria-label="Find resources" title={sidebarPinned ? undefined : "Find resources"} onClick={() => setView("library")}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
-          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" aria-label="Ask teachers" title={sidebarPinned ? undefined : "Ask teachers"} onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
-          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" aria-label="Learn Kalinga" title={sidebarPinned ? undefined : "Learn Kalinga"} onClick={openTutorial}><span className="nav-icon" aria-hidden="true">?</span><span>Learn Kalinga</span>{tutorialStatus.completed && <small>✓</small>}</button>
+          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" aria-label="Today" onClick={() => navigateFromSidebar(() => setView("home"))}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
+          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" aria-label="Classes &amp; learners" onClick={() => navigateFromSidebar(() => setView("classes"))}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
+          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" aria-label="Plan lessons" onClick={() => navigateFromSidebar(openPlanLessons)}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
+          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" aria-label="Find resources" onClick={() => navigateFromSidebar(() => setView("library"))}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
+          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" aria-label="Ask teachers" onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
+          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" aria-label="Learn Kalinga" onClick={() => navigateFromSidebar(openTutorial)}><span className="nav-icon" aria-hidden="true">?</span><span>Learn Kalinga</span>{tutorialStatus.completed && <small>✓</small>}</button>
         </nav>
 
-        <button className="sidebar-pin-toggle" type="button" aria-pressed={sidebarPinned} aria-label={sidebarPinned ? "Keep sidebar open. Collapse to icon rail" : "Keep sidebar open. Expand sidebar"} title={sidebarPinned ? undefined : "Keep sidebar open"} onClick={toggleSidebarPinned}>
-          <span className="sidebar-pin-direction" aria-hidden="true">{sidebarPinned ? "‹" : "›"}</span>
-          <span className="sidebar-pin-copy"><b>Keep sidebar open</b><small>{sidebarPinned ? "Pinned" : "Icon rail"}</small></span>
-          <span className="sidebar-pin-switch" aria-hidden="true"><i /></span>
-        </button>
-
-        <div className="offline-card sidebar-status" title={sidebarPinned ? undefined : "Teaching kit: 2 starter PDFs ready"}>
+        <div className="offline-card sidebar-status">
           <span className="status-dot" />
           <div><strong>Teaching kit</strong><small>2 starter PDFs ready</small></div>
         </div>
 
         <div className="account-anchor desktop-account">
           {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
-          <button className="profile" type="button" aria-label={`Account options for ${teacherLabel(teacherName)}`} title={sidebarPinned ? undefined : teacherLabel(teacherName)} aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
+          <button className="profile" type="button" aria-label={`Account options for ${teacherLabel(teacherName)}`} aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
             <span className="avatar">{teacherInitials(teacherName)}</span>
             <span><strong>{teacherLabel(teacherName)}</strong><small>{schoolName.trim() || "Add your school in a lesson plan"}</small></span>
             <span aria-hidden="true">···</span>
@@ -1086,8 +1142,13 @@ export default function Home() {
         </div>
       </aside>
 
+      <div className="sidebar-edge-trigger" aria-hidden="true" onMouseEnter={revealSidebarFromEdge} />
+
       <section className="workspace">
         <header className="topbar">
+          <button ref={topbarSidebarToggleRef} className="desktop-sidebar-toggle topbar-sidebar-toggle" type="button" aria-label={sidebarToggleLabel} aria-expanded={sidebarState.open} aria-pressed={sidebarState.pinned} aria-controls="kalinga-sidebar" title={sidebarToggleLabel} onClick={toggleSidebar}>
+            <SidebarToggleIcon />
+          </button>
           <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority /></button>
           <div className="top-actions">
             {blockedWrites.length && !storageError
@@ -1347,6 +1408,13 @@ function TutorialView({ teacherName, status, onProgress, onExit, onAskGabay, onG
       </main>
     </div>
   </div>;
+}
+
+function SidebarToggleIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3.5" y="4" width="17" height="16" rx="2.5" />
+    <path d="M9 4v16" />
+  </svg>;
 }
 
 function BellIcon() {

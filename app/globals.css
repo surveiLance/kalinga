@@ -1739,46 +1739,28 @@ html { scroll-behavior: smooth; }
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid #0b5f59 !important; outline-offset: 3px; }
 .plan-workspace-surface .ilaw-editor .edit-cell:focus-visible, .plan-workspace-surface .ilaw-editor .cell-input:focus-visible, .plan-workspace-surface .ilaw-editor .ilaw-title-input:focus-visible { outline: 3px solid #0b5f59 !important; outline-offset: 2px; background: #edf8f5; box-shadow: 0 0 0 5px rgba(11, 95, 89, .15); }
 
-/* Desktop sidebar pin and accessible icon rail */
-.app-shell { transition: grid-template-columns .28s cubic-bezier(.22, 1, .36, 1); }
-.sidebar { transition: padding .28s cubic-bezier(.22, 1, .36, 1); }
-.sidebar-pin-toggle { width: 100%; min-height: 44px; margin-top: auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 8px; color: var(--text-muted); background: rgba(255, 255, 255, .72); text-align: left; cursor: pointer; }
-.sidebar-pin-toggle:hover { border-color: #a9cec7; color: var(--support); background: #edf7f4; }
-.sidebar-pin-direction { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--support); background: var(--support-soft); font-size: 25px; font-weight: 800; line-height: 1; }
-.sidebar-pin-copy { min-width: 0; }
-.sidebar-pin-copy b, .sidebar-pin-copy small { display: block; }
-.sidebar-pin-copy b { color: var(--text); font-size: 11px; line-height: 1.2; }
-.sidebar-pin-copy small { margin-top: 2px; color: var(--text-muted); font-size: 9px; }
-.sidebar-pin-switch { width: 30px; height: 18px; padding: 2px; border-radius: 999px; display: flex; align-items: center; background: #d9d8d3; transition: background-color .2s ease; }
-.sidebar-pin-switch i { width: 14px; height: 14px; border-radius: 50%; display: block; background: #fff; box-shadow: 0 1px 3px rgba(36, 48, 55, .24); transition: transform .2s cubic-bezier(.22, 1, .36, 1); }
-.sidebar-pin-toggle[aria-pressed="true"] .sidebar-pin-switch { background: var(--support); }
-.sidebar-pin-toggle[aria-pressed="true"] .sidebar-pin-switch i { transform: translateX(12px); }
-.sidebar-status { margin-top: 8px; flex: 0 0 auto; }
+/* Dia-inspired desktop sidebar: edge reveal with one persistent toggle */
+.app-shell { --desktop-sidebar-width: 236px; grid-template-columns: 0 minmax(0, 1fr); transition: grid-template-columns .28s cubic-bezier(.22, 1, .36, 1); }
+.workspace { grid-column: 2; }
+.sidebar { position: fixed; z-index: 48; inset: 0 auto 0 0; width: var(--desktop-sidebar-width); height: 100dvh; transform: translateX(calc(-100% - 18px)); box-shadow: 18px 0 42px rgba(30, 40, 48, .16); animation: none; transition: transform .28s cubic-bezier(.22, 1, .36, 1), box-shadow .28s ease; }
+.sidebar-revealed, .sidebar-pinned { grid-template-columns: var(--desktop-sidebar-width) minmax(0, 1fr); }
+.sidebar-revealed .sidebar, .sidebar-pinned .sidebar { transform: none; box-shadow: none; }
+.sidebar .nav-item > span:not(.nav-icon) { overflow: hidden; opacity: 0; transform: translateX(-6px); text-overflow: ellipsis; white-space: nowrap; transition: opacity .18s ease .05s, transform .22s cubic-bezier(.22, 1, .36, 1) .05s; }
+.sidebar-revealed .sidebar .nav-item > span:not(.nav-icon), .sidebar-pinned .sidebar .nav-item > span:not(.nav-icon) { opacity: 1; transform: translateX(0); }
+.sidebar-status { flex: 0 0 auto; }
+.sidebar-edge-trigger { position: fixed; z-index: 47; inset: 0 auto 0 0; width: 12px; }
+.sidebar-pinned .sidebar-edge-trigger { display: none; }
+.desktop-sidebar-toggle { width: 42px; height: 42px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); display: grid; place-items: center; color: var(--text-muted); background: var(--surface-raised); cursor: pointer; }
+.desktop-sidebar-toggle:hover, .desktop-sidebar-toggle[aria-pressed="true"] { border-color: #a9cec7; color: var(--support); background: #edf7f4; }
+.desktop-sidebar-toggle svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.topbar-sidebar-toggle { margin-right: auto; }
 
-@media (min-width: 721px) {
-  .app-shell.sidebar-rail { grid-template-columns: 76px minmax(0, 1fr); }
-  .sidebar-rail .sidebar { padding-inline: 13px; overflow: visible; }
-  .sidebar-rail .brand { width: 50px; height: 72px; padding-inline: 0; overflow: hidden; justify-content: flex-start; }
-  .sidebar-rail .brand img { width: 150px; max-width: none; flex: 0 0 150px; }
-  .sidebar-rail .nav-item { width: 50px; padding-inline: 10px; justify-content: center; gap: 0; }
-  .sidebar-rail .nav-item > span:not(.nav-icon),
-  .sidebar-rail .nav-item small { display: none; }
-  .sidebar-rail .nav-item .nav-icon { flex-basis: 30px; }
-  .sidebar-rail .sidebar-pin-toggle { width: 50px; padding: 6px 10px; grid-template-columns: 30px; justify-content: center; }
-  .sidebar-rail .sidebar-pin-copy,
-  .sidebar-rail .sidebar-pin-switch { display: none; }
-  .sidebar-rail .sidebar-status { width: 50px; min-height: 50px; padding: 0; justify-content: center; }
-  .sidebar-rail .sidebar-status > div { display: none; }
-  .sidebar-rail .sidebar-status .status-dot { width: 12px; height: 12px; }
-  .sidebar-rail .desktop-account { width: 50px; }
-  .sidebar-rail .profile { width: 50px; padding: 7px; grid-template-columns: 36px; justify-content: center; }
-  .sidebar-rail .profile > span:nth-child(2),
-  .sidebar-rail .profile > span:last-child { display: none; }
-  .sidebar-rail .profile .avatar { width: 36px; height: 36px; }
-  .sidebar-rail .account-menu { position: fixed; left: 70px; bottom: 18px; }
+@media (max-width: 1020px) and (min-width: 721px) {
+  .app-shell { --desktop-sidebar-width: 214px; }
 }
 
 @media (max-width: 720px) {
+  .desktop-sidebar-toggle, .sidebar-edge-trigger { display: none; }
   .mobile-nav button { min-height: 50px; touch-action: manipulation; }
   .topbar button, .page-intro-action button, .class-workspace-tabs button, .community-tabs button, .starter-library-toolbar button, .tutorial-missions button { min-height: 44px; }
   .status-options button, .grade-picker button { min-height: 44px; touch-action: manipulation; }
@@ -1788,5 +1770,5 @@ html { scroll-behavior: smooth; }
 
 @media (prefers-reduced-motion: reduce) {
   .home-page, .page-intro, .home-essentials-grid, .class-page-layout, .attendance-grid, .resource-grid, .discussion-layout, .tutorial-layout { animation: none !important; }
-  .app-shell, .sidebar, .sidebar-pin-switch, .sidebar-pin-switch i { transition: none !important; }
+  .app-shell, .sidebar, .sidebar .nav-item > span:not(.nav-icon) { transition: none !important; }
 }
