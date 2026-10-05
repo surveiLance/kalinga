@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { GabayMascot } from "@/components/gabay-mascot";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { attendanceStatusLabel, attendanceStatuses, isStoredAttendanceStatus, toStoredAttendanceStatus } from "@/lib/attendance";
@@ -11,6 +12,7 @@ import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGrad
 import { createSampleLearners, learnerRosterSummary, learnerSexCounts, normalizeLearnerSex } from "@/lib/learners";
 import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes, weekDays } from "@/lib/schedule";
 import { teacherInitials, teacherLabel, teacherMention } from "@/lib/teachers";
+import { sidebarLayoutMode, sidebarStateFromPreference, sidebarToggleFocusTarget, serializeSidebarPinned, transitionSidebar, sidebarPreferenceKey, type SidebarAction, type SidebarFocusTarget } from "@/lib/sidebar-preference";
 import { dateInputValue, displayDate, moveDate } from "@/lib/dates";
 import { normalizeClass, normalizeSavedPlan, remoteSchedule } from "@/lib/normalize";
 import { decodeCommunityMessage, encodeCommunityMessage } from "@/lib/community-message";
@@ -360,6 +362,11 @@ export default function Home() {
   const [tutorialStatus, setTutorialStatus] = useState<TutorialStatus>(emptyTutorialStatus);
   const [tutorialStatusKnown, setTutorialStatusKnown] = useState(false);
   const [tutorialStatusReady, setTutorialStatusReady] = useState(false);
+  const [sidebarState, setSidebarState] = useState(() => sidebarStateFromPreference(null));
+  const sidebarCloseTimer = useRef<number | null>(null);
+  const pendingSidebarFocus = useRef<SidebarFocusTarget | null>(null);
+  const topbarSidebarToggleRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const sessionTeacherId = useRef("");
   const wakeSync = useRef<(refresh?: boolean) => void>(() => {});
   const syncRun = useRef<Promise<void> | null>(null);
@@ -368,6 +375,49 @@ export default function Home() {
     : entryMode === "prototype"
       ? "prototype"
       : "";
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [view]);
+
+  useEffect(() => {
+    if (!sidebarState.open || sidebarState.pinned) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarState((current) => transitionSidebar(current, "dismiss"));
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [sidebarState.open, sidebarState.pinned]);
+
+  useEffect(() => () => {
+    if (sidebarCloseTimer.current !== null) window.clearTimeout(sidebarCloseTimer.current);
+  }, []);
+
+  useEffect(() => {
+    const target = pendingSidebarFocus.current;
+    if (!target) return;
+    const button = topbarSidebarToggleRef.current;
+    if (!button) return;
+    button.focus();
+    pendingSidebarFocus.current = null;
+  }, [sidebarState.open, sidebarState.pinned]);
+
+  useEffect(() => {
+    const restoreSidebarPreference = (event?: StorageEvent) => {
+      if (event?.key && event.key !== sidebarPreferenceKey) return;
+      try {
+        setSidebarState(sidebarStateFromPreference(window.localStorage.getItem(sidebarPreferenceKey)));
+      } catch {
+        setSidebarState(sidebarStateFromPreference(null));
+      }
+    };
+    const restoreTimer = window.setTimeout(restoreSidebarPreference, 0);
+    window.addEventListener("storage", restoreSidebarPreference);
+    return () => {
+      window.clearTimeout(restoreTimer);
+      window.removeEventListener("storage", restoreSidebarPreference);
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -1001,6 +1051,53 @@ export default function Home() {
     queueChanges(changes, "Attendance is saved on this device and will sync when your connection returns.");
   }
 
+  function updateSidebar(action: SidebarAction) {
+    if (action !== "edge-leave" && sidebarCloseTimer.current !== null) {
+      window.clearTimeout(sidebarCloseTimer.current);
+      sidebarCloseTimer.current = null;
+    }
+    setSidebarState((current) => {
+      const next = transitionSidebar(current, action);
+      try {
+        if (next.pinned !== current.pinned) {
+          window.localStorage.setItem(sidebarPreferenceKey, serializeSidebarPinned(next.pinned));
+        }
+      } catch {
+        // The sidebar still works for this session when device storage is unavailable.
+      }
+      return next;
+    });
+  }
+
+  function revealSidebarFromEdge() {
+    updateSidebar("edge-enter");
+  }
+
+  function keepSidebarRevealed() {
+    if (sidebarCloseTimer.current !== null) {
+      window.clearTimeout(sidebarCloseTimer.current);
+      sidebarCloseTimer.current = null;
+    }
+  }
+
+  function scheduleSidebarClose() {
+    keepSidebarRevealed();
+    sidebarCloseTimer.current = window.setTimeout(() => {
+      sidebarCloseTimer.current = null;
+      updateSidebar("edge-leave");
+    }, 160);
+  }
+
+  function toggleSidebar() {
+    pendingSidebarFocus.current = sidebarToggleFocusTarget(sidebarState);
+    updateSidebar("toggle");
+  }
+
+  function navigateFromSidebar(action: () => void) {
+    action();
+    updateSidebar("navigate");
+  }
+
   if (entryMode === "loading") {
     return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening your teaching space…</p></section><KalingaFooterArtwork /></main>;
   }
@@ -1013,30 +1110,32 @@ export default function Home() {
     return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening this teacher’s workspace…</p></section><KalingaFooterArtwork /></main>;
   }
 
+  const sidebarToggleLabel = sidebarState.pinned ? "Close sidebar" : "Keep sidebar open";
+
   return (
-    <main className="app-shell">
-      <aside className="sidebar" aria-label="Main navigation">
-        <button className="brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}>
+    <main className={`app-shell sidebar-${sidebarLayoutMode(sidebarState)}`}>
+      <aside id="kalinga-sidebar" className="sidebar" aria-label="Main navigation" aria-hidden={!sidebarState.open} inert={!sidebarState.open ? true : undefined} onMouseEnter={keepSidebarRevealed} onMouseLeave={scheduleSidebarClose}>
+        <button className="brand" type="button" aria-label="Kalinga home" onClick={() => navigateFromSidebar(() => setView("home"))}>
           <Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority />
         </button>
 
         <nav className="nav-list">
-          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" onClick={() => setView("home")}>Today</button>
-          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" onClick={() => setView("classes")}>Classes &amp; learners</button>
-          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" onClick={() => openPlanLessons()}>Plan lessons</button>
-          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" onClick={() => setView("library")}>Find resources</button>
-          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}>Ask teachers</button>
-          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" onClick={openTutorial}><span className="nav-icon">?</span> Learn Kalinga{tutorialStatus.completed && <small>✓</small>}</button>
+          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" aria-label="Today" onClick={() => navigateFromSidebar(() => setView("home"))}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
+          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" aria-label="Classes &amp; learners" onClick={() => navigateFromSidebar(() => setView("classes"))}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
+          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" aria-label="Plan lessons" onClick={() => navigateFromSidebar(openPlanLessons)}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
+          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" aria-label="Find resources" onClick={() => navigateFromSidebar(() => setView("library"))}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
+          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" aria-label="Ask teachers" onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
+          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" aria-label="Learn Kalinga" onClick={() => navigateFromSidebar(openTutorial)}><span className="nav-icon" aria-hidden="true">?</span><span>Learn Kalinga</span>{tutorialStatus.completed && <small>✓</small>}</button>
         </nav>
 
-        <div className="offline-card">
+        <div className="offline-card sidebar-status">
           <span className="status-dot" />
           <div><strong>Teaching kit</strong><small>2 starter PDFs ready</small></div>
         </div>
 
         <div className="account-anchor desktop-account">
           {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
-          <button className="profile" type="button" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
+          <button className="profile" type="button" aria-label={`Account options for ${teacherLabel(teacherName)}`} aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
             <span className="avatar">{teacherInitials(teacherName)}</span>
             <span><strong>{teacherLabel(teacherName)}</strong><small>{schoolName.trim() || "Add your school in a lesson plan"}</small></span>
             <span aria-hidden="true">···</span>
@@ -1044,8 +1143,13 @@ export default function Home() {
         </div>
       </aside>
 
+      <div className="sidebar-edge-trigger" aria-hidden="true" onMouseEnter={revealSidebarFromEdge} />
+
       <section className="workspace">
         <header className="topbar">
+          <button ref={topbarSidebarToggleRef} className="desktop-sidebar-toggle topbar-sidebar-toggle" type="button" aria-label={sidebarToggleLabel} aria-expanded={sidebarState.open} aria-pressed={sidebarState.pinned} aria-controls="kalinga-sidebar" title={sidebarToggleLabel} onClick={toggleSidebar}>
+            <SidebarToggleIcon />
+          </button>
           <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority /></button>
           <div className="top-actions">
             {blockedWrites.length && !storageError
@@ -1066,11 +1170,13 @@ export default function Home() {
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
         {showTutorialOffer && <TutorialOffer teacherName={teacherName} onStart={() => { saveTutorialProgress(emptyTutorialStatus); setView("tutorial"); }} onDismiss={() => saveTutorialProgress({ ...emptyTutorialStatus, dismissed: true })} />}
 
-        <div className="content">
-          {view === "home" ? <div className="view-page home-page">
-            <GabayTodayBriefing teacherName={teacherName} activeClass={activeClass} blocks={todayTeachingBlocks} nextBlock={nextTeachingBlock} missingPlanCount={missingPlanCount} attendanceSavedCount={attendanceSavedCount} latestUpdate={gabayEventMessage} motion={gabayMotion} onOpen={() => setGabayOpen(true)} onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} />
-            {(authWelcomeMessage || notice) && <p className="notice" role="status">{authWelcomeMessage || notice}</p>}
-            {activeClass && <section className="home-essentials-grid">
+        <div className="content" ref={contentRef}>
+          {view === "home" ? <div className="view-page home-page home-guided-day">
+            <div className="home-primary-context">
+              <GabayTodayBriefing teacherName={teacherName} activeClass={activeClass} blocks={todayTeachingBlocks} nextBlock={nextTeachingBlock} missingPlanCount={missingPlanCount} attendanceSavedCount={attendanceSavedCount} latestUpdate={gabayEventMessage} motion={gabayMotion} onOpen={() => setGabayOpen(true)} onSetUp={() => setView("classes")} onLoadSample={loadSampleClass} />
+              {(authWelcomeMessage || notice) && <p className="notice" role="status">{authWelcomeMessage || notice}</p>}
+            </div>
+            {activeClass && <section className="home-essentials-grid home-quick-actions">
               <TodayScheduleSummary blocks={todayTeachingBlocks} onOpenClass={(classId) => { setActiveClassId(classId); setView("classes"); }} />
               <article className="home-action-card">
                 <div className="home-action-heading"><div><p className="eyebrow">WORKING WITH</p><h2>{activeClass.name}</h2><p>{gradeList(activeClass.grades)} · {activeClass.learners.length} learners</p></div>{classes.length > 1 && <select aria-label="Choose active class" value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>}</div>
@@ -1134,7 +1240,7 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
         <div className="auth-mode-switch" role="tablist" aria-label="Account access"><button className={formMode === "sign-in" ? "active" : ""} type="button" role="tab" aria-selected={formMode === "sign-in"} onClick={() => switchMode("sign-in")}>Sign in</button><button className={formMode === "create" ? "active" : ""} type="button" role="tab" aria-selected={formMode === "create"} onClick={() => switchMode("create")}>Create account</button></div>
         <form className="login-form" onSubmit={submitLogin}>
           {formMode === "create" && <label>Teacher name<input type="text" value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Your name" autoComplete="name" required /></label>}
-          <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="teacher@school.edu.ph" required /></label>
+          <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="teacher@school.edu.ph" autoComplete="email" required /></label>
           <label>Password<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} autoComplete={formMode === "sign-in" ? "current-password" : "new-password"} required /><button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? "Hide" : "Show"}</button></span></label>
           <div className="login-options"><span>{formMode === "sign-in" ? "Your session stays securely signed in on this device." : "Use at least 6 characters."}</span></div>
           {formError && <p className="auth-feedback error" role="alert">{formError}</p>}
@@ -1223,8 +1329,8 @@ function NotificationPanel({ notifications, readIds, authenticated, onOpen, onMa
 function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
   return (
     <header className="page-intro">
-      <div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lead">{description}</p></div>
-      {action}
+      <div className="page-intro-copy"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lead">{description}</p></div>
+      {action && <div className="page-intro-action">{action}</div>}
     </header>
   );
 }
@@ -1282,9 +1388,9 @@ function TutorialView({ teacherName, status, onProgress, onExit, onAskGabay, onG
     onProgress(emptyTutorialStatus);
   }
 
-  if (selectedStep >= tutorialStepCount) return <div className="view-page tutorial-page"><section className="tutorial-complete"><GabayMascot size="hero" motion={false} speaking /><p className="eyebrow">ALL SIX MISSIONS COMPLETE</p><h1>You’re ready to use Kalinga.</h1><p>You practiced the full flow without changing any real records. Return to Today when you are ready, or replay the tour whenever you want.</p><div><button className="primary-button" type="button" onClick={onExit}>Go to Today →</button><button className="secondary-button" type="button" onClick={restart}>Replay tutorial</button></div></section></div>;
+  if (selectedStep >= tutorialStepCount) return <div className="view-page tutorial-page tutorial-workspace-surface"><section className="tutorial-complete"><GabayMascot size="hero" motion={false} speaking /><p className="eyebrow">ALL SIX MISSIONS COMPLETE</p><h1>You’re ready to use Kalinga.</h1><p>You practiced the full flow without changing any real records. Return to Today when you are ready, or replay the tour whenever you want.</p><div><button className="primary-button" type="button" onClick={onExit}>Go to Today →</button><button className="secondary-button" type="button" onClick={restart}>Replay tutorial</button></div></section></div>;
 
-  return <div className="view-page tutorial-page">
+  return <div className="view-page tutorial-page tutorial-workspace-surface">
     <PageIntro eyebrow="LEARN KALINGA" title={`Practice with Gabay, ${teacherLabel(teacherName)}`} description="A safe, guided workspace. Every class, learner, lesson, and message shown here is only a demo." action={<button className="secondary-button" type="button" onClick={onExit}>Exit tutorial</button>} />
     <div className="tutorial-safety"><span>✓</span><p><b>Practice mode is on</b><small>Your real workspace will not be changed.</small></p><strong>{Math.round((status.step / tutorialStepCount) * 100)}% complete</strong></div>
     <div className="tutorial-layout">
@@ -1305,25 +1411,18 @@ function TutorialView({ teacherName, status, onProgress, onExit, onAskGabay, onG
   </div>;
 }
 
+function SidebarToggleIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3.5" y="4" width="17" height="16" rx="2.5" />
+    <path d="M9 4v16" />
+  </svg>;
+}
+
 function BellIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
     <path d="M10 21h4" />
   </svg>;
-}
-
-function GabayMascot({ size = "medium", motion = true, speaking = false }: { size?: "small" | "medium" | "large" | "hero" | "companion"; motion?: boolean; speaking?: boolean }) {
-  return <span className={`gabay-mascot gabay-mascot-${size} ${motion ? "" : "motion-paused"} ${speaking ? "is-speaking" : ""}`} aria-hidden="true">
-    <svg viewBox="0 0 96 96" role="img">
-      <path className="gabay-arm gabay-arm-left" d="M28 57c-8 2-12 8-13 14" />
-      <path className="gabay-arm gabay-arm-right" d="M68 57c9-1 13-7 15-13" />
-      <path className="gabay-body" d="M22 55c0-17 11-28 26-28s26 11 26 28v18c0 8-7 14-15 14H37c-8 0-15-6-15-14z" />
-      <ellipse className="gabay-face" cx="48" cy="51" rx="19" ry="17" />
-      <g className="gabay-eyes"><circle cx="41" cy="49" r="2.4" /><circle cx="55" cy="49" r="2.4" /></g>
-      <path className="gabay-smile" d="M41 57c4 4 10 4 14 0" />
-      <path className="gabay-cape" d="M31 69c5 4 11 6 17 6s12-2 17-6v9c-5 4-11 6-17 6s-12-2-17-6z" />
-    </svg>
-  </span>;
 }
 
 type GabayChatMessage = { id: string; conversationId: string; role: "teacher" | "gabay"; text: string; view: View; createdAt: string };
@@ -1759,7 +1858,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   }
 
   return (
-    <div className="view-page classes-page">
+    <div className="view-page classes-page class-workspace-surface">
       {!!classes.length && selectedClass && <>
         <section className="class-page-heading">
           <div><p className="eyebrow">CLASSES & LEARNERS</p><h1>Your classes</h1></div>
@@ -1921,7 +2020,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
 
   if (!teachingClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>This lesson’s class is unavailable</h2><p>Return to Today and choose another saved lesson.</p></div><button className="secondary-button" type="button" onClick={onBack}>Back to Today</button></section>;
 
-  return <div className="view-page teaching-page">
+  return <div className="view-page teaching-page teaching-workspace-surface">
     <PageIntro eyebrow="TEACH · MULTIGRADE LESSON" title={plan.title} description={`${teachingClass.name} · ${plan.subject} · ${planStart}–${planEnd}`} action={<div className="teaching-page-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="secondary-button" type="button" onClick={onEdit}>Edit plan</button><button className="primary-button" type="button" onClick={() => window.print()}>Print or save PDF</button></div>} />
 
     <section className="teaching-guide-summary">
@@ -2052,7 +2151,7 @@ function PlanIndex({ plans, classes, onOpen, onNew, onBack, onDelete }: { plans:
   function activate(planId: string) { if (selecting) toggle(planId); else onOpen(planId); }
 
   return (
-    <div className="view-page plan-index">
+    <div className="view-page plan-index plan-workspace-surface">
       <PageIntro eyebrow="LESSON PLANS" title="Your lesson plans" description="Open a saved plan to keep editing, start a new one, or select plans to delete." action={<div className="plan-index-actions">
         {plans.length > 0 && (selecting
           ? <button className="secondary-button" type="button" onClick={exitSelect}>Cancel</button>
@@ -2446,7 +2545,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   };
 
   return (
-    <div className={`view-page plan-page${printingPlan ? " ilaw-print-mode" : ""}`}>
+    <div className={`view-page plan-page plan-workspace-surface${printingPlan ? " ilaw-print-mode" : ""}`}>
       <PageIntro eyebrow="MULTIGRADE LESSON PLAN" title={lessonTitle.trim() || "New lesson plan"} description="Set four things, let Gabay draft, then edit the plan exactly where it prints." action={<button className="secondary-button" type="button" onClick={onBack}>← Today</button>} />
 
       <section className={`plan-setup${setupOpen ? " open" : ""}`}>
@@ -2767,7 +2866,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     setCommentInput(""); setLibraryError("");
   }
 
-  return <div className="view-page resource-library-page">
+  return <div className="view-page resource-library-page resource-workspace-surface">
     <PageIntro eyebrow="TEACHER RESOURCE LIBRARY" title="Open it. Teach it. Improve it together." description="Use the two Kalinga starters or submit a PDF of your own with clear classroom details." action={<button className="primary-button" type="button" onClick={() => authenticated ? setSubmissionOpen((open) => !open) : onRequestSignIn()}>＋ Upload a resource</button>} />
     {submissionOpen && <form className="resource-submission" onSubmit={submitResource}>
       <header><div><p className="eyebrow">RESOURCE SUBMISSION</p><h2>Tell teachers exactly what they are opening</h2><p>Your name, classroom fit, and sharing status stay visible. Uploading does not mean Kalinga has reviewed or approved the material.</p></div><button type="button" aria-label="Close resource submission" onClick={() => setSubmissionOpen(false)}>×</button></header>
@@ -2873,7 +2972,7 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
 
   if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><div><p className="eyebrow">RECORD ATTENDANCE</p><h2>Set up a class first</h2><p>Attendance needs a saved learner list and class schedule before there is anything to record.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
-  return <div className="view-page attendance-page"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
+  return <div className="view-page attendance-page attendance-workspace-surface"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
     <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div className="attendance-date-picker"><button type="button" aria-label="Previous day" onClick={() => chooseDate(moveDate(selectedDate, -1))}>←</button><label>Date<input type="date" value={selectedDate} onChange={(event) => chooseDate(event.target.value)} /></label><button type="button" aria-label="Next day" onClick={() => chooseDate(moveDate(selectedDate, 1))}>→</button><button type="button" onClick={() => chooseDate(dateInputValue())}>Today</button></div><span>{selectedClass.meetings.map((meeting) => `${meeting.days} · ${meeting.startTime}`).join("  |  ")}</span></section>
     <div className="attendance-grid">
       <section className="attendance-main">
@@ -3058,9 +3157,9 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     setDeleteTarget(undefined); setCommunityError("");
   }
 
-  if (!authenticated) return <div className="view-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
+  if (!authenticated) return <div className="view-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
-  return <div className="view-page community-page"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
+  return <div className="view-page community-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
     <aside className="community-explainer"><span>@</span><p><b>Your tag is {teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><button type="button" onClick={onOpenLibrary}>Upload or manage resources →</button></aside>
     {composerOpen && <form className="community-composer" onSubmit={submitQuestion}>
       <header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header>
