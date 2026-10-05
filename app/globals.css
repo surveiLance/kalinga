@@ -992,7 +992,7 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 .plan-setup-grid label.needs-topic input { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(238, 84, 33, .18); }
 .topic-prompt { margin: 2px 24px 0; padding: 10px 14px; border-radius: 10px; color: #a33d1c; background: #fde5da; font-size: 12px; font-weight: 700; }
 .plan-setup-notes { margin: 12px 24px 0; display: flex; flex-direction: column; gap: 6px; color: var(--ink); font-size: 11px; font-weight: 800; }.plan-setup-notes small { margin-left: 4px; color: var(--muted); font-weight: 600; }.plan-setup-notes textarea { width: 100%; padding: 10px 12px; border: 1px solid #d9d3c8; border-radius: 10px; background: #fff; font: 500 13px var(--font-ui); color: var(--ink); line-height: 1.45; resize: vertical; }
-.plan-toolbar { position: sticky; top: 8px; z-index: 30; margin: 18px 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; background: rgba(247, 244, 238, .96); backdrop-filter: blur(6px); box-shadow: 0 6px 20px rgba(40, 34, 26, .08); }.plan-toolbar > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }.plan-toolbar > div:last-child { margin-left: auto; }
+.plan-toolbar { position: static; margin: 18px 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; background: rgba(247, 244, 238, .96); backdrop-filter: blur(6px); box-shadow: 0 6px 20px rgba(40, 34, 26, .08); }.plan-toolbar > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }.plan-toolbar > div:last-child { margin-left: auto; }
 .plan-time-warning { color: var(--orange-dark); font-size: 11px; font-weight: 700; }
 .ilaw-editor { margin-bottom: 40px; }
 .ilaw-editor .edit-cell { width: 100%; min-height: 24px; padding: 2px 3px; border: 1px dashed transparent; border-radius: 4px; resize: none; overflow: hidden; background: transparent; color: inherit; font: inherit; line-height: 1.4; }.ilaw-editor .edit-cell:hover { border-color: #c9c2b5; }.ilaw-editor .edit-cell:focus { outline: none; border-color: var(--teal-ink); border-style: solid; background: #f4fbf9; }.ilaw-editor .edit-cell::placeholder { color: #a39c90; font-style: italic; }.ilaw-editor .edit-cell.compact { display: inline-block; width: calc(100% - 4px); vertical-align: top; }
@@ -1207,7 +1207,7 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   /* Planner setup and toolbar */
   .plan-setup > footer { flex-direction: column; align-items: stretch; }
   .plan-setup > footer .toolbar-gabay { justify-content: center; }
-  .plan-toolbar { position: sticky; top: 70px; padding: 8px 10px; }
+  .plan-toolbar { padding: 8px 10px; }
   .plan-toolbar > div:first-child { width: 100%; }
   .plan-toolbar > div:last-child { width: 100%; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr; }
   .plan-toolbar > div:last-child .primary-button { grid-column: 1 / -1; min-height: 46px; }
@@ -1496,7 +1496,7 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 .plan-workspace-surface .plan-setup { margin-top: 20px; border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
 .plan-workspace-surface .plan-setup-grid input, .plan-workspace-surface .plan-setup-grid select, .plan-workspace-surface .plan-setup-notes textarea { border-color: var(--border); border-radius: var(--radius-sm); }
 .plan-workspace-surface .plan-setup-more { border-top: 1px solid var(--border); }
-.plan-workspace-surface .plan-toolbar { top: 82px; border-color: var(--border); border-radius: var(--radius-md); background: rgba(255, 253, 248, .96); box-shadow: var(--shadow-md); }
+.plan-workspace-surface .plan-toolbar { border-color: var(--border); border-radius: var(--radius-md); background: rgba(255, 253, 248, .96); box-shadow: var(--shadow-md); }
 .plan-workspace-surface .plan-time-warning { overflow-wrap: anywhere; }
 .plan-workspace-surface .gabay-draft-button { border-radius: var(--radius-sm); }
 .plan-workspace-surface .grade-switcher { border-color: #b6d8d1; background: var(--support-soft); }
@@ -1524,7 +1524,6 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .plan-workspace-surface .plan-setup-notes { margin-inline: 16px; }
   .plan-workspace-surface .plan-setup-more { margin-inline: 16px; }
   .plan-workspace-surface .plan-setup > footer { padding-inline: 16px; }
-  .plan-workspace-surface .plan-toolbar { top: 68px; }
   .teaching-workspace-surface .teaching-guide-summary { padding: 18px; }
   .teaching-workspace-surface .teaching-focus-card > header { padding: 20px 18px; }
   .teaching-workspace-surface .teaching-reference-grid { gap: 12px; }
