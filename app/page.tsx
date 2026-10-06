@@ -2235,6 +2235,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   const [downloadingDocx, setDownloadingDocx] = useState(false);
   const [docxError, setDocxError] = useState("");
   const [fullPlanDraftError, setFullPlanDraftError] = useState("");
+  const [fullPlanDraftStatus, setFullPlanDraftStatus] = useState("");
   const [printingPlan, setPrintingPlan] = useState(false);
   const documentRef = useRef<HTMLElement>(null);
   const incompletePlanSections = useMemo(() => [
@@ -2416,8 +2417,28 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     if (!selectedClass || draftingFullPlan || !requireTopic()) return;
     setDraftingFullPlan(true);
     setFullPlanDraftError("");
-    const result = await requestGabayDraft("full-plan", draftContext("Complete ILAW draft", [`Quarter: ${quarter}`, `Language: ${language}`, `Multigrade approach: ${multigradeModel}`, ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`)]), "");
+    setFullPlanDraftStatus("Gabay is drafting the whole plan…");
+    // A full plan is the largest thing Gabay generates, so a first attempt can fail
+    // transiently: Groq's free tier meters tokens per minute (a big draft can use most
+    // of a minute, so a quick second click is rate-limited) and the model occasionally
+    // returns a truncated draft. Rather than surfacing an error the teacher clears by
+    // re-clicking — which only burns more of the minute — Gabay now waits and retries on
+    // its own, waiting longer when it is rate-limited so the token window can reset.
+    const context = draftContext("Complete ILAW draft", [`Quarter: ${quarter}`, `Language: ${language}`, `Multigrade approach: ${multigradeModel}`, ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`)]);
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const retryWaits = { busy: [24, 36], unavailable: [4, 9] } as const; // seconds, by failure reason
+    let result = await requestGabayDraft("full-plan", context, "");
+    for (let retry = 0; !result.connected && (result.reason === "busy" || result.reason === "unavailable") && retry < retryWaits.busy.length; retry += 1) {
+      const wait = retryWaits[result.reason][retry];
+      setFullPlanDraftStatus(result.reason === "busy"
+        ? `Gabay reached its limit for this minute — waiting ${wait}s, then trying again…`
+        : `That draft didn’t come through — Gabay is trying again in ${wait}s…`);
+      await sleep(wait * 1_000);
+      setFullPlanDraftStatus("Gabay is drafting the whole plan…");
+      result = await requestGabayDraft("full-plan", context, "");
+    }
     setDraftingFullPlan(false);
+    setFullPlanDraftStatus("");
     if (!result.connected) { setFullPlanDraftError(draftFailure(result.reason, "the complete plan")); return; }
     if (result.draft.type !== "full-plan") return;
     // Apply straight away. The teacher asked for a plan and should see one, not a
@@ -2570,10 +2591,11 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
             </div>
           </details>
           <footer>
-            <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Gabay is drafting the whole plan…" : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>
+            <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? (fullPlanDraftStatus || "Gabay is drafting the whole plan…") : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>
             <button className="secondary-button" type="button" onClick={() => setSetupOpen(false)}>I’ll write it myself</button>
           </footer>
         </> : <button type="button" className="plan-setup-summary" onClick={() => setSetupOpen(true)}><span><b>{selectedClass?.name}</b> · {subject || "No subject"} · {printedDate || "No date"} · {quarter} · {startTime} · {targetMinutes} min · {language}</span><b>Change setup</b></button>}
+        {draftingFullPlan && fullPlanDraftStatus && <p className="gabay-draft-status" role="status">{fullPlanDraftStatus}</p>}
         {fullPlanDraftError && <p className="gabay-draft-error" role="alert">{fullPlanDraftError}</p>}
       </section>
 
