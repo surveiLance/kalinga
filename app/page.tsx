@@ -62,6 +62,16 @@ type RemoteAttendanceRow = {
 };
 
 const commonSubjects = ["Mathematics", "Science", "English", "Filipino", "Araling Panlipunan", "MAPEH", "Edukasyon sa Pagpapakatao", "TLE"];
+const lessonSetupHints: Record<string, { topic: string; notes: string }> = {
+  mathematics: { topic: "Adding fractions with like denominators", notes: "Some learners need more practice with addition. No printer. We have bottle caps and a chalkboard." },
+  science: { topic: "Parts of a plant and their functions", notes: "Learners can observe plants in the schoolyard. We have leaves, paper, and pencils." },
+  english: { topic: "Finding the main idea in a short story", notes: "Some learners need help reading unfamiliar words. We have a short story and a chalkboard." },
+  filipino: { topic: "Pagtukoy sa pangunahing ideya ng isang kuwento", notes: "May mga mag-aaral na nangangailangan ng gabay sa pagbasa. May maikling kuwento at pisara kami." },
+  "araling panlipunan": { topic: "People and places in our community", notes: "Use familiar places in our community. We have a local map and pictures." },
+  mapeh: { topic: "Keeping a steady beat with clapping", notes: "We have space for movement but no musical instruments. Use clapping and familiar songs." },
+  "edukasyon sa pagpapakatao": { topic: "Showing respect and helping others", notes: "Use everyday classroom situations. Learners can work in pairs and act out examples." },
+  tle: { topic: "Using tools safely in the school garden", notes: "We have basic gardening tools. Include a demonstration before learners practise." },
+};
 const gabayPageLabels: Record<View, string> = {
   home: "Today",
   classes: "Classes",
@@ -1999,6 +2009,11 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
   const activeEnd = plan.slots[activeIndex + 1]?.time || planEnd;
   const readyTasks = corePlanTasksReady(plan);
   const teacherFocusGrade = plan.grades.find((grade) => activeSlot?.teacherFocus.toLowerCase().includes(gradeLabel(grade).toLowerCase()));
+  const wholeClassStep = Boolean(activeSlot && (activeSlot.wholeClass || !teacherFocusGrade));
+  const activeDuration = activeSlot ? Math.max(1, toMinutes(activeEnd) - toMinutes(activeSlot.time)) : 0;
+  const activeGradeTasks = activeSlot ? plan.grades.map((grade) => ({ grade, task: activeSlot.gradeTasks[grade]?.trim() || "No activity has been entered for this group yet." })) : [];
+  const distinctTasks = Array.from(new Set(activeGradeTasks.map(({ task }) => task)));
+  const independentGrades = plan.grades.filter((grade) => grade !== teacherFocusGrade);
 
   useEffect(() => {
     onGabayContext({
@@ -2024,24 +2039,29 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
     <PageIntro eyebrow="TEACH · MULTIGRADE LESSON" title={plan.title} description={`${teachingClass.name} · ${plan.subject} · ${planStart}–${planEnd}`} action={<div className="teaching-page-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="secondary-button" type="button" onClick={onEdit}>Edit plan</button><button className="primary-button" type="button" onClick={() => window.print()}>Print or save PDF</button></div>} />
 
     <section className="teaching-guide-summary">
-      <div><p className="eyebrow">CLASSROOM TEACHING GUIDE</p><h2>{plan.slots.length ? `${plan.slots.length} teaching ${plan.slots.length === 1 ? "block" : "blocks"}` : "Add a teaching flow"}</h2><p>{gradeList(plan.grades)} · {plan.duration} · {plan.multigradeModel || "Multigrade lesson"}</p><p className="teaching-guide-hint">Step through the lesson block by block while you teach — each block shows what every grade is doing and who is with you.</p></div>
-      <div className={`teaching-readiness ${readyTasks === 3 ? "ready" : "draft"}`}><b>{readyTasks === 3 ? "Ready to teach" : "Usable draft"}</b><span>{readyTasks}/3 core tasks prepared</span></div>
+      <div><p className="eyebrow">LESSON AT A GLANCE</p><h2>{plan.slots.length ? `${plan.slots.length} lesson ${plan.slots.length === 1 ? "step" : "steps"}` : "Add lesson steps"}</h2><p className="teaching-guide-hint">A lesson step is one short part of the class. Follow the steps in order and Kalinga will show what you teach and what each grade does.</p><div className="teaching-guide-meta"><span>{gradeList(plan.grades)}</span><span>{plan.duration}</span><span>{plan.multigradeModel || "Multigrade lesson"}</span></div></div>
+      <div className={`teaching-readiness ${readyTasks === 3 ? "ready" : "draft"}`}><b>{readyTasks === 3 ? "Lesson plan complete" : "Lesson can be taught"}</b><span>{readyTasks === 3 ? "All core parts are ready" : `${3 - readyTasks} core ${3 - readyTasks === 1 ? "part needs" : "parts need"} attention`}</span></div>
     </section>
 
     {plan.slots.length ? <>
-      <nav className="teaching-block-nav" aria-label="Teaching blocks">{plan.slots.map((slot, index) => <button className={slot.id === activeSlot?.id ? "active" : ""} type="button" aria-current={slot.id === activeSlot?.id ? "step" : undefined} onClick={() => setActiveSlotId(slot.id)} key={slot.id}><span>{index + 1}</span><p><b>{slot.time}</b><small>{slot.teacherFocus}</small></p></button>)}</nav>
+      <section className="teaching-flow-workspace">
+        <nav className="teaching-step-list" aria-label="Lesson steps"><header><p className="eyebrow">LESSON STEPS</p><b>Choose where you are now</b><small>The current step is highlighted.</small></header><div>{plan.slots.map((slot, index) => <button className={slot.id === activeSlot?.id ? "active" : ""} type="button" aria-current={slot.id === activeSlot?.id ? "step" : undefined} onClick={() => setActiveSlotId(slot.id)} key={slot.id}><span>{index + 1}</span><p><b>{slot.time}</b><small>{slot.teacherFocus || slot.stage || "Class activity"}</small></p>{slot.id === activeSlot?.id && <strong>NOW</strong>}</button>)}</div></nav>
 
-      {activeSlot && <section className="teaching-focus-card">
-        <header><div><p className="eyebrow">BLOCK {activeIndex + 1} OF {plan.slots.length} · {activeSlot.time}–{activeEnd}</p><h2>{activeSlot.teacherFocus || "Class activity"}</h2><p>{teacherFocusGrade ? `Give direct support to ${gradeLabel(teacherFocusGrade)} while the other groups continue their assigned work.` : "Guide the whole class through this part of the lesson."}</p></div><span>{Math.max(1, toMinutes(activeEnd) - toMinutes(activeSlot.time))}<small>minutes</small></span></header>
-        <div className="teaching-grade-tasks">{plan.grades.map((grade) => { const teacherLed = grade === teacherFocusGrade || activeIndex === 0; return <article className={teacherLed ? "teacher-led" : "independent"} key={grade}><div><span>{teacherLed ? "WITH TEACHER" : "INDEPENDENT"}</span><b>{gradeLabel(grade)}</b></div><p>{activeSlot.gradeTasks[grade]?.trim() || "No activity has been entered for this group yet."}</p></article>; })}</div>
-        <footer><button type="button" disabled={activeIndex === 0} onClick={() => setActiveSlotId(plan.slots[activeIndex - 1]?.id || activeSlot.id)}>← Previous block</button><span>{activeIndex + 1} of {plan.slots.length}</span>{activeIndex < plan.slots.length - 1 ? <button className="next" type="button" onClick={() => setActiveSlotId(plan.slots[activeIndex + 1].id)}>Next block →</button> : <button className="next" type="button" onClick={onAttendance}>Finish with attendance →</button>}</footer>
-      </section>}
+        {activeSlot && <section className="teaching-focus-card" aria-live="polite">
+          <header><div><p className="eyebrow">NOW TEACHING · STEP {activeIndex + 1} OF {plan.slots.length}</p><h2>{activeSlot.teacherFocus || "Class activity"}</h2><p>{wholeClassStep ? "Teach and guide all grades together for this part of the lesson." : `Work directly with ${gradeLabel(teacherFocusGrade!)} while the other groups complete their assigned activities.`}</p></div><div className="teaching-step-time"><b>{activeSlot.time}–{activeEnd}</b><span>{activeDuration} {activeDuration === 1 ? "minute" : "minutes"}</span></div></header>
+
+          {wholeClassStep && distinctTasks.length === 1 ? <div className="teaching-together-task"><div><p className="eyebrow">EVERYONE LEARNS TOGETHER</p><h3>Guide all grades through one activity</h3><span>{gradeList(plan.grades)}</span></div><p>{distinctTasks[0]}</p></div> : wholeClassStep ? <div className="teaching-all-grade-tasks"><header><p className="eyebrow">GUIDE ALL GRADES TOGETHER</p><h3>Each grade has its own task</h3></header>{activeGradeTasks.map(({ grade, task }) => <article key={grade}><b>{gradeLabel(grade)}</b><p>{task}</p></article>)}</div> : <div className="teaching-role-layout"><article className="teaching-role-card teacher"><p className="eyebrow">YOU TEACH</p><h3>{gradeLabel(teacherFocusGrade!)}</h3><p>{activeSlot.gradeTasks[teacherFocusGrade!]?.trim() || "No activity has been entered for this group yet."}</p></article>{independentGrades.length > 0 && <article className="teaching-role-card independent"><p className="eyebrow">WHILE YOU TEACH</p><h3>Other groups work independently</h3><div>{independentGrades.map((grade) => <section key={grade}><b>{gradeLabel(grade)}</b><p>{activeSlot.gradeTasks[grade]?.trim() || "No activity has been entered for this group yet."}</p></section>)}</div></article>}</div>}
+
+          <footer><button type="button" disabled={activeIndex === 0} onClick={() => setActiveSlotId(plan.slots[activeIndex - 1]?.id || activeSlot.id)}>← Previous step</button><span>Step {activeIndex + 1} of {plan.slots.length}</span>{activeIndex < plan.slots.length - 1 ? <button className="next" type="button" onClick={() => setActiveSlotId(plan.slots[activeIndex + 1].id)}>Continue to next step →</button> : <button className="next" type="button" onClick={onAttendance}>Lesson finished · Take attendance →</button>}</footer>
+        </section>}
+      </section>
     </> : <section className="teaching-empty-flow"><span>＋</span><h2>This lesson needs a teaching flow</h2><p>Add at least one activity block before using it in class.</p><button className="primary-button" type="button" onClick={onEdit}>Edit teaching flow</button></section>}
 
-    <section className="teaching-reference-grid">
-      <article><p className="eyebrow">BEFORE CLASS</p><h3>Materials and context</h3><dl><div><dt>Materials</dt><dd>{plan.materials?.trim() || "No materials listed"}</dd></div><div><dt>Learner context</dt><dd>{plan.learnerContext?.trim() || "No additional learner notes"}</dd></div></dl></article>
-      <article><p className="eyebrow">LEARNING TARGETS</p><h3>What each group should learn</h3><div className="teaching-reference-list">{plan.grades.map((grade) => <div key={grade}><b>{gradeLabel(grade)}</b><p>{plan.objectives?.[grade]?.trim() || plan.competencies?.[grade]?.trim() || "No learning target entered"}</p></div>)}</div></article>
-      <article><p className="eyebrow">ASSESSMENT</p><h3>Assessment by grade</h3><div className="teaching-reference-list">{plan.grades.map((grade) => <div key={grade}><b>{gradeLabel(grade)}</b><p>{plan.formativeAssessments?.[grade]?.trim() || "No assessment entered"}</p>{plan.successCriteria?.[grade]?.trim() && <small>Success: {plan.successCriteria[grade]}</small>}</div>)}</div></article>
+    <section className="teaching-reference-stack" aria-label="Lesson notes">
+      <header><p className="eyebrow">LESSON NOTES</p><h2>Open these only when you need them</h2></header>
+      <details open><summary><div><b>Before class</b><span>Materials and learner context</span></div><strong>Show details</strong></summary><div className="teaching-reference-content"><dl><div><dt>Materials</dt><dd>{plan.materials?.trim() || "No materials listed"}</dd></div><div><dt>Learner context</dt><dd>{plan.learnerContext?.trim() || "No additional learner notes"}</dd></div></dl></div></details>
+      <details><summary><div><b>Learning targets</b><span>What each grade should learn</span></div><strong>Show details</strong></summary><div className="teaching-reference-content"><div className="teaching-reference-list">{plan.grades.map((grade) => <div key={grade}><b>{gradeLabel(grade)}</b><p>{plan.objectives?.[grade]?.trim() || plan.competencies?.[grade]?.trim() || "No learning target entered"}</p></div>)}</div></div></details>
+      <details><summary><div><b>Assessment</b><span>How learning will be checked</span></div><strong>Show details</strong></summary><div className="teaching-reference-content"><div className="teaching-reference-list">{plan.grades.map((grade) => <div key={grade}><b>{gradeLabel(grade)}</b><p>{plan.formativeAssessments?.[grade]?.trim() || "No assessment entered"}</p>{plan.successCriteria?.[grade]?.trim() && <small>Success: {plan.successCriteria[grade]}</small>}</div>)}</div></div></details>
     </section>
   </div>;
 }
@@ -2195,6 +2215,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   const emptyByGrade = (list: GradeLevel[]) => Object.fromEntries(list.map((grade) => [grade, ""]));
   const [grades, setGrades] = useState(initialPlan?.grades || selectedClass?.grades || []);
   const [subject, setSubject] = useState(initialPlan?.subject || selectedClass?.subjects[0] || "");
+  const setupHints = lessonSetupHints[subject.trim().toLowerCase()] || { topic: "A specific topic your class will learn", notes: "Some learners need extra guidance. Tell Gabay what materials you have and any classroom needs." };
   const [quarter, setQuarter] = useState(initialPlan?.quarter || "Quarter 1");
   const [duration, setDuration] = useState(String(durationMinutes(initialPlan?.duration || 80)));
   const [startTime, setStartTime] = useState(initialPlan?.startTime || selectedClass?.startTime || "8:00 AM");
@@ -2574,11 +2595,11 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
           <div className="plan-setup-grid">
             <label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
             <label>Subject<input list="plan-subjects" value={subject} onChange={(event) => { setSubject(event.target.value); touch(); }} placeholder="e.g. Filipino" /><datalist id="plan-subjects">{[...new Set([...(selectedClass?.subjects || []), ...commonSubjects])].map((item) => <option value={item} key={item} />)}</datalist></label>
-            <label className={topicPrompt ? "needs-topic" : ""}>Lesson topic <small>Needed for Gabay</small><input ref={topicRef} value={lessonTitle} onChange={(event) => { setLessonTitle(event.target.value); if (event.target.value.trim()) setTopicPrompt(""); touch(); }} placeholder="e.g. Adding fractions with like denominators" /></label>
+            <label className={topicPrompt ? "needs-topic" : ""}>Lesson topic <small>Needed for Gabay</small><input ref={topicRef} value={lessonTitle} onChange={(event) => { setLessonTitle(event.target.value); if (event.target.value.trim()) setTopicPrompt(""); touch(); }} placeholder={`e.g. ${setupHints.topic}`} /></label>
             <label>Teaching date<input type="date" value={teachingDate} onChange={(event) => { setTeachingDate(event.target.value); touch(); }} /></label>
           </div>
           {topicPrompt && <p className="topic-prompt" role="alert">{topicPrompt}</p>}
-          <label className="plan-setup-notes">Anything Gabay should know <small>Optional · do not include learner names or sensitive details</small><textarea rows={2} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder="e.g. Grade 3 still struggles with regrouping. No printer. We have bottle caps and a chalkboard." /></label>
+          <label className="plan-setup-notes">Anything Gabay should know <small>Optional · do not include learner names or sensitive details</small><textarea rows={2} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder={`e.g. ${setupHints.notes}`} /></label>
           <details className="plan-setup-more">
             <summary><span>{quarter} · {startTime} · {targetMinutes} min · {language} · {multigradeModel}</span><b>Change</b></summary>
             <div className="plan-setup-grid">

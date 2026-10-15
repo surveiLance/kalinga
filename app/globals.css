@@ -1515,6 +1515,8 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 .plan-workspace-surface .ilaw-editor .edit-cell:focus, .plan-workspace-surface .ilaw-editor .cell-input:focus, .plan-workspace-surface .ilaw-editor .ilaw-title-input:focus { background: #edf8f5; box-shadow: 0 0 0 2px rgba(31, 123, 114, .16); }
 .teaching-workspace-surface .teaching-guide-summary { margin-top: 20px; border-color: #acd4cd; border-radius: var(--radius-lg); background: linear-gradient(145deg, #edf8f5, #dcefeb); box-shadow: var(--shadow-sm); }
 .teaching-workspace-surface .teaching-readiness { border-radius: var(--radius-sm); }
+.teaching-workspace-surface .teaching-guide-meta { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; }
+.teaching-workspace-surface .teaching-guide-meta span { padding: 6px 9px; border: 1px solid #c7ddd8; border-radius: 999px; color: #3e625e; background: rgba(255,255,255,.72); font-size: 10px; font-weight: 750; }
 .teaching-workspace-surface .teaching-block-nav { border-color: var(--border); border-radius: var(--radius-md); background: #f3ede4; }
 .teaching-workspace-surface .teaching-block-nav button.active { border-color: #79b9ae; background: #fff; box-shadow: var(--shadow-sm); }
 .teaching-workspace-surface .teaching-block-nav button.active > span { background: var(--support); }
@@ -1524,6 +1526,83 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
 .teaching-workspace-surface .teaching-focus-card > footer button.next { border-color: var(--support); background: var(--support); }
 .teaching-workspace-surface .teaching-reference-grid > article { border-color: var(--border); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
 .teaching-workspace-surface .teaching-reference-list > div { background: #f7f1e8; }
+.teaching-workspace-surface .teaching-flow-workspace { margin-top: 16px; display: grid; grid-template-columns: 270px minmax(0, 1fr); align-items: start; gap: 14px; }
+.teaching-workspace-surface .teaching-step-list { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.teaching-workspace-surface .teaching-step-list > header { padding: 17px 18px 14px; border-bottom: 1px solid var(--border); background: #f7f1e8; }
+.teaching-workspace-surface .teaching-step-list > header b, .teaching-workspace-surface .teaching-step-list > header small { display: block; }
+.teaching-workspace-surface .teaching-step-list > header b { margin-top: 4px; color: var(--text); font-size: 14px; }
+.teaching-workspace-surface .teaching-step-list > header small { margin-top: 4px; color: var(--text-muted); font-size: 11px; }
+.teaching-workspace-surface .teaching-step-list > div { max-height: 520px; padding: 7px; display: grid; gap: 4px; overflow-y: auto; scrollbar-width: thin; }
+.teaching-workspace-surface .teaching-step-list button { width: 100%; min-height: 62px; padding: 10px; border: 1px solid transparent; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; color: var(--text); background: transparent; text-align: left; cursor: pointer; }
+.teaching-workspace-surface .teaching-step-list button > span { width: 32px; height: 32px; border: 1px solid #d8d0c4; border-radius: 50%; display: grid; place-items: center; color: var(--text-muted); background: #fff; font-size: 10px; font-weight: 850; }
+.teaching-workspace-surface .teaching-step-list button p { min-width: 0; margin: 0; }
+.teaching-workspace-surface .teaching-step-list button b, .teaching-workspace-surface .teaching-step-list button small { display: block; }
+.teaching-workspace-surface .teaching-step-list button b { font-size: 13px; }
+.teaching-workspace-surface .teaching-step-list button small { margin-top: 3px; color: var(--text-muted); font-size: 11px; line-height: 1.35; }
+.teaching-workspace-surface .teaching-step-list button strong { padding: 4px 6px; border-radius: 999px; color: var(--support); background: var(--support-soft); font-size: 8px; letter-spacing: .08em; }
+.teaching-workspace-surface .teaching-step-list button:hover { background: #faf6ef; }
+.teaching-workspace-surface .teaching-step-list button.active { border-color: #89bdb4; background: var(--support-soft); box-shadow: inset 3px 0 0 var(--support); }
+.teaching-workspace-surface .teaching-step-list button.active > span { border-color: var(--support); color: #fff; background: var(--support); }
+.teaching-workspace-surface .teaching-flow-workspace .teaching-focus-card { margin-top: 0; }
+.teaching-workspace-surface .teaching-flow-workspace .teaching-focus-card > header { padding: 24px 25px; color: var(--text); background: linear-gradient(135deg, #f7fbfa, var(--support-soft)); }
+.teaching-workspace-surface .teaching-flow-workspace .teaching-focus-card > header .eyebrow { color: var(--brand-strong); }
+.teaching-workspace-surface .teaching-flow-workspace .teaching-focus-card > header h2 { color: var(--text); font-size: 29px; }
+.teaching-workspace-surface .teaching-flow-workspace .teaching-focus-card > header p:not(.eyebrow) { color: var(--text-muted); font-size: 13px; }
+.teaching-step-time { min-width: 132px; padding: 12px 14px; border: 1px solid #b9d6d0; border-radius: var(--radius-sm); color: var(--support); background: #fff; text-align: center; }
+.teaching-step-time b, .teaching-step-time span { display: block; }
+.teaching-step-time b { font-size: 14px; }
+.teaching-step-time span { margin-top: 4px; color: var(--text-muted); font-size: 10px; font-weight: 700; }
+.teaching-together-task { min-height: 210px; padding: 26px; display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); align-items: center; gap: 28px; }
+.teaching-together-task > div { padding-right: 24px; border-right: 1px solid var(--border); }
+.teaching-together-task h3 { margin: 6px 0 10px; color: var(--text); font-size: 20px; }
+.teaching-together-task > div > span { color: var(--support); font-size: 11px; font-weight: 800; }
+.teaching-together-task > p { margin: 0; color: #3f4b55; font-size: 17px; line-height: 1.6; white-space: pre-wrap; }
+.teaching-all-grade-tasks { padding: 24px; }
+.teaching-all-grade-tasks > header { margin-bottom: 12px; }
+.teaching-all-grade-tasks h3 { margin: 5px 0 0; font-size: 18px; }
+.teaching-all-grade-tasks article { padding: 15px 0; border-top: 1px solid var(--border); display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: start; gap: 16px; }
+.teaching-all-grade-tasks article b { color: var(--support); font-size: 13px; }
+.teaching-all-grade-tasks article p { margin: 0; color: #4f5864; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.teaching-role-layout { padding: 20px; display: grid; grid-template-columns: minmax(240px, .78fr) minmax(0, 1.22fr); gap: 12px; }
+.teaching-role-card { min-height: 220px; padding: 22px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.teaching-role-card h3 { margin: 6px 0 16px; font-size: 20px; }
+.teaching-role-card > p:last-child { margin: 0; color: #414c56; font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
+.teaching-role-card.teacher { border-color: #e8a98f; background: #fff5f0; box-shadow: inset 4px 0 0 var(--brand); }
+.teaching-role-card.teacher .eyebrow { color: var(--brand-strong); }
+.teaching-role-card.independent { border-color: #acd3cc; background: #f4fbf9; }
+.teaching-role-card.independent .eyebrow { color: var(--support); }
+.teaching-role-card.independent > div { display: grid; gap: 0; }
+.teaching-role-card.independent section { padding: 13px 0; border-top: 1px solid #cfe2de; display: grid; grid-template-columns: 90px minmax(0, 1fr); align-items: start; gap: 12px; }
+.teaching-role-card.independent section b { color: var(--support); font-size: 12px; }
+.teaching-role-card.independent section p { margin: 0; color: #4f5864; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.teaching-workspace-surface .teaching-focus-card > footer button { font-size: 11px; }
+.teaching-reference-stack { margin-top: 16px; }
+.teaching-reference-stack > header { margin-bottom: 10px; }
+.teaching-reference-stack > header h2 { margin: 4px 0 0; font-size: 20px; }
+.teaching-reference-stack details { border: 1px solid var(--border); background: var(--surface-raised); }
+.teaching-reference-stack details + details { border-top: 0; }
+.teaching-reference-stack details:first-of-type { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.teaching-reference-stack details:last-child { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.teaching-reference-stack summary { min-height: 70px; padding: 14px 17px; display: flex; align-items: center; justify-content: space-between; gap: 18px; cursor: pointer; list-style: none; }
+.teaching-reference-stack summary::-webkit-details-marker { display: none; }
+.teaching-reference-stack summary::marker { content: ""; }
+.teaching-reference-stack summary div b, .teaching-reference-stack summary div span { display: block; }
+.teaching-reference-stack summary div b { color: var(--text); font-size: 14px; }
+.teaching-reference-stack summary div span { margin-top: 4px; color: var(--text-muted); font-size: 11px; }
+.teaching-reference-stack summary > strong { color: var(--support); font-size: 10px; }
+.teaching-reference-stack details[open] summary { border-bottom: 1px solid var(--border); background: #f7f1e8; }
+.teaching-reference-stack details[open] summary > strong { font-size: 0; }
+.teaching-reference-stack details[open] summary > strong::after { content: "Hide details"; font-size: 10px; }
+.teaching-reference-content { padding: 18px; }
+.teaching-reference-content dl { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.teaching-reference-content dt { color: var(--text-muted); font-size: 9px; font-weight: 850; text-transform: uppercase; letter-spacing: .07em; }
+.teaching-reference-content dd { margin: 6px 0 0; color: #525c66; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.teaching-reference-content .teaching-reference-list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+@media (max-width: 960px) {
+  .teaching-workspace-surface .teaching-flow-workspace { grid-template-columns: 1fr; }
+  .teaching-workspace-surface .teaching-step-list > div { max-height: 310px; }
+}
 
 @media (max-width: 720px) {
   .plan-workspace-surface .plan-index-actions { display: grid; grid-template-columns: 1fr 1fr; }
@@ -1537,10 +1616,25 @@ select.needs-choice { border-color: #e0a465; background: #fff7ec; color: #8a5a1c
   .teaching-workspace-surface .teaching-guide-summary { padding: 18px; }
   .teaching-workspace-surface .teaching-focus-card > header { padding: 20px 18px; }
   .teaching-workspace-surface .teaching-reference-grid { gap: 12px; }
+  .teaching-workspace-surface .teaching-flow-workspace .teaching-focus-card > header { align-items: stretch; flex-direction: column; }
+  .teaching-step-time { width: 100%; text-align: left; }
+  .teaching-together-task, .teaching-role-layout { grid-template-columns: 1fr; }
+  .teaching-together-task { min-height: 0; padding: 20px 18px; gap: 18px; }
+  .teaching-together-task > div { padding: 0 0 16px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .teaching-together-task > p { font-size: 15px; }
+  .teaching-role-layout { padding: 13px; }
+  .teaching-role-card { min-height: 0; padding: 18px; }
+  .teaching-all-grade-tasks { padding: 18px; }
+  .teaching-all-grade-tasks article, .teaching-role-card.independent section { grid-template-columns: 1fr; gap: 6px; }
+  .teaching-reference-content dl { grid-template-columns: 1fr; }
+  .teaching-reference-stack summary > strong { white-space: nowrap; }
 }
 
 @media print {
   .plan-workspace-surface .ilaw-export-document, .plan-workspace-surface .ilaw-editor { box-shadow: none !important; }
+  .teaching-workspace-surface .teaching-step-list { display: none !important; }
+  .teaching-workspace-surface .teaching-flow-workspace { display: block; }
+  .teaching-reference-stack details > *:not(summary) { display: block !important; }
 }
 
 /* Resources, teacher community, and guided onboarding */
