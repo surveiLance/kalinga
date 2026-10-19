@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { validateRevisionRequest, validateRevisionProposal, type RevisionRequest, type RevisionProposal } from "@/lib/lesson-revisions";
 
 export type GabayPageContext = {
   view: string;
@@ -65,6 +66,27 @@ type GabayDraftResult =
   | { connected: false; reason: "not-configured" | "not-signed-in" | "busy" | "unavailable" };
 
 export { isSupabaseConfigured };
+
+export async function requestGabayRevision(request: RevisionRequest, pageContext: GabayPageContext, signal?: AbortSignal): Promise<{ connected: true; proposal: RevisionProposal } | { connected: false; reason: string }> {
+  try {
+    if (signal?.aborted) return { connected: false, reason: "cancelled" };
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return { connected: false, reason: "offline" };
+    const checked = validateRevisionRequest(request);
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return { connected: false, reason: "not-configured" };
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return { connected: false, reason: "not-signed-in" };
+    const capability = await supabase.functions.invoke("gabay-chat", { body: { message: "Check revision support", task: { type: "revision-capabilities" } }, signal });
+    if (signal?.aborted) return { connected: false, reason: "cancelled" };
+    if (capability.error || capability.data?.revisionVersion !== 1) return { connected: false, reason: "unsupported" };
+    const result = await supabase.functions.invoke("gabay-chat", { body: { message: "Suggest lesson revisions", task: { type: "revise-plan" }, revision: checked, pageContext: { ...pageContext, classId: checked.source.context.classId } }, signal });
+    if (signal?.aborted) return { connected: false, reason: "cancelled" };
+    if (result.error) return { connected: false, reason: (result.error as { context?: { status?: number } }).context?.status === 429 ? "busy" : "unavailable" };
+    return { connected: true, proposal: validateRevisionProposal(result.data?.proposal, checked) };
+  } catch (error) {
+    return { connected: false, reason: signal?.aborted ? "cancelled" : error instanceof Error && /too large|too long|supports/.test(error.message) ? "too-large" : "unavailable" };
+  }
+}
 
 export async function askConnectedGabay(message: string, pageContext: GabayPageContext, history: GabayHistoryMessage[] = []): Promise<GabayResult> {
   try {

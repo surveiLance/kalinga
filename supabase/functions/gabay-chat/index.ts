@@ -1,5 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { redactGabayPII } from "../_shared/gabay-privacy.ts";
+import { validateRevisionRequest, validateRevisionProposal, redactRevisionRequest } from "../_shared/lesson-revisions.ts";
+import { revisionTaskKind, generateRevision } from "../_shared/gabay-revision.ts";
 
 type PageContext = {
   view?: string;
@@ -169,6 +171,15 @@ Deno.serve(async (request) => {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return json({ error: "Invalid session" }, 401, origin);
 
+  let payload: Record<string, unknown>;
+  let taskKind: string;
+  try {
+    payload = await request.json();
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Invalid JSON object");
+    taskKind = revisionTaskKind(payload.task);
+  } catch { return json({ error: "Invalid request or unknown Gabay task" }, 400, origin); }
+  if (taskKind === "revision-capabilities") return json({ revisionVersion: 1 }, 200, origin);
+
   const { data: quota, error: quotaError } = await supabase.rpc("claim_gabay_request", {
     window_seconds: positiveEnvNumber("GABAY_RATE_WINDOW_SECONDS", 300),
     max_requests: positiveEnvNumber("GABAY_RATE_MAX_REQUESTS", 30),
@@ -185,13 +196,6 @@ Deno.serve(async (request) => {
       status: 429,
       headers: { ...corsHeaders(origin), "Content-Type": "application/json", "Retry-After": String(retryAfter) },
     });
-  }
-
-  let payload: Record<string, unknown>;
-  try {
-    payload = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400, origin);
   }
 
   const rawMessage = cleanText(payload.message, MAX_MESSAGE_LENGTH);
@@ -240,6 +244,19 @@ Deno.serve(async (request) => {
   }
   const learnerNames = (ownedLearnerRows || []).map((learner) => cleanText(learner.display_name, 160)).filter(Boolean);
   const redact = (value: string) => redactGabayPII(value, learnerNames);
+  if (taskKind === "revise-plan") {
+    let revision;
+    try { revision = validateRevisionRequest(payload.revision); }
+    catch (error) { return json({ error: error instanceof Error ? error.message : "Invalid revision" }, 400, origin); }
+    const { data: owner, error: ownerError } = await supabase.from("classes").select("id").eq("id", revision.source.context.classId).eq("teacher_id", userData.user.id).maybeSingle();
+    if (ownerError || !owner || ownedLearnersError) return json({ error: "This class or its privacy context is unavailable." }, 403, origin);
+    try {
+      const redacted = redactRevisionRequest(revision, redact);
+      const result = await generateRevision(redacted, groqApiKey, Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-20b");
+      if (result.proposal) result.proposal = validateRevisionProposal({ ...result.proposal, changes: result.proposal.changes.map((change) => ({ ...change, value: redact(change.value) })) }, redacted);
+      return json(result, result.status, origin);
+    } catch { return json({ error: "Gabay could not suggest changes. Your lesson is unchanged." }, 502, origin); }
+  }
   const message = redact(rawMessage);
   pageContext.lessonTopic = redact(pageContext.lessonTopic || "");
   pageContext.currentSummary = (pageContext.currentSummary || []).map(redact);
