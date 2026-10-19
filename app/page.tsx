@@ -6,6 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { GabayMascot } from "@/components/gabay-mascot";
 import { GabayThinking } from "@/components/gabay-thinking";
 import { LessonRevisionPanel } from "@/components/lesson-revision-panel";
+import { GabayWalkthrough, WalkthroughOffer } from "@/components/gabay-walkthrough";
+import { emptyWalkthroughStatus, readWalkthroughStatus, walkthroughProgress, type WalkthroughStatus } from "@/lib/gabay-walkthrough";
 import { leaveLesson, deleteLesson } from "@/lib/lesson-navigation";
 import { lessonObservations, preserveLessonObservations, hasInstructionalEdits } from "@/lib/lesson-document";
 import { applyRevision, undoRevision, type RevisionRequest, type RevisionChange, type RevisionScope } from "@/lib/lesson-revisions";
@@ -25,13 +27,12 @@ import { isStarterResourceId, legacyWorkspaceKeys, normalizeResourceBookmarkId, 
 import type { ClassLearner, ClassMeeting, GradeLevel, LegacySavedPlan, LegacyTeachingClass, PlanSlot, SavedPlan, TeachingClass, TeacherWorkspace, TodayTeachingBlock } from "@/lib/teaching-types";
 import { acknowledgePendingWrite, attendanceChanges, canSyncScope, enqueuePendingWrite, failPendingWrite, maxSyncAttempts, pendingCandidates, readPendingWrites, reconcilePendingWrites, retryPendingWrites, startPendingWrite, type PendingChange, type PendingWrite } from "@/lib/pending-writes";
 
-type View = "home" | "classes" | "plan" | "teach" | "library" | "attendance" | "community" | "tutorial";
+type View = "home" | "classes" | "plan" | "teach" | "library" | "attendance" | "community";
 type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
 type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
 type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string; read?: boolean };
 type NotificationRow = { id: string; kind: string; title: string; body: string; discussion_id: string; read_at: string | null; created_at: string };
-type TutorialStatus = { step: number; completed: boolean; dismissed: boolean };
 
 type RemoteClassRow = {
   id: string;
@@ -85,10 +86,7 @@ const gabayPageLabels: Record<View, string> = {
   library: "Resources",
   attendance: "Attendance",
   community: "Teacher community",
-  tutorial: "Learn Kalinga",
 };
-const tutorialStepCount = 6;
-const emptyTutorialStatus: TutorialStatus = { step: 0, completed: false, dismissed: false };
 const notificationResourceCatalog = [
   { id: "starter-math", subject: "Mathematics", title: "Fraction Market with Bottle Caps" },
   { id: "starter-science", subject: "Science", title: "Schoolyard Plant Detectives" },
@@ -118,16 +116,6 @@ function persistDeviceWorkspace(scope: string, workspace: TeacherWorkspace) {
   window.localStorage.setItem(workspaceStorageKey(scope, "attendance"), JSON.stringify(workspace.attendance));
   window.localStorage.setItem(workspaceStorageKey(scope, "attendance-notes"), JSON.stringify(workspace.attendanceNotes));
   window.localStorage.setItem(workspaceStorageKey(scope, "saved-resources"), JSON.stringify(workspace.savedResourceIds));
-}
-
-function readTutorialStatus(value: string | null): TutorialStatus {
-  if (!value) return emptyTutorialStatus;
-  try {
-    const status = JSON.parse(value) as Partial<TutorialStatus>;
-    return { step: Math.min(tutorialStepCount, Math.max(0, Number(status.step) || 0)), completed: status.completed === true, dismissed: status.dismissed === true };
-  } catch {
-    return emptyTutorialStatus;
-  }
 }
 
 function migrateLegacyPrototypeWorkspace() {
@@ -374,7 +362,8 @@ export default function Home() {
   const [syncing, setSyncing] = useState(false);
   const [storageError, setStorageError] = useState("");
   const [cloudLoaded, setCloudLoaded] = useState(false);
-  const [tutorialStatus, setTutorialStatus] = useState<TutorialStatus>(emptyTutorialStatus);
+  const [tutorialStatus, setTutorialStatus] = useState<WalkthroughStatus>(emptyWalkthroughStatus);
+  const [walkthroughScope, setWalkthroughScope] = useState("");
   const [tutorialStatusKnown, setTutorialStatusKnown] = useState(false);
   const [tutorialStatusReady, setTutorialStatusReady] = useState(false);
   const [sidebarState, setSidebarState] = useState(() => sidebarStateFromPreference(null));
@@ -529,7 +518,8 @@ export default function Home() {
       setStorageError("");
       setCloudLoaded(false);
       setSyncing(false);
-      setTutorialStatus(emptyTutorialStatus);
+      setTutorialStatus(emptyWalkthroughStatus);
+      setWalkthroughScope("");
       setTutorialStatusKnown(false);
       setTutorialStatusReady(false);
 
@@ -554,7 +544,7 @@ export default function Home() {
         if (workspaceScope === "prototype" && storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
         setSchoolName(storedSchoolName || "");
         if (storedGabayMotion) setGabayMotion(storedGabayMotion !== "false");
-        setTutorialStatus(readTutorialStatus(storedTutorialStatus));
+        setTutorialStatus(readWalkthroughStatus(storedTutorialStatus));
         setTutorialStatusKnown(storedTutorialStatus !== null);
       } catch {
         setStorageError("This device’s saved work could not be read. Sync is paused to protect it. Do not clear browser storage; reload after checking device storage.");
@@ -803,7 +793,7 @@ export default function Home() {
     waiting: `${pendingWrites.length} waiting to sync`,
     synced: "All work synced",
   }[syncState];
-  const showTutorialOffer = tutorialStatusReady && !tutorialStatusKnown && view !== "tutorial" && classes.length === 0 && savedPlans.length === 0 && (entryMode === "prototype" || cloudLoaded);
+  const showTutorialOffer = tutorialStatusReady && !tutorialStatusKnown && !walkthroughScope && (entryMode === "prototype" || cloudLoaded);
   const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
   const latestPlan = activePlans[0];
@@ -832,7 +822,6 @@ export default function Home() {
     library: ["Open a ready-to-use PDF", "Filter by subject", "Discuss a resource with teachers", "Share a resource"],
     attendance: ["Change the attendance date", "Filter by grade", "Mark learners present", "Save attendance"],
     community: ["Start a discussion", "Ask a clearer question", "Reply to another teacher"],
-    tutorial: ["Complete the current practice mission", "Explain this feature", "Repeat a tutorial step", "Return to the real workspace"],
   };
   const gabayPageContext: GabayPageContext = {
     view,
@@ -886,22 +875,25 @@ export default function Home() {
     setNotice("");
   }
 
-  function saveTutorialProgress(status: TutorialStatus) {
+  const saveTutorialProgress = useCallback((status: WalkthroughStatus) => {
     setTutorialStatus(status);
     setTutorialStatusKnown(true);
     try {
       window.localStorage.setItem(workspaceStorageKey(workspaceScope, "tutorial-status"), JSON.stringify(status));
     } catch {
-      setNotice("Tutorial progress could not be saved on this device, but you can continue while this page stays open.");
+      setNotice("Walkthrough progress could not be saved on this device. Your class and lesson data are unchanged.");
     }
-  }
+    if (status.completed) setWalkthroughScope("");
+  }, [workspaceScope]);
 
-  function openTutorial() {
-    if (!tutorialStatusKnown) saveTutorialProgress(emptyTutorialStatus);
-    setView("tutorial");
+  function openWalkthrough() {
+    saveTutorialProgress(tutorialStatus.completed ? emptyWalkthroughStatus : { ...tutorialStatus, dismissed: false });
+    setWalkthroughScope(workspaceScope);
     setGabayOpen(false);
     setAccountOpen(false);
+    setNotificationsOpen(false);
   }
+  const exitWalkthrough = useCallback(() => { saveTutorialProgress(walkthroughProgress(tutorialStatus.step, "pause")); setWalkthroughScope(""); }, [saveTutorialProgress, tutorialStatus.step]);
 
   function markNotificationsRead(ids: string[]) {
     const newIds = ids.filter((id) => !notificationReadIds.includes(id));
@@ -1137,12 +1129,11 @@ export default function Home() {
         </button>
 
         <nav className="nav-list">
-          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" aria-label="Today" onClick={() => navigateFromSidebar(() => setView("home"))}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
-          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" aria-label="Classes &amp; learners" onClick={() => navigateFromSidebar(() => setView("classes"))}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
-          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" aria-label="Plan lessons" onClick={() => navigateFromSidebar(openPlanLessons)}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
-          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" aria-label="Find resources" onClick={() => navigateFromSidebar(() => setView("library"))}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
-          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" aria-label="Ask teachers" onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
-          <button className={`nav-item tutorial-nav ${view === "tutorial" ? "active" : ""}`} type="button" aria-label="Learn Kalinga" onClick={() => navigateFromSidebar(openTutorial)}><span className="nav-icon" aria-hidden="true">?</span><span>Learn Kalinga</span>{tutorialStatus.completed && <small>✓</small>}</button>
+          <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" data-tour="nav-home" aria-label="Today" onClick={() => navigateFromSidebar(() => setView("home"))}><span className="nav-icon" aria-hidden="true">⌂</span><span>Today</span></button>
+          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" data-tour="nav-classes" aria-label="Classes &amp; learners" onClick={() => navigateFromSidebar(() => setView("classes"))}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
+          <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" data-tour="nav-plan" aria-label="Plan lessons" onClick={() => navigateFromSidebar(openPlanLessons)}><span className="nav-icon" aria-hidden="true">✎</span><span>Plan lessons</span></button>
+          <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" data-tour="nav-library" aria-label="Find resources" onClick={() => navigateFromSidebar(() => setView("library"))}><span className="nav-icon" aria-hidden="true">▱</span><span>Find resources</span></button>
+          <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" data-tour="nav-community" aria-label="Ask teachers" onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
         </nav>
 
         <div className="offline-card sidebar-status">
@@ -1164,17 +1155,17 @@ export default function Home() {
 
       <section className="workspace">
         <header className="topbar">
-          <button ref={topbarSidebarToggleRef} className="desktop-sidebar-toggle topbar-sidebar-toggle" type="button" aria-label={sidebarToggleLabel} aria-expanded={sidebarState.open} aria-pressed={sidebarState.pinned} aria-controls="kalinga-sidebar" title={sidebarToggleLabel} onClick={toggleSidebar}>
+          <button data-tour="nav-toggle" ref={topbarSidebarToggleRef} className="desktop-sidebar-toggle topbar-sidebar-toggle" type="button" aria-label={sidebarToggleLabel} aria-expanded={sidebarState.open} aria-pressed={sidebarState.pinned} aria-controls="kalinga-sidebar" title={sidebarToggleLabel} onClick={toggleSidebar}>
             <SidebarToggleIcon />
           </button>
           <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority /></button>
           <div className="top-actions">
             {blockedWrites.length && !storageError
-              ? <button className={`connection ${syncState}`} type="button" onClick={retrySync} aria-label={`${syncLabel}. Retry sync now.`}><i /> {syncLabel} · Retry</button>
-              : <span className={`connection ${syncState}`} role="status"><i /> {syncLabel}</span>}
-            <button className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
+              ? <button data-tour="sync-status" className={`connection ${syncState}`} type="button" onClick={retrySync} aria-label={`${syncLabel}. Retry sync now.`}><i /> {syncLabel} · Retry</button>
+              : <span data-tour="sync-status" className={`connection ${syncState}`} role="status"><i /> {syncLabel}</span>}
+            <button data-tour="gabay-open" className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
             <div className="notification-anchor">
-              <button className={`notification ${unreadNotifications.length ? "has-unread" : ""}`} type="button" aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ""}`} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><BellIcon />{unreadNotifications.length > 0 && <b>{Math.min(unreadNotifications.length, 9)}</b>}</button>
+              <button data-tour="notifications" className={`notification ${unreadNotifications.length ? "has-unread" : ""}`} type="button" aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ""}`} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><BellIcon />{unreadNotifications.length > 0 && <b>{Math.min(unreadNotifications.length, 9)}</b>}</button>
               {notificationsOpen && <NotificationPanel notifications={notifications} readIds={notificationReadIds} authenticated={entryMode === "authenticated"} onOpen={openNotification} onMarkAll={() => markNotificationsRead(unreadNotifications.map((item) => item.id))} />}
             </div>
             <div className="account-anchor mobile-account">
@@ -1185,7 +1176,8 @@ export default function Home() {
         </header>
 
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
-        {showTutorialOffer && <TutorialOffer teacherName={teacherName} onStart={() => { saveTutorialProgress(emptyTutorialStatus); setView("tutorial"); }} onDismiss={() => saveTutorialProgress({ ...emptyTutorialStatus, dismissed: true })} />}
+        {showTutorialOffer && <WalkthroughOffer onStart={openWalkthrough} onDismiss={() => saveTutorialProgress({ ...emptyWalkthroughStatus, dismissed: true })} />}
+        {walkthroughScope === workspaceScope && !tutorialStatus.completed && <GabayWalkthrough key={workspaceScope} step={tutorialStatus.step} motion={gabayMotion} onProgress={saveTutorialProgress} onExit={exitWalkthrough} />}
 
         <div className="content" ref={contentRef}>
           {view === "home" ? <div className="view-page home-page home-guided-day">
@@ -1199,18 +1191,18 @@ export default function Home() {
                 <div className="home-action-heading"><div><p className="eyebrow">WORKING WITH</p><h2>{activeClass.name}</h2><p>{gradeList(activeClass.grades)} · {activeClass.learners.length} learners</p></div>{classes.length > 1 && <select aria-label="Choose active class" value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>}</div>
                 <div className="home-essential-actions">
                   <button type="button" onClick={() => latestPlan ? openTeachingPlan(latestPlan.id) : beginPlan()}><p><b>{latestPlan ? "Open teaching guide" : "Plan a lesson"}</b><small>{latestPlan ? `${latestPlan.title} · ${corePlanTasksReady(latestPlan)}/3 core tasks ready.` : "Start with the essentials, then edit one task at a time."}</small></p><b>→</b></button>
-                  <button type="button" onClick={() => setView("attendance")}><p><b>Take attendance</b><small>{activeAttendance.length ? `${activeAttendance.length} records saved. Open to review them.` : `Mark the status of ${activeClass.learners.length} learners.`}</small></p><b>→</b></button>
+                  <button data-tour="attendance-open" type="button" onClick={() => setView("attendance")}><p><b>Take attendance</b><small>{activeAttendance.length ? `${activeAttendance.length} records saved. Open to review them.` : `Mark the status of ${activeClass.learners.length} learners.`}</small></p><b>→</b></button>
                   <button type="button" onClick={() => setView("library")}><p><b>Find a resource</b><small>Browse materials matched to these grade levels.</small></p><b>→</b></button>
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
-        <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
+        <GabayGuide onStartWalkthrough={openWalkthrough} open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button className={view === "plan" || view === "teach" ? "active" : ""} type="button" onClick={() => openPlanLessons()}><span>＋</span>Plan</button><button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button><button className={view === "tutorial" ? "active" : ""} type="button" onClick={openTutorial}><span>?</span>Learn</button>
+          <button data-tour="nav-home" className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button data-tour="nav-classes" className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button data-tour="nav-plan" className={view === "plan" || view === "teach" ? "active" : ""} type="button" onClick={() => openPlanLessons()}><span>＋</span>Plan</button><button data-tour="nav-library" className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button data-tour="nav-community" className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button>
         </nav>
       </section>
     </main>
@@ -1352,81 +1344,6 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
   );
 }
 
-const tutorialMissions = [
-  { label: "Today", title: "Know what needs you first", detail: "Read Gabay’s briefing and spot the most useful next action.", gabay: "Start here every day. I’ll summarize the schedule and unfinished work so you do not have to search the whole app." },
-  { label: "Classes", title: "Set up a practice class", detail: "Try the minimum information Kalinga needs to organize your work.", gabay: "A class is the home for its learners, meeting times, lesson plans, and attendance. This practice class will not be saved." },
-  { label: "Plan", title: "Start a focused lesson", detail: "Choose a subject and give the lesson a working topic.", gabay: "Begin with what you already know. The detailed ILAW sections can stay out of the way until they are useful." },
-  { label: "Teach", title: "Follow one teaching block", detail: "Choose the grade you would guide while other groups work independently.", gabay: "Teaching View turns the plan into a classroom guide: one time block, one teacher focus, and a clear task for every grade." },
-  { label: "Attendance", title: "Record a quick attendance check", detail: "Mark the three practice learners to see how fast a class can be recorded.", gabay: "Attendance belongs to the selected class and date. Kalinga keeps it available on the device and syncs it when possible." },
-  { label: "Share", title: "Ask with useful context", detail: "Attach a practice resource and write a clear question for other teachers.", gabay: "Resources and Ask Teachers work together. Share the material and explain what kind of help you need—without including private learner details." },
-] as const;
-
-function TutorialOffer({ teacherName, onStart, onDismiss }: { teacherName: string; onStart: () => void; onDismiss: () => void }) {
-  return <div className="tutorial-offer-backdrop"><section className="tutorial-offer" role="dialog" aria-modal="true" aria-labelledby="tutorial-offer-title"><div className="tutorial-offer-mascot"><GabayMascot size="hero" motion={false} /></div><div><p className="eyebrow">OPTIONAL GUIDED TOUR</p><h2 id="tutorial-offer-title">Want to practice first, {teacherLabel(teacherName)}?</h2><p>Gabay can walk you through six short missions using demo information. Nothing in the tutorial changes your real classes, plans, attendance, resources, or messages.</p><div className="tutorial-offer-facts"><span>About 5 minutes</span><span>Practice data only</span><span>Available again anytime</span></div><div className="tutorial-offer-actions"><button className="primary-button" type="button" onClick={onStart}>Start with Gabay →</button><button className="secondary-button" type="button" onClick={onDismiss}>Not now</button></div></div></section></div>;
-}
-
-function TutorialView({ teacherName, status, onProgress, onExit, onAskGabay, onGabayContext }: { teacherName: string; status: TutorialStatus; onProgress: (status: TutorialStatus) => void; onExit: () => void; onAskGabay: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
-  const [selectedStep, setSelectedStep] = useState(status.completed ? tutorialStepCount : status.step);
-  const [briefingOpened, setBriefingOpened] = useState(false);
-  const [demoClassName, setDemoClassName] = useState("");
-  const [demoGrades, setDemoGrades] = useState<string[]>([]);
-  const [demoSubject, setDemoSubject] = useState("");
-  const [demoTopic, setDemoTopic] = useState("");
-  const [guidedGrade, setGuidedGrade] = useState("");
-  const [demoAttendance, setDemoAttendance] = useState<Record<string, string>>({});
-  const [resourceAttached, setResourceAttached] = useState(false);
-  const [demoQuestion, setDemoQuestion] = useState("");
-  const mission = tutorialMissions[Math.min(selectedStep, tutorialStepCount - 1)];
-  const previouslyCompleted = status.completed || selectedStep < status.step;
-  const ready = previouslyCompleted || (selectedStep === 0 ? briefingOpened
-    : selectedStep === 1 ? Boolean(demoClassName.trim() && demoGrades.length)
-      : selectedStep === 2 ? Boolean(demoSubject && demoTopic.trim())
-        : selectedStep === 3 ? Boolean(guidedGrade)
-          : selectedStep === 4 ? Object.keys(demoAttendance).length === 3
-            : resourceAttached && demoQuestion.trim().length >= 12);
-
-  useEffect(() => {
-    onGabayContext({ view: "tutorial", pageStep: status.completed ? "Tutorial complete" : `Practice mission ${selectedStep + 1} of ${tutorialStepCount}: ${mission.label}`, currentSummary: status.completed ? ["The teacher completed the guided Kalinga tutorial"] : [mission.title, mission.detail, "All information on this page is practice data and will not change the teacher workspace"], availableActions: ["Explain this practice step", "Tell me why this feature matters", "Give me an example", "Repeat the instruction in simpler Taglish"] });
-  }, [mission, onGabayContext, selectedStep, status.completed]);
-
-  function advance() {
-    const next = selectedStep + 1;
-    if (next >= tutorialStepCount) {
-      onProgress({ step: tutorialStepCount, completed: true, dismissed: false });
-      setSelectedStep(tutorialStepCount);
-      return;
-    }
-    onProgress({ step: Math.max(status.step, next), completed: false, dismissed: false });
-    setSelectedStep(next);
-  }
-
-  function restart() {
-    setSelectedStep(0); setBriefingOpened(false); setDemoClassName(""); setDemoGrades([]); setDemoSubject(""); setDemoTopic(""); setGuidedGrade(""); setDemoAttendance({}); setResourceAttached(false); setDemoQuestion("");
-    onProgress(emptyTutorialStatus);
-  }
-
-  if (selectedStep >= tutorialStepCount) return <div className="view-page tutorial-page tutorial-workspace-surface"><section className="tutorial-complete"><GabayMascot size="hero" motion={false} speaking /><p className="eyebrow">ALL SIX MISSIONS COMPLETE</p><h1>You’re ready to use Kalinga.</h1><p>You practiced the full flow without changing any real records. Return to Today when you are ready, or replay the tour whenever you want.</p><div><button className="primary-button" type="button" onClick={onExit}>Go to Today →</button><button className="secondary-button" type="button" onClick={restart}>Replay tutorial</button></div></section></div>;
-
-  return <div className="view-page tutorial-page tutorial-workspace-surface">
-    <PageIntro eyebrow="LEARN KALINGA" title={`Practice with Gabay, ${teacherLabel(teacherName)}`} description="A safe, guided workspace. Every class, learner, lesson, and message shown here is only a demo." action={<button className="secondary-button" type="button" onClick={onExit}>Exit tutorial</button>} />
-    <div className="tutorial-safety"><span>✓</span><p><b>Practice mode is on</b><small>Your real workspace will not be changed.</small></p><strong>{Math.round((status.step / tutorialStepCount) * 100)}% complete</strong></div>
-    <div className="tutorial-layout">
-      <nav className="tutorial-missions" aria-label="Tutorial missions">{tutorialMissions.map((item, index) => { const complete = status.completed || index < status.step; const available = complete || index === status.step; return <button className={`${index === selectedStep ? "active" : ""} ${complete ? "complete" : ""}`} type="button" disabled={!available} onClick={() => setSelectedStep(index)} key={item.label}><span>{complete ? "✓" : index + 1}</span><p><b>{item.label}</b><small>{complete ? "Completed" : index === status.step ? "Current mission" : "Locked"}</small></p></button>; })}</nav>
-      <main className="tutorial-stage">
-        <section className="tutorial-gabay"><GabayMascot size="medium" motion={false} speaking /><div><p className="eyebrow">GABAY · MISSION {selectedStep + 1}</p><h2>{mission.title}</h2><p>{mission.gabay}</p></div><button type="button" onClick={onAskGabay}>Ask Gabay</button></section>
-        <section className="tutorial-practice"><header><div><p className="eyebrow">YOUR TURN · PRACTICE ONLY</p><h2>{mission.detail}</h2></div><span>{selectedStep + 1} / {tutorialStepCount}</span></header>
-          {selectedStep === 0 && <div className="tutorial-today-demo"><div><small>TODAY</small><b>1 class at 8:00 AM</b></div><div><small>NEEDS ATTENTION</small><b>Lesson plan needs a learning check</b></div><button className={briefingOpened ? "done" : ""} type="button" onClick={() => setBriefingOpened(true)}>{briefingOpened ? "✓ Priorities checked" : "Check today’s priorities →"}</button></div>}
-          {selectedStep === 1 && <div className="tutorial-class-demo"><label>Practice class name<input value={demoClassName} onChange={(event) => setDemoClassName(event.target.value)} placeholder="e.g. Morning Multigrade Class" /></label><fieldset><legend>Choose at least one grade</legend><div>{["Grade 2", "Grade 3", "Grade 4"].map((grade) => <button className={demoGrades.includes(grade) ? "selected" : ""} type="button" onClick={() => setDemoGrades((current) => current.includes(grade) ? current.filter((item) => item !== grade) : [...current, grade])} key={grade}>{demoGrades.includes(grade) ? "✓ " : "+ "}{grade}</button>)}</div></fieldset><small>This class exists only inside this tutorial.</small></div>}
-          {selectedStep === 2 && <div className="tutorial-plan-demo"><label>Subject<select value={demoSubject} onChange={(event) => setDemoSubject(event.target.value)}><option value="">Choose a subject</option><option>Mathematics</option><option>Science</option><option>English</option><option>Filipino</option></select></label><label>Working lesson topic<input value={demoTopic} onChange={(event) => setDemoTopic(event.target.value)} placeholder="What will the class learn?" /></label><div><span>1</span><p><b>Start with the essentials</b><small>Detailed ILAW fields remain editable later.</small></p></div></div>}
-          {selectedStep === 3 && <div className="tutorial-teach-demo"><p>It is 8:15 AM. Which group will you guide directly?</p><div>{["Grade 2", "Grade 3", "Grade 4"].map((grade) => <button className={guidedGrade === grade ? "selected" : ""} type="button" onClick={() => setGuidedGrade(grade)} key={grade}><small>{guidedGrade === grade ? "WITH TEACHER" : "INDEPENDENT"}</small><b>{grade}</b><span>{guidedGrade === grade ? "Guided lesson" : "Practice activity"}</span></button>)}</div></div>}
-          {selectedStep === 4 && <div className="tutorial-attendance-demo">{["Mika · Grade 2", "Paolo · Grade 3", "Lina · Grade 4"].map((learner) => <div key={learner}><b>{learner}</b><span>{["Present", "Late", "Absent"].map((value) => <button className={demoAttendance[learner] === value ? "selected" : ""} type="button" onClick={() => setDemoAttendance((current) => ({ ...current, [learner]: value }))} key={value}>{value}</button>)}</span></div>)}</div>}
-          {selectedStep === 5 && <div className="tutorial-share-demo"><button className={resourceAttached ? "resource-attached" : ""} type="button" onClick={() => setResourceAttached(true)}><span>PDF</span><p><b>Fractions using local objects</b><small>{resourceAttached ? "✓ Attached to practice question" : "Attach this resource"}</small></p></button><label>Question for teachers<textarea value={demoQuestion} onChange={(event) => setDemoQuestion(event.target.value)} placeholder="What would you like another teacher to help with?" /></label><small>This question will not be posted.</small></div>}
-          <footer><button className="secondary-button" type="button" disabled={selectedStep === 0} onClick={() => setSelectedStep((current) => Math.max(0, current - 1))}>← Back</button><p>{ready ? <><b>✓ Ready</b> This practice step is complete.</> : "Complete the practice action above to continue."}</p><button className="primary-button" type="button" disabled={!ready} onClick={advance}>{selectedStep === tutorialStepCount - 1 ? "Finish tutorial" : "Complete mission →"}</button></footer>
-        </section>
-      </main>
-    </div>
-  </div>;
-}
 
 function SidebarToggleIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1488,7 +1405,7 @@ function GabayTodayBriefing({ teacherName, activeClass, blocks, nextBlock, missi
       </div>}
       {latestUpdate && <small className="gabay-briefing-latest"><b>Latest:</b> {latestUpdate}</small>}
     </div>
-    <div className="gabay-briefing-actions">{activeClass ? <button className="gabay-briefing-action" type="button" onClick={onOpen}>Ask Gabay <span>→</span></button> : <><button className="primary-button" type="button" onClick={onSetUp}>＋ Set up my first class</button><button className="gabay-sample-link" type="button" onClick={onLoadSample}>Preview sample data</button></>}</div>
+    <div className="gabay-briefing-actions">{activeClass ? <button className="gabay-briefing-action" type="button" onClick={onOpen}>Ask Gabay <span>→</span></button> : <><button data-tour="class-first" className="primary-button" type="button" onClick={onSetUp}>＋ Set up my first class</button><button className="gabay-sample-link" type="button" onClick={onLoadSample}>Preview sample data</button></>}</div>
   </section>;
 }
 
@@ -1499,7 +1416,7 @@ function TodayScheduleSummary({ blocks, onOpenClass }: { blocks: TodayTeachingBl
   </section>;
 }
 
-function GabayGuide({ open, view, pageContext, activeClass, motion, authenticated, teacherAccountId, onClose, onRequestSignIn }: { open: boolean; view: View; pageContext: GabayPageContext; activeClass?: TeachingClass; motion: boolean; authenticated: boolean; teacherAccountId: string; onClose: () => void; onRequestSignIn: () => void }) {
+function GabayGuide({ open, view, pageContext, activeClass, motion, authenticated, teacherAccountId, onClose, onRequestSignIn, onStartWalkthrough }: { onStartWalkthrough: () => void; open: boolean; view: View; pageContext: GabayPageContext; activeClass?: TeachingClass; motion: boolean; authenticated: boolean; teacherAccountId: string; onClose: () => void; onRequestSignIn: () => void }) {
   const [chatInput, setChatInput] = useState("");
   const [conversations, setConversations] = useState<GabayConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState("");
@@ -1609,7 +1526,6 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     library: "Ask me to help narrow down a resource.",
     attendance: "Ask about a status, note, or attendance step.",
     community: "Ask me to help make your teacher question clearer.",
-    tutorial: "Ask me to explain this practice mission.",
   };
 
   async function askGabay(message: string) {
@@ -1743,7 +1659,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
     <header><GabayMascot size="small" motion={motion} speaking={isReplying} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? isReplying ? "Thinking with your page context…" : contextReady ? `${gabayPageLabels[view]} context ready` : "Reading this page…" : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
     {authenticated && <div className={`gabay-context-status ${contextReady ? "ready" : "loading"}`} role="status" aria-live="polite"><i />{contextReady ? `Ready to help with ${pageContext.pageStep || gabayPageLabels[view]}` : "Loading the current page context…"}</div>}
-    {conversationMenuOpen && <div className="gabay-conversation-menu"><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 12).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}<div className="gabay-delete-actions">{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Delete this conversation</button>}{conversations.length > 1 && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearAllConversations}>Delete all conversations</button>}</div>{conversationDeleteError && <p className="gabay-delete-error">{conversationDeleteError}</p>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
+    {conversationMenuOpen && <div className="gabay-conversation-menu"><button className="gabay-walkthrough-start" type="button" onClick={() => { setConversationMenuOpen(false); onStartWalkthrough(); }}>Show me around Kalinga</button><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 12).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}<div className="gabay-delete-actions">{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Delete this conversation</button>}{conversations.length > 1 && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearAllConversations}>Delete all conversations</button>}</div>{conversationDeleteError && <p className="gabay-delete-error">{conversationDeleteError}</p>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
     <div className="gabay-chat-body">
       {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{isReplying && <GabayThinking motion={motion} />}</div>}
     </div>
@@ -1889,12 +1805,12 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   }
 
   return (
-    <div className="view-page classes-page class-workspace-surface">
+    <div data-tour="class-page" className="view-page classes-page class-workspace-surface">
       {!!classes.length && selectedClass && <>
         <section className="class-page-heading">
           <div><p className="eyebrow">CLASSES & LEARNERS</p><h1>Your classes</h1></div>
           <label><span>Class</span><select value={selectedClass.id} onChange={(event) => selectWorkspaceClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-          <button type="button" onClick={openNewClassForm}>Add class</button>
+          <button data-tour="class-add" type="button" onClick={openNewClassForm}>Add class</button>
         </section>
         <div className="class-page-layout">
           <section className="class-hub class-hub-tabbed">
@@ -1906,7 +1822,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
           {deleteCandidateId === selectedClass.id && <div className="delete-confirm prominent-delete" role="alert"><div><b>Delete {selectedClass.name} permanently?</b><span>This removes the class, its lesson plans, learner attendance, and saved timetable from this device.</span></div><div><button type="button" onClick={() => setDeleteCandidateId("")}>Keep class</button><button type="button" onClick={() => { onDelete(selectedClass.id); setDeleteCandidateId(""); }}>Yes, delete class</button></div></div>}
           <nav className="class-workspace-tabs" aria-label={`${selectedClass.name} sections`}>{([['overview', 'Class details'], ['learners', 'Learners'], ['schedule', 'Schedule'], ['lessons', 'Lesson plans']] as const).map(([value, label]) => <button className={workspaceTab === value ? "active" : ""} type="button" aria-current={workspaceTab === value ? "page" : undefined} onClick={() => setWorkspaceTab(value)} key={value}>{label}</button>)}</nav>
 
-          {workspaceTab === "overview" && <div className="class-overview-panel">
+          {workspaceTab === "overview" && <div data-tour="class-overview" className="class-overview-panel">
             <button type="button" onClick={() => editClass(selectedClass, "details")}><b>Subjects</b><span>{selectedClass.subjects.join(", ") || "No subjects added"}</span><strong>Edit subjects</strong></button>
             <button type="button" onClick={() => setWorkspaceTab("learners")}><b>Learners</b><span>{selectedClass.learners.length ? `${selectedClass.learners.length} enrolled · ${learnerRosterSummary(selectedClass.learners)}` : "No learners enrolled yet"}</span><strong>View learners</strong></button>
             <button type="button" onClick={() => editClass(selectedClass, "schedule")}><b>Meeting times</b><span>{selectedClass.meetings[0] ? `${selectedClass.meetings[0].days} · ${selectedClass.meetings[0].startTime}–${formatTime(toMinutes(selectedClass.meetings[0].startTime) + selectedClass.meetings[0].durationMinutes)}${selectedClass.meetings.length > 1 ? ` · +${selectedClass.meetings.length - 1} more` : ""}` : "No meeting time added"}</span><strong>Edit meeting times</strong></button>
@@ -1943,7 +1859,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
           <button className="class-editor-close" type="button" aria-label="Close class editor" onClick={() => { resetForm(); setFormOpen(false); }}>×</button>
         </div>
 
-        {classStep === 1 && <section className="class-wizard-step" aria-label="Class details">
+        {classStep === 1 && <section data-tour="class-details" className="class-wizard-step" aria-label="Class details">
           <div className="form-grid class-form-grid single-field">
             <label>Class or section name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Morning Multigrade Class" required /></label>
           </div>
@@ -1951,7 +1867,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
           <div className="field-group subject-setup"><p className="group-label">What subjects do you teach this class?<small>Choose one or more. You can change these later.</small></p><details className="multi-select-picker"><summary><span>{subjects.length ? subjects.join(", ") : "Choose subjects"}</span><small>{subjects.length ? `${subjects.length} selected` : "Select one or more"}</small></summary><div className="multi-select-panel"><div className="subject-options">{commonSubjects.map((subject) => <button className={subjects.includes(subject) ? "selected" : ""} type="button" onClick={() => toggleSubject(subject)} key={subject}>{subjects.includes(subject) ? "✓ " : "+ "}{subject}</button>)}</div><div className="custom-subject"><input value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomSubject(); } }} placeholder="Another subject (e.g. Mother Tongue)" /><button className="secondary-button" type="button" onClick={addCustomSubject}>Add subject</button></div></div></details>{!!subjects.length && <div className="selected-subjects">{subjects.map((subject) => <button type="button" onClick={() => toggleSubject(subject)} key={subject}>{subject} ×</button>)}</div>}</div>
         </section>}
 
-        {classStep === 2 && <section className="class-wizard-step" aria-label="Class schedule">
+        {classStep === 2 && <section data-tour="class-schedule" className="class-wizard-step" aria-label="Class schedule">
           <div className="field-group class-meeting-builder"><div className="meeting-editor-list">{meetings.map((meeting, index) => <section className="meeting-editor-card" aria-label={`Meeting ${index + 1}`} key={meeting.id}>
             <header><b>{meetings.length > 1 ? `Meeting ${index + 1}` : "Your weekly meeting"}</b>{meetings.length > 1 && <button type="button" aria-label={`Remove meeting ${index + 1}`} onClick={() => setMeetings((current) => current.filter((item) => item.id !== meeting.id))}>Remove</button>}</header>
             <div className="meeting-editor-days"><p>Which days?</p><MeetingDayPicker value={meeting.days} onChange={(days) => updateMeeting(meeting.id, { days })} inline /></div>
@@ -1961,7 +1877,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
           </section>)}</div><button className="add-meeting-inline" type="button" onClick={addMeeting}>＋ Add another meeting time</button>{scheduleError && <p className="meeting-editor-error" role="alert">{scheduleError}</p>}</div>
         </section>}
 
-        {classStep === 3 && <section className="class-wizard-step" aria-label="Learners">
+        {classStep === 3 && <section data-tour="class-learners" className="class-wizard-step" aria-label="Learners">
           <div className="field-group roster-builder"><div className="roster-heading"><div><p className="group-label">Who are the learners in this class?<small>Add names for attendance. Sex fills the F / M counts printed on every lesson plan, so set it for each learner.</small></p></div><button className="secondary-button" type="button" onClick={addLearner} disabled={!grades.length}>＋ Add learner</button></div>{!learners.length ? <div className="roster-empty"><span>◎</span><p><b>You can skip learner names for now</b><small>Save the class now and add names from Manage learners whenever you are ready.</small></p></div> : <div className="roster-rows"><div className="roster-column-labels" aria-hidden="true"><span></span><b>Learner name</b><b>Grade</b><b>Sex (optional)</b><span></span></div>{learners.map((learner, index) => <div className="roster-row" key={learner.id}><span>{index + 1}</span><input aria-label={`Learner ${index + 1} name`} value={learner.name} onChange={(event) => updateLearner(learner.id, "name", event.target.value)} placeholder="Full name" /><select aria-label={`Learner ${index + 1} grade`} value={learner.grade} onChange={(event) => updateLearner(learner.id, "grade", event.target.value)}>{grades.map((grade) => <option value={grade} key={grade}>{gradeLabel(grade)}</option>)}</select><select aria-label={`Learner ${index + 1} sex`} className={learner.sex === "Not specified" ? "needs-choice" : ""} value={learner.sex} onChange={(event) => updateLearner(learner.id, "sex", event.target.value)}><option>Female</option><option>Male</option><option>Not specified</option></select><button type="button" aria-label={`Remove learner ${index + 1}`} onClick={() => setLearners((current) => current.filter((item) => item.id !== learner.id))}>×</button></div>)}</div>}</div>
         </section>}
 
@@ -1970,13 +1886,13 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
           <div className="class-wizard-buttons">
             <button className="secondary-button" type="button" onClick={() => { if (!editSection && classStep > 1) goToClassStep((classStep - 1) as 1 | 2); else { resetForm(); setFormOpen(false); } }}>{!editSection && classStep > 1 ? "← Back" : "Cancel"}</button>
             {editSection ? <button className="primary-button" type="submit" disabled={!detailsComplete || !!scheduleError}>{editSection === "schedule" ? "Save meeting times" : editSection === "learners" ? "Save learners" : "Save class details"}</button> : <>
-            {classStep === 1 && <button className="primary-button" type="button" disabled={!detailsComplete} onClick={() => goToClassStep(2)}>Continue to schedule →</button>}
+            {classStep === 1 && <button data-tour="class-details-next" className="primary-button" type="button" disabled={!detailsComplete} onClick={() => goToClassStep(2)}>Continue to schedule →</button>}
             {classStep === 2 && <button className="primary-button" type="button" disabled={!!scheduleError} onClick={() => goToClassStep(3)}>Continue to learners →</button>}
-            {classStep === 3 && <button className="primary-button" type="submit" disabled={!!scheduleError}>{namedLearnerCount ? "Save class →" : "Save without learners →"}</button>}</>}
+            {classStep === 3 && <button data-tour="class-save" className="primary-button" type="submit" disabled={!!scheduleError}>{namedLearnerCount ? "Save class →" : "Save without learners →"}</button>}</>}
           </div>
         </footer>
       </form></dialog>}
-      {!classes.length && !formOpen && <section className="class-zero-state"><h2>Start with your first class</h2><p>Add its subjects and meeting times, then enter learners whenever you are ready.</p><button className="primary-button" type="button" onClick={openNewClassForm}>Set up a class</button></section>}
+      {!classes.length && !formOpen && <section className="class-zero-state"><h2>Start with your first class</h2><p>Add its subjects and meeting times, then enter learners whenever you are ready.</p><button data-tour="class-add" className="primary-button" type="button" onClick={openNewClassForm}>Set up a class</button></section>}
       {!classes.length && <button className="sample-data-button" type="button" onClick={onLoadSample}>Not ready to enter data? Load one sample class</button>}
     </div>
   );
@@ -2066,7 +1982,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
 
   if (!teachingClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>This lesson’s class is unavailable</h2><p>Return to Today and choose another saved lesson.</p></div><button className="secondary-button" type="button" onClick={onBack}>Back to Today</button></section>;
 
-  return <div className="view-page teaching-page teaching-workspace-surface">
+  return <div data-tour="teach-page" className="view-page teaching-page teaching-workspace-surface">
     <PageIntro eyebrow="TEACH · MULTIGRADE LESSON" title={plan.title} description={`${teachingClass.name} · ${plan.subject} · ${planStart}–${planEnd}`} action={<div className="teaching-page-actions"><button className="secondary-button" type="button" onClick={onBack}>← Today</button><button className="secondary-button" type="button" onClick={onEdit}>Edit plan</button><button className="primary-button" type="button" onClick={() => window.print()}>Print or save PDF</button></div>} />
 
     <section className="teaching-guide-summary">
@@ -2078,7 +1994,7 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
       <section className="teaching-flow-workspace">
         <nav className="teaching-step-list" aria-label="Lesson steps"><header><p className="eyebrow">LESSON STEPS</p><b>Choose where you are now</b><small>The current step is highlighted.</small></header><div>{plan.slots.map((slot, index) => <button className={slot.id === activeSlot?.id ? "active" : ""} type="button" aria-current={slot.id === activeSlot?.id ? "step" : undefined} onClick={() => setActiveSlotId(slot.id)} key={slot.id}><span>{index + 1}</span><p><b>{slot.time}</b><small>{slot.teacherFocus || slot.stage || "Class activity"}</small></p>{slot.id === activeSlot?.id && <strong>NOW</strong>}</button>)}</div></nav>
 
-        {activeSlot && <section className="teaching-focus-card" aria-live="polite">
+        {activeSlot && <section data-tour="teach-current" className="teaching-focus-card" aria-live="polite">
           <header><div><p className="eyebrow">NOW TEACHING · STEP {activeIndex + 1} OF {plan.slots.length}</p><h2>{activeSlot.teacherFocus || "Class activity"}</h2><p>{wholeClassStep ? "Teach and guide all grades together for this part of the lesson." : `Work directly with ${gradeLabel(teacherFocusGrade!)} while the other groups complete their assigned activities.`}</p></div><div className="teaching-step-time"><b>{activeSlot.time}–{activeEnd}</b><span>{activeDuration} {activeDuration === 1 ? "minute" : "minutes"}</span></div></header>
 
           {wholeClassStep && distinctTasks.length === 1 ? <div className="teaching-together-task"><div><p className="eyebrow">EVERYONE LEARNS TOGETHER</p><h3>Guide all grades through one activity</h3><span>{gradeList(plan.grades)}</span></div><p>{distinctTasks[0]}</p></div> : wholeClassStep ? <div className="teaching-all-grade-tasks"><header><p className="eyebrow">GUIDE ALL GRADES TOGETHER</p><h3>Each grade has its own task</h3></header>{activeGradeTasks.map(({ grade, task }) => <article key={grade}><b>{gradeLabel(grade)}</b><p>{task}</p></article>)}</div> : <div className="teaching-role-layout"><article className="teaching-role-card teacher"><p className="eyebrow">YOU TEACH</p><h3>{gradeLabel(teacherFocusGrade!)}</h3><p>{activeSlot.gradeTasks[teacherFocusGrade!]?.trim() || "No activity has been entered for this group yet."}</p></article>{independentGrades.length > 0 && <article className="teaching-role-card independent"><p className="eyebrow">WHILE YOU TEACH</p><h3>Other groups work independently</h3><div>{independentGrades.map((grade) => <section key={grade}><b>{gradeLabel(grade)}</b><p>{activeSlot.gradeTasks[grade]?.trim() || "No activity has been entered for this group yet."}</p></section>)}</div></article>}</div>}
@@ -2111,7 +2027,7 @@ function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = 
       <tr><th>Time / Sessions</th><td>1 session, {plan.duration} · {plan.startTime}</td><th>No. of Learners</th><td>{learnerCountSummary(teachingClass, plan.grades)}</td></tr>
       <tr><th>Multigrade Model</th><td colSpan={3}>{plan.multigradeModel || "—"}</td></tr>
     </tbody></table>
-    <section className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
+    <section data-tour="plan-intentions" className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
       {plan.sharedTheme?.trim() && <p><b>Shared Sub-theme:</b> {lines(plan.sharedTheme)}</p>}
       <table>{gradeHead}<tbody>
         {gradeRow("Pamantayang Pangnilalaman (Content Standard)", plan.contentStandards)}
@@ -2202,13 +2118,13 @@ function PlanIndex({ plans, classes, onOpen, onNew, onBack, onDelete }: { plans:
   function activate(planId: string) { if (selecting) toggle(planId); else onOpen(planId); }
 
   return (
-    <div className="view-page plan-index plan-workspace-surface">
+    <div data-tour="plan-index" className="view-page plan-index plan-workspace-surface">
       <PageIntro eyebrow="LESSON PLANS" title="Your lesson plans" description="Open a saved plan to keep editing, start a new one, or select plans to delete." action={<div className="plan-index-actions">
         {plans.length > 0 && (selecting
           ? <button className="secondary-button" type="button" onClick={exitSelect}>Cancel</button>
           : <button className="secondary-button" type="button" onClick={() => setSelecting(true)}>Select</button>)}
         <button className="secondary-button" type="button" onClick={onBack}>← Today</button>
-        <button className="primary-button" type="button" onClick={onNew}>＋ New lesson plan</button>
+        <button data-tour="plan-new" className="primary-button" type="button" onClick={onNew}>＋ New lesson plan</button>
       </div>} />
       {plans.length ? <div className="plan-index-list">
         {plans.map((plan) => {
@@ -2616,11 +2532,11 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
   };
 
   return (
-    <div className={`view-page plan-page plan-workspace-surface${printingPlan ? " ilaw-print-mode" : ""}`}>
+    <div data-tour="plan-page" className={`view-page plan-page plan-workspace-surface${printingPlan ? " ilaw-print-mode" : ""}`}>
       <div className="lesson-document-navigation"><button type="button" onClick={() => leaveLesson(dirty, window.confirm, onAllPlans)}>← All lesson plans</button>{persistedPlan && <button type="button" className="lesson-delete-button" onClick={() => { if (deleteLesson(planId, persistedPlan.title, window.confirm, onDelete)) onAllPlans(); }}>Delete lesson</button>}</div>
       <PageIntro eyebrow="MULTIGRADE LESSON PLAN" title={lessonTitle.trim() || "New lesson plan"} description="Prepare your lesson, review Gabay’s suggestions, and edit directly on the document." action={<button className="secondary-button" type="button" onClick={() => leaveLesson(dirty, window.confirm, onBack)}>← Today</button>} />
 
-      <section className={`plan-setup${setupOpen ? " open" : ""}`}>
+      <section data-tour="plan-setup" className={`plan-setup${setupOpen ? " open" : ""}`}>
         {setupOpen ? <>
           <div className="plan-setup-grid">
             <label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
@@ -2642,10 +2558,10 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
             </div>
           </details>
           <footer>
-            {!hasPlanContent && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? (fullPlanDraftStatus || "Gabay is drafting the whole plan…") : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>}
-            <button className="secondary-button" type="button" onClick={() => setSetupOpen(false)}>I’ll write it myself</button>
+            {!hasPlanContent && <button data-tour="plan-draft" className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? (fullPlanDraftStatus || "Gabay is drafting the whole plan…") : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>}
+            <button data-tour="plan-manual" className="secondary-button" type="button" onClick={() => setSetupOpen(false)}>I’ll write it myself</button>
           </footer>
-        </> : <button type="button" className="plan-setup-summary" onClick={() => setSetupOpen(true)}><span><b>{selectedClass?.name}</b> · {subject || "No subject"} · {printedDate || "No date"} · {quarter} · {startTime} · {targetMinutes} min · {language}</span><b>Change setup</b></button>}
+        </> : <button data-tour="plan-change" type="button" className="plan-setup-summary" onClick={() => setSetupOpen(true)}><span><b>{selectedClass?.name}</b> · {subject || "No subject"} · {printedDate || "No date"} · {quarter} · {startTime} · {targetMinutes} min · {language}</span><b>Change setup</b></button>}
         {draftingFullPlan && fullPlanDraftStatus && <p className="gabay-draft-status" role="status">{fullPlanDraftStatus}</p>}
         {fullPlanDraftError && <p className="gabay-draft-error" role="alert">{fullPlanDraftError}</p>}
       </section>
@@ -2656,11 +2572,11 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
           {plannedMinutes !== targetMinutes && <span className="plan-time-warning">Blocks add up to {plannedMinutes} min; the lesson is {targetMinutes} min.</span>}
         </div>
         <div>
-          {(hasPlanContent || !setupOpen) && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={() => hasPlanContent ? setRevisionScope("whole") : draftCompletePlan()}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : hasPlanContent ? "Improve lesson with Gabay" : "Draft the whole plan with Gabay"}</button>}
-          <button className="secondary-button" type="button" onClick={exportCurrentPlan}>Print / PDF</button>
-          <button className="secondary-button" type="button" disabled={downloadingDocx} onClick={downloadCurrentPlanDocx}>{downloadingDocx ? "Preparing…" : "Download Word"}</button>
-          <button className="feature-button" type="button" onClick={() => saveCurrentPlan(true)}><span className="feature-icon" aria-hidden="true">▷</span> Teach this lesson</button>
-          <button className="primary-button" type="button" onClick={() => saveCurrentPlan()}>{saved ? "✓ Saved" : "Save lesson"}</button>
+          {(hasPlanContent || !setupOpen) && <button data-tour={hasPlanContent ? "plan-improve" : "plan-draft"} className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={() => hasPlanContent ? setRevisionScope("whole") : draftCompletePlan()}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : hasPlanContent ? "Improve lesson with Gabay" : "Draft the whole plan with Gabay"}</button>}
+          <button data-tour="plan-pdf" className="secondary-button" type="button" onClick={exportCurrentPlan}>Print / PDF</button>
+          <button data-tour="plan-word" className="secondary-button" type="button" disabled={downloadingDocx} onClick={downloadCurrentPlanDocx}>{downloadingDocx ? "Preparing…" : "Download Word"}</button>
+          <button data-tour="plan-teach" className="feature-button" type="button" onClick={() => saveCurrentPlan(true)}><span className="feature-icon" aria-hidden="true">▷</span> Teach this lesson</button>
+          <button data-tour={saved ? "plan-saved" : "plan-save"} className="primary-button" type="button" onClick={() => saveCurrentPlan()}>{saved ? "✓ Saved" : "Save lesson"}</button>
         </div>
       </div>
       {revisionNotice && <p className="draft-restore" role="status">{revisionNotice} {revisionUndo && <button type="button" onClick={undoSuggestions}>Undo applied changes</button>}</p>}
@@ -2669,7 +2585,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
 
       {narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}
 
-      {selectedClass && <article className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
+      {selectedClass && <article data-tour="plan-document" className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
         <header className="ilaw-print-title"><p>{planTitleLine(grades)}</p><input className="ilaw-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); touch(); }} /></header>
         <table className="ilaw-print-meta"><tbody>
           <tr><th>School</th><td><input className="cell-input" aria-label="School" value={schoolName} placeholder="School name" onChange={(event) => onSchoolNameChange(event.target.value)} /></td><th>Grade Levels</th><td>{gradeList(grades)}</td></tr>
@@ -2679,7 +2595,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
           <tr><th>Multigrade Model</th><td colSpan={3}><EditCell compact label="Multigrade model" value={multigradeModel} placeholder="e.g. Same Theme, Different Task (STDT) with a Grade 4 peer leader supporting Grade 3" onChange={(value) => { setMultigradeModel(value); touch(); }} /></td></tr>
         </tbody></table>
 
-        <section className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
+        <section data-tour="plan-intentions" className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
           <p><b>Shared Sub-theme:</b> <EditCell compact label="Shared sub-theme" value={sharedTheme} placeholder="The theme every grade works under this session" onChange={(value) => { setSharedTheme(value); touch(); }} /></p>
           <table><thead><tr><th />{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
             {gradeRow("Pamantayang Pangnilalaman (Content Standard)", "contentStandards", "Naipamamalas ng mag-aaral ang…")}
@@ -2941,7 +2857,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     setCommentInput(""); setLibraryError("");
   }
 
-  return <div className="view-page resource-library-page resource-workspace-surface">
+  return <div data-tour="library-page" className="view-page resource-library-page resource-workspace-surface">
     <PageIntro eyebrow="TEACHER RESOURCE LIBRARY" title="Open it. Teach it. Improve it together." description="Use the two Kalinga starters or submit a PDF of your own with clear classroom details." action={<button className="primary-button" type="button" onClick={() => authenticated ? setSubmissionOpen((open) => !open) : onRequestSignIn()}>＋ Upload a resource</button>} />
     {submissionOpen && <form className="resource-submission" onSubmit={submitResource}>
       <header><div><p className="eyebrow">RESOURCE SUBMISSION</p><h2>Tell teachers exactly what they are opening</h2><p>Your name, classroom fit, and sharing status stay visible. Uploading does not mean Kalinga has reviewed or approved the material.</p></div><button type="button" aria-label="Close resource submission" onClick={() => setSubmissionOpen(false)}>×</button></header>
@@ -3047,7 +2963,7 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
 
   if (!selectedClass) return <section className="class-zero-state compact-zero"><span className="zero-icon">✓</span><div><p className="eyebrow">RECORD ATTENDANCE</p><h2>Set up a class first</h2><p>Attendance needs a saved learner list and class schedule before there is anything to record.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={onSetUpClass}>Set up a class</button></div></section>;
 
-  return <div className="view-page attendance-page attendance-workspace-surface"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
+  return <div data-tour="attendance-page" className="view-page attendance-page attendance-workspace-surface"><PageIntro eyebrow="RECORD · ATTENDANCE" title={selectedDate === dateInputValue() ? "Today’s attendance" : "Attendance record"} description={`${displayDate(selectedDate)} · ${selectedClass.name}`} action={<button className="primary-button" type="button" onClick={saveVisibleAttendance}>{saved ? "✓ Saved on device" : "Save attendance"}</button>} />
     <section className="attendance-class-picker"><label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div className="attendance-date-picker"><button type="button" aria-label="Previous day" onClick={() => chooseDate(moveDate(selectedDate, -1))}>←</button><label>Date<input type="date" value={selectedDate} onChange={(event) => chooseDate(event.target.value)} /></label><button type="button" aria-label="Next day" onClick={() => chooseDate(moveDate(selectedDate, 1))}>→</button><button type="button" onClick={() => chooseDate(dateInputValue())}>Today</button></div><span>{selectedClass.meetings.map((meeting) => `${meeting.days} · ${meeting.startTime}`).join("  |  ")}</span></section>
     <div className="attendance-grid">
       <section className="attendance-main">
@@ -3232,9 +3148,9 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     setDeleteTarget(undefined); setCommunityError("");
   }
 
-  if (!authenticated) return <div className="view-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
+  if (!authenticated) return <div data-tour="community-page" className="view-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
-  return <div className="view-page community-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
+  return <div data-tour="community-page" className="view-page community-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
     <aside className="community-explainer"><span>@</span><p><b>Your tag is {teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><button type="button" onClick={onOpenLibrary}>Upload or manage resources →</button></aside>
     {composerOpen && <form className="community-composer" onSubmit={submitQuestion}>
       <header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header>
