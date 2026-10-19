@@ -20,6 +20,19 @@ export function formatTime(totalMinutes: number) {
   return `${hour}:${String(normalized % 60).padStart(2, "0")} ${period}`;
 }
 
+export function durationBetweenTimes(startTime: string, endTime: string) {
+  return (toMinutes(endTime) - toMinutes(startTime) + 1440) % 1440;
+}
+
+export function meetingScheduleError(meetings: ClassMeeting[]) {
+  if (!meetings.length) return "Add at least one meeting time.";
+  for (const [index, meeting] of meetings.entries()) {
+    if (!daysForPattern(meeting.days).some((day) => weekDays.includes(day))) return `Choose at least one day for meeting ${index + 1}.`;
+    if (!Number.isFinite(meeting.durationMinutes) || meeting.durationMinutes < 5 || meeting.durationMinutes > 600) return `Meeting ${index + 1} must last between 5 minutes and 10 hours. Check the start and end times, including AM / PM.`;
+  }
+  return "";
+}
+
 export function durationMinutes(duration: string | number) {
   const parsed = typeof duration === "number" ? duration : Number.parseInt(duration, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 80;

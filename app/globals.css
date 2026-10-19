@@ -1877,3 +1877,60 @@ html { scroll-behavior: smooth; }
   .home-page, .page-intro, .home-essentials-grid, .class-page-layout, .attendance-grid, .resource-grid, .discussion-layout, .tutorial-layout { animation: none !important; }
   .app-shell, .sidebar, .sidebar .nav-item > span:not(.nav-icon) { transition: none !important; }
 }
+
+/* Gabay chat waiting state */
+.gabay-thinking-bubble { min-width: 112px; min-height: 66px; padding: 9px 16px 9px 10px; border: 1px solid #cce4dc; border-radius: 18px 18px 18px 5px; display: flex; align-items: center; gap: 10px; background: #edf7f2; }
+.gabay-thinking .gabay-mascot { width: 44px; height: 44px; animation: gabay-think-sway 2.4s ease-in-out infinite; }
+.gabay-thinking .gabay-mascot-arm { animation: none; }.gabay-thinking .gabay-mascot-aura { animation: gabay-think-glow 2.4s ease-in-out infinite; }
+.gabay-thinking-dots { display: flex; align-items: center; gap: 5px; }.gabay-thinking-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--support); animation: gabay-think-dot 1.5s ease-in-out infinite; }.gabay-thinking-dots i:nth-child(2) { animation-delay: .18s; }.gabay-thinking-dots i:nth-child(3) { animation-delay: .36s; }
+.gabay-thinking.motion-paused * { animation: none !important; }
+@keyframes gabay-think-sway { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-3px) rotate(5deg); } }
+@keyframes gabay-think-glow { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes gabay-think-dot { 0%, 60%, 100% { opacity: .4; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .gabay-thinking *, .gabay-thinking .gabay-mascot { animation: none !important; } }
+
+/* Focused class setup and editing */
+.class-editor-dialog { width: min(880px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; overflow-y: auto; border: 1px solid #c3d8d2; border-radius: 18px; color: var(--text); background: var(--paper); box-shadow: 0 28px 90px #132e3540; }
+.class-editor-dialog::backdrop { background: #182c3d85; backdrop-filter: blur(3px); }
+.class-editor-dialog .class-setup-card { width: 100%; max-width: none; margin: 0; overflow: visible; border: 0; border-radius: 0; box-shadow: none; }
+.class-editor-dialog .class-wizard-progress { padding: 12px 22px; background: #eef7f3; }
+.class-editor-dialog .class-wizard-progress > div { border-radius: 10px; }
+.class-editor-dialog .class-wizard-progress b { font-size: 14px; }.class-editor-dialog .class-wizard-progress small { font-size: 12px; }
+.class-editor-dialog .class-setup-heading { padding: 26px 28px 20px; gap: 14px; border-top: 4px solid var(--brand); background: linear-gradient(105deg, #fff4ea, #f2faf6); }
+.class-editor-dialog .class-setup-heading h2 { margin: 5px 0 8px; font-size: 29px; line-height: 1.2; }
+.class-editor-dialog .class-setup-heading p { margin: 0; font-size: 15px; }.class-editor-dialog .class-setup-heading .eyebrow { color: var(--support); font-size: 12px; }
+.class-editor-close { width: 42px; height: 42px; flex: 0 0 42px; padding: 0; border: 1px solid #c8dcd5; border-radius: 50%; background: #fffdfa; color: var(--support); font-size: 28px; cursor: pointer; }
+.class-editor-close:hover { background: var(--support-soft); }
+.class-editor-dialog .class-wizard-step > .field-group { margin: 22px 0; padding: 0 28px; }
+.class-editor-dialog .class-form-grid { padding: 22px 28px 0; }
+.class-editor-dialog .group-label { display: block; font-size: 17px; }.class-editor-dialog .group-label small { display: block; margin-top: 5px; font-size: 14px; }
+.class-editor-dialog .class-form-grid input, .class-editor-dialog .custom-subject input, .class-editor-dialog .roster-row input, .class-editor-dialog .roster-row select { font-size: 16px; }
+.class-editor-dialog .class-wizard-actions { position: sticky; z-index: 2; bottom: 0; padding: 18px 28px; background: #faf5ec; box-shadow: 0 -5px 14px #27241807; }
+.class-editor-dialog .class-wizard-actions > span { max-width: 310px; font-size: 13px; }.class-editor-dialog .class-wizard-buttons > button { min-height: 46px; font-size: 15px; }
+.meeting-editor-list { display: grid; gap: 22px; }
+.meeting-editor-card { min-width: 0; overflow: hidden; padding: 22px; border: 1px solid #d0dfd8; border-radius: 12px; background: #fffdfa; }
+.meeting-editor-card > header { margin: -22px -22px 20px; padding: 13px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--support); background: #eaf5ef; }
+.meeting-editor-card > header b { font-size: 16px; }.meeting-editor-card > header button { min-height: 34px; border: 0; color: var(--danger); background: transparent; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.meeting-editor-days > p, .meeting-editor-times > div > p { margin: 0 0 10px; font-size: 16px; font-weight: 700; }
+.meeting-day-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.meeting-day-buttons button { min-height: 44px; padding: 10px 14px; border: 1px solid #cecfc6; border-radius: 8px; color: var(--text); background: #fff; font-size: 15px; cursor: pointer; }
+.meeting-day-buttons button.selected { border-color: var(--support); color: #105a54; background: #cdebe1; box-shadow: inset 0 -2px 0 #19766f; font-weight: 700; }
+.meeting-day-buttons button:hover { border-color: var(--support); background: #e4f3ed; }
+.meeting-editor-times { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.meeting-editor-times .time-picker { width: 100%; min-width: 0; grid-template-columns: minmax(50px, 1fr) auto minmax(55px, 1fr) auto; gap: 6px; }
+.meeting-editor-times .time-picker select { width: 100%; height: 48px; font-size: 16px; }.meeting-editor-times .period-toggle button { padding: 8px 10px; font-size: 14px; }
+.meeting-editor-label { margin-top: 20px; }.meeting-editor-label > summary { width: fit-content; padding: 5px 0; color: var(--support); cursor: pointer; font-size: 14px; }.meeting-editor-label summary small { color: var(--muted); }
+.meeting-editor-label input { width: 100%; margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 16px; }
+.meeting-editor-summary { margin-top: 22px; padding: 16px 18px; border-left: 4px solid var(--brand); border-radius: 0 8px 8px 0; display: grid; gap: 5px; background: #fff1e6; }
+.meeting-editor-summary b { color: var(--brand-strong); font-size: 13px; }.meeting-editor-summary span { font-size: 16px; }.meeting-editor-summary small { color: var(--muted); font-size: 14px; }
+.class-editor-dialog .add-meeting-inline { margin-top: 16px; min-height: 46px; padding: 12px; border-color: #8dbfb0; color: var(--support); background: #f0f8f3; font-size: 15px; }
+.meeting-editor-error { margin: 16px 0 0; padding: 12px 16px; border-radius: 8px; color: var(--danger); background: #fff0e8; font-size: 15px; }
+@media (max-width: 640px) {
+  .class-editor-dialog { width: calc(100vw - 20px); max-height: calc(100dvh - 24px); border-radius: 12px; }
+  .class-editor-dialog .class-setup-heading { padding: 20px 18px; }.class-editor-dialog .class-setup-heading h2 { font-size: 24px; }
+  .class-editor-dialog .class-wizard-step > .field-group { padding: 0 16px; }.class-editor-dialog .class-form-grid { padding: 20px 18px 0; }
+  .class-editor-dialog .class-wizard-actions { padding: 14px 18px; flex-direction: column; align-items: stretch; gap: 12px; }.class-editor-dialog .class-wizard-actions > span { max-width: none; }
+  .class-editor-dialog .class-wizard-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; }.class-editor-dialog .class-wizard-buttons > button { width: auto; flex: 1; order: initial; white-space: normal; }
+  .meeting-editor-card { padding: 16px; }.meeting-editor-card > header { margin: -16px -16px 18px; padding: 12px 16px; }
+  .meeting-editor-times { grid-template-columns: 1fr; gap: 18px; }.meeting-day-buttons { gap: 6px; }.meeting-day-buttons button { padding: 9px 12px; font-size: 14px; }
+}

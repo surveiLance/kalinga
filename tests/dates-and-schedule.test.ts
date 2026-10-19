@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dateInputValue, moveDate } from "@/lib/dates";
-import { daysForPattern, durationMinutes, formatMeetingDays, formatTime, parseTime, toMinutes } from "@/lib/schedule";
+import { daysForPattern, durationBetweenTimes, durationMinutes, formatMeetingDays, formatTime, meetingScheduleError, parseTime, toMinutes } from "@/lib/schedule";
 import { decodeCommunityMessage, encodeCommunityMessage } from "@/lib/community-message";
 import { normalizeResourceBookmarkId, workspaceStorageKey } from "@/lib/workspace-keys";
 
@@ -79,6 +79,24 @@ describe("time helpers", () => {
 });
 
 describe("meeting day patterns", () => {
+  it("derives the saved duration from start and end times, including midnight", () => {
+    expect(durationBetweenTimes("8:00 AM", "9:00 AM")).toBe(60);
+    expect(durationBetweenTimes("11:45 AM", "12:30 PM")).toBe(45);
+    expect(durationBetweenTimes("11:00 PM", "1:00 AM")).toBe(120);
+    expect(durationBetweenTimes("8:00 AM", "8:00 AM")).toBe(0);
+  });
+
+  it("blocks an empty schedule, missing days, and invalid time ranges before saving", () => {
+    const meeting = { id: "m1", label: "", days: "Monday", startTime: "8:00 AM", durationMinutes: 60 };
+    expect(meetingScheduleError([meeting])).toBe("");
+    expect(meetingScheduleError([])).not.toBe("");
+    expect(meetingScheduleError([{ ...meeting, days: "" }])).not.toBe("");
+    expect(meetingScheduleError([{ ...meeting, durationMinutes: 0 }])).not.toBe("");
+    expect(meetingScheduleError([{ ...meeting, durationMinutes: 1380 }])).not.toBe("");
+    expect(meetingScheduleError([{ ...meeting, durationMinutes: NaN }])).not.toBe("");
+    expect(meetingScheduleError([meeting, { ...meeting, id: "m2", durationMinutes: 3 }])).not.toBe("");
+  });
+
   it("expands the named patterns", () => {
     expect(daysForPattern("Monday to Friday")).toEqual(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
     expect(daysForPattern("Tuesday and Thursday")).toEqual(["Tuesday", "Thursday"]);
