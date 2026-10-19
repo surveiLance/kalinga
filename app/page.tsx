@@ -1,10 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { GabayMascot } from "@/components/gabay-mascot";
 import { GabayThinking } from "@/components/gabay-thinking";
+import { LessonRevisionPanel } from "@/components/lesson-revision-panel";
+import { leaveLesson, deleteLesson } from "@/lib/lesson-navigation";
+import { applyRevision, undoRevision, type RevisionRequest, type RevisionChange, type RevisionScope } from "@/lib/lesson-revisions";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { attendanceStatusLabel, attendanceStatuses, isStoredAttendanceStatus, toStoredAttendanceStatus } from "@/lib/attendance";
@@ -871,6 +874,8 @@ export default function Home() {
     else beginPlan();
   }
 
+  function showAllPlans() { setPlanListOpen(true); setEditingPlanId(""); setView("plan"); setNotice(""); }
+
   function openTeachingPlan(planId: string) {
     const plan = savedPlans.find((item) => item.id === planId);
     if (!plan) return;
@@ -1198,7 +1203,7 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "tutorial" ? <TutorialView teacherName={teacherName} status={tutorialStatus} onProgress={saveTutorialProgress} onExit={() => setView("home")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
@@ -2234,7 +2239,7 @@ function useIsNarrow(query = "(max-width: 720px)") {
   return narrow;
 }
 
-function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName, onSchoolNameChange, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; initialPlan?: SavedPlan; teacherName: string; schoolName: string; onSchoolNameChange: (name: string) => void; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId, initialPlan, teacherName, schoolName, onSchoolNameChange, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; persistedPlans: SavedPlan[]; onAllPlans: () => void; onDelete: (id: string) => void; activeClassId: string; initialPlan?: SavedPlan; teacherName: string; schoolName: string; onSchoolNameChange: (name: string) => void; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const emptyByGrade = (list: GradeLevel[]) => Object.fromEntries(list.map((grade) => [grade, ""]));
@@ -2247,6 +2252,8 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   const [language, setLanguage] = useState(initialPlan?.language || "English & Filipino");
   const [lessonTitle, setLessonTitle] = useState(initialPlan?.title || "");
   const [planId] = useState(initialPlan?.id || crypto.randomUUID());
+  const persistedPlan = persistedPlans.find((plan) => plan.id === planId);
+  const [dirty, setDirty] = useState(false);
   const [teachingDate, setTeachingDate] = useState(initialPlan?.teachingDate || new Date().toLocaleDateString("en-CA"));
   const [competencies, setCompetencies] = useState<Record<GradeLevel, string>>(initialPlan?.competencies || emptyByGrade(selectedClass?.grades || []));
   const [competencyCodes, setCompetencyCodes] = useState<Record<GradeLevel, string>>(initialPlan?.competencyCodes || emptyByGrade(selectedClass?.grades || []));
@@ -2269,15 +2276,18 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   const [topicPrompt, setTopicPrompt] = useState("");
   const topicRef = useRef<HTMLInputElement>(null);
   const [slots, setSlots] = useState<PlanSlot[]>(initialPlan?.slots || createSchedule(selectedClass?.grades || [], selectedClass?.startTime, initialPlan?.duration || "80 minutes"));
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(Boolean(initialPlan));
+  const [revisionScope, setRevisionScope] = useState<RevisionScope | null>(null);
+  const closeRevisions = useCallback(() => setRevisionScope(null), []);
+  const [revisionUndo, setRevisionUndo] = useState<{ before: SavedPlan; applied: RevisionChange[] } | null>(null);
+  const [revisionNotice, setRevisionNotice] = useState("");
+  const latestPlan = useRef<SavedPlan | null>(null);
+  const planMounted = useRef(true);
   const [setupOpen, setSetupOpen] = useState(!initialPlan);
   const narrow = useIsNarrow();
   const [mobileGrade, setMobileGrade] = useState<GradeLevel>((initialPlan?.grades || selectedClass?.grades || [])[0] || "");
   const shownGrades = narrow ? grades.filter((grade) => grade === (grades.includes(mobileGrade) ? mobileGrade : grades[0])) : grades;
-  const [draftingGrade, setDraftingGrade] = useState("");
-  const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [draftingFullPlan, setDraftingFullPlan] = useState(false);
-  const [previousDraft, setPreviousDraft] = useState<SavedPlan | null>(null);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
   const [docxError, setDocxError] = useState("");
   const [fullPlanDraftError, setFullPlanDraftError] = useState("");
@@ -2319,7 +2329,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     return () => window.removeEventListener("afterprint", finishPrinting);
   }, []);
 
-  function touch() { setSaved(false); }
+  function touch() { setSaved(false); setDirty(true); }
   function setGradeField(setter: React.Dispatch<React.SetStateAction<Record<GradeLevel, string>>>) {
     return (grade: GradeLevel, value: string) => { setter((current) => ({ ...current, [grade]: value })); touch(); };
   }
@@ -2436,31 +2446,10 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     return reason === "not-signed-in" ? `Sign in to let Gabay draft ${what}.` : reason === "busy" ? "Gabay is helping many teachers right now. Please try again shortly." : `Gabay could not draft ${what} right now. Your work is unchanged.`;
   }
 
-  // A single grade's section is redrafted in place; the teacher asked for it and
-  // can keep typing over the result.
-  async function redraftGrade(type: "intentions" | "assessment", grade: GradeLevel) {
-    if (!selectedClass || draftingGrade || !requireTopic()) return;
-    const key = `${type}:${grade}`;
-    setDraftingGrade(key);
-    setCellErrors((current) => ({ ...current, [key]: "" }));
-    const result = await requestGabayDraft(type, draftContext(`${type === "intentions" ? "Intentions" : "Assessment"} · ${gradeLabel(grade)}`, [`Drafting only for ${gradeLabel(grade)}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", ...(type === "assessment" ? [`Competency: ${competencies[grade] || "blank"}`, `Objective: ${objectives[grade] || "blank"}`] : [])]), gradeLabel(grade));
-    setDraftingGrade("");
-    if (!result.connected) { setCellErrors((current) => ({ ...current, [key]: draftFailure(result.reason, `${gradeLabel(grade)} ${type}`) })); return; }
-    if (result.draft.type === "intentions") {
-      setCompetencies((current) => ({ ...current, [grade]: result.draft.type === "intentions" ? result.draft.competency : current[grade] }));
-      setObjectives((current) => ({ ...current, [grade]: result.draft.type === "intentions" ? result.draft.objective : current[grade] }));
-    }
-    if (result.draft.type === "assessment") {
-      const draft = result.draft;
-      setFormativeAssessments((current) => ({ ...current, [grade]: draft.formativeAssessment }));
-      setExitTasks((current) => ({ ...current, [grade]: draft.exitTask }));
-      setSuccessCriteria((current) => ({ ...current, [grade]: draft.successCriteria }));
-    }
-    touch();
-  }
-
   async function draftCompletePlan() {
     if (!selectedClass || draftingFullPlan || !requireTopic()) return;
+    if (hasPlanContent) { setRevisionScope("whole"); return; }
+    const captured = JSON.stringify(currentPlan);
     setDraftingFullPlan(true);
     setFullPlanDraftError("");
     setFullPlanDraftStatus("Gabay is drafting the whole plan…");
@@ -2474,33 +2463,26 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const retryWaits = { busy: [24, 36], unavailable: [4, 9] } as const; // seconds, by failure reason
     let result = await requestGabayDraft("full-plan", context, "");
-    for (let retry = 0; !result.connected && (result.reason === "busy" || result.reason === "unavailable") && retry < retryWaits.busy.length; retry += 1) {
+    for (let retry = 0; planMounted.current && !result.connected && (result.reason === "busy" || result.reason === "unavailable") && retry < retryWaits.busy.length; retry += 1) {
       const wait = retryWaits[result.reason][retry];
       setFullPlanDraftStatus(result.reason === "busy"
         ? `Gabay reached its limit for this minute — waiting ${wait}s, then trying again…`
         : `That draft didn’t come through — Gabay is trying again in ${wait}s…`);
       await sleep(wait * 1_000);
+      if (!planMounted.current) return;
       setFullPlanDraftStatus("Gabay is drafting the whole plan…");
       result = await requestGabayDraft("full-plan", context, "");
     }
+    if (!planMounted.current) return;
     setDraftingFullPlan(false);
     setFullPlanDraftStatus("");
     if (!result.connected) { setFullPlanDraftError(draftFailure(result.reason, "the complete plan")); return; }
     if (result.draft.type !== "full-plan") return;
-    // Apply straight away. The teacher asked for a plan and should see one, not a
-    // second button. Their own draft, if they had one, stays one click away.
-    if (currentPlan && planHasTeacherContent(currentPlan)) setPreviousDraft(currentPlan);
+    if (JSON.stringify(latestPlan.current) !== captured) { setFullPlanDraftError("You edited the lesson while Gabay was drafting. Your edits are unchanged. Use Improve lesson with Gabay to review suggestions."); return; }
     const saved = applyCompletePlan(result.draft);
-    if (saved) { onSave(saved); setSaved(true); }
+    if (saved) { onSave(saved); setSaved(true); setDirty(false); }
     setSetupOpen(false);
     window.requestAnimationFrame(() => documentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  }
-
-  function restorePreviousDraft() {
-    if (!previousDraft) return;
-    applyPlanFields(previousDraft);
-    setPreviousDraft(null);
-    touch();
   }
 
   function applyPlanFields(source: SavedPlan) {
@@ -2512,7 +2494,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     setCompetencies(pick(source.competencies)); setCompetencyCodes(pick(source.competencyCodes)); setContentStandards(pick(source.contentStandards)); setPerformanceStandards(pick(source.performanceStandards)); setObjectives(pick(source.objectives));
     setFormativeAssessments(pick(source.formativeAssessments)); setExitTasks(pick(source.exitTasks)); setSuccessCriteria(pick(source.successCriteria));
     setReflectionQuestions(pick(source.reflectionQuestions)); setRemediations(pick(source.remediations)); setEnrichments(pick(source.enrichments));
-    setSlots(retimeSlots(source.slots, startTime));
+    setSlots(source.slots);
   }
 
   // Builds the plan from a Gabay draft, applies it to the editable form, and
@@ -2556,11 +2538,30 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     reflection: Object.values(reflectionQuestions).filter(Boolean).join("\n"), remediation: Object.values(remediations).filter(Boolean).join("\n"), enrichment: Object.values(enrichments).filter(Boolean).join("\n"),
     nextSessionNotes, schoolHeadName, draftNotes, slots, savedAt: "just now",
   } : null;
+  const hasPlanContent = Boolean(initialPlan || saved || currentPlan && (planHasTeacherContent(currentPlan) || slots.some((slot) => Object.values(slot.gradeTasks).some((task) => task.trim() && !["Shared introduction", "Guided lesson", "Independent task"].includes(task)))));
+  useEffect(() => { latestPlan.current = currentPlan; });
+  useEffect(() => { planMounted.current = true; return () => { planMounted.current = false; }; }, []);
+
+  function applySuggestions(request: RevisionRequest, changes: RevisionChange[]) {
+    if (!currentPlan) return;
+    const result = applyRevision(currentPlan, request, changes);
+    if (!result.applied.length) { setRevisionNotice("The lesson changed. Your edits are protected; request new suggestions."); return; }
+    setRevisionUndo({ before: currentPlan, applied: result.applied });
+    applyPlanFields(result.plan); touch(); closeRevisions();
+    setRevisionNotice(`${result.applied.length} suggestions applied to your draft. Save when you are ready.`);
+  }
+  function undoSuggestions() {
+    if (!currentPlan || !revisionUndo) return;
+    const result = undoRevision(currentPlan, revisionUndo.before, revisionUndo.applied);
+    applyPlanFields(result.plan); touch(); setRevisionUndo(null);
+    setRevisionNotice(result.skipped ? `Undid available changes. ${result.skipped} newer edits were kept.` : "Gabay's applied changes were undone. Your other edits were kept.");
+  }
 
   function saveCurrentPlan(openTeachingView = false) {
     if (!currentPlan) return;
     onSave(currentPlan);
     setSaved(true);
+    setDirty(false);
     if (openTeachingView) onTeach(currentPlan);
   }
 
@@ -2568,6 +2569,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     if (!currentPlan) return;
     onSave(currentPlan);
     setSaved(true);
+    setDirty(false);
     setPrintingPlan(true);
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.print()));
   }
@@ -2576,6 +2578,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
     if (!currentPlan || !selectedClass || downloadingDocx) return;
     onSave(currentPlan);
     setSaved(true);
+    setDirty(false);
     setDownloadingDocx(true);
     setDocxError("");
     try {
@@ -2607,13 +2610,13 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
   };
 
   const redraftButton = (type: "intentions" | "assessment", grade: GradeLevel) => {
-    const key = `${type}:${grade}`;
-    return <div className="cell-tools"><button type="button" className="cell-gabay" disabled={Boolean(draftingGrade)} onClick={() => redraftGrade(type, grade)}>{draftingGrade === key ? "Gabay is drafting…" : "↻ Redraft with Gabay"}</button>{cellErrors[key] && <small role="alert">{cellErrors[key]}</small>}</div>;
+    return <div className="cell-tools"><button type="button" className="cell-gabay" aria-label={`Review ${type} suggestions for all grades, including ${gradeLabel(grade)}`} onClick={() => setRevisionScope(type)}>Improve {type === "intentions" ? "objectives" : "assessment"} with Gabay</button></div>;
   };
 
   return (
     <div className={`view-page plan-page plan-workspace-surface${printingPlan ? " ilaw-print-mode" : ""}`}>
-      <PageIntro eyebrow="MULTIGRADE LESSON PLAN" title={lessonTitle.trim() || "New lesson plan"} description="Set four things, let Gabay draft, then edit the plan exactly where it prints." action={<button className="secondary-button" type="button" onClick={onBack}>← Today</button>} />
+      <div className="lesson-document-navigation"><button type="button" onClick={() => leaveLesson(dirty, window.confirm, onAllPlans)}>← All lesson plans</button>{persistedPlan && <button type="button" className="lesson-delete-button" onClick={() => { if (deleteLesson(planId, persistedPlan.title, window.confirm, onDelete)) onAllPlans(); }}>Delete lesson</button>}</div>
+      <PageIntro eyebrow="MULTIGRADE LESSON PLAN" title={lessonTitle.trim() || "New lesson plan"} description="Prepare your lesson, review Gabay’s suggestions, and edit directly on the document." action={<button className="secondary-button" type="button" onClick={() => leaveLesson(dirty, window.confirm, onBack)}>← Today</button>} />
 
       <section className={`plan-setup${setupOpen ? " open" : ""}`}>
         {setupOpen ? <>
@@ -2637,7 +2640,7 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
             </div>
           </details>
           <footer>
-            <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? (fullPlanDraftStatus || "Gabay is drafting the whole plan…") : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>
+            {!hasPlanContent && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? (fullPlanDraftStatus || "Gabay is drafting the whole plan…") : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>}
             <button className="secondary-button" type="button" onClick={() => setSetupOpen(false)}>I’ll write it myself</button>
           </footer>
         </> : <button type="button" className="plan-setup-summary" onClick={() => setSetupOpen(true)}><span><b>{selectedClass?.name}</b> · {subject || "No subject"} · {printedDate || "No date"} · {quarter} · {startTime} · {targetMinutes} min · {language}</span><b>Change setup</b></button>}
@@ -2651,14 +2654,15 @@ function PlanView({ classes, activeClassId, initialPlan, teacherName, schoolName
           {plannedMinutes !== targetMinutes && <span className="plan-time-warning">Blocks add up to {plannedMinutes} min; the lesson is {targetMinutes} min.</span>}
         </div>
         <div>
-          {!setupOpen && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : topicReady ? "Draft with Gabay" : "Add a topic to draft"}</button>}
+          {(hasPlanContent || !setupOpen) && <button className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={() => hasPlanContent ? setRevisionScope("whole") : draftCompletePlan()}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : hasPlanContent ? "Improve lesson with Gabay" : "Draft the whole plan with Gabay"}</button>}
           <button className="secondary-button" type="button" onClick={exportCurrentPlan}>Print / PDF</button>
           <button className="secondary-button" type="button" disabled={downloadingDocx} onClick={downloadCurrentPlanDocx}>{downloadingDocx ? "Preparing…" : "Download Word"}</button>
           <button className="feature-button" type="button" onClick={() => saveCurrentPlan(true)}><span className="feature-icon" aria-hidden="true">▷</span> Teach this lesson</button>
           <button className="primary-button" type="button" onClick={() => saveCurrentPlan()}>{saved ? "✓ Saved" : "Save lesson"}</button>
         </div>
       </div>
-      {previousDraft && <p className="draft-restore" role="status">Gabay’s draft replaced what you had written. <button type="button" onClick={restorePreviousDraft}>Restore my previous draft</button></p>}
+      {revisionNotice && <p className="draft-restore" role="status">{revisionNotice} {revisionUndo && <button type="button" onClick={undoSuggestions}>Undo applied changes</button>}</p>}
+      {revisionScope && currentPlan && <LessonRevisionPanel key={revisionScope} plan={currentPlan} initialScope={revisionScope} onClose={closeRevisions} onApply={applySuggestions} />}
       {docxError && <p className="gabay-draft-error" role="alert">{docxError}</p>}
 
       {narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}

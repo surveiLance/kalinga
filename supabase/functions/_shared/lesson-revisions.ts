@@ -17,6 +17,9 @@ export type RevisionSource = {
 export type RevisionRequest = { id: string; scope: RevisionScope; instruction: string; source: RevisionSource };
 export type RevisionProposal = { id: string; changes: RevisionChange[] };
 export const revisionKey = (change: Omit<RevisionChange, "value">) => JSON.stringify([change.field, change.grade || "", change.slotId || ""]);
+export function revisionGroupKeys(change: RevisionChange, source: RevisionSource) {
+  return change.field === "gradeTasks" && source.slots.some((slot) => slot.id === change.slotId && slot.wholeClass) ? source.context.grades.map((grade) => revisionKey({ ...change, grade })) : [revisionKey(change)];
+}
 function object(value: unknown): value is Record<string, unknown> { return !!value && typeof value === "object" && !Array.isArray(value); }
 function exact(value: Record<string, unknown>, keys: string[]) { if (Object.keys(value).some((key) => !keys.includes(key))) throw new Error("Unexpected revision fields."); }
 function text(value: unknown, limit = 4000, required = false): asserts value is string { if (typeof value !== "string" || value.length > limit || (required && !value.trim())) throw new Error("Revision text is missing or too long."); }
@@ -83,14 +86,17 @@ export function validateRevisionProposal(value: unknown, request: RevisionReques
     if (seen.has(key)) throw new Error("Duplicate suggestion.");
     seen.add(key);
     return { ...change, value: change.value.trim() };
-  }).filter((change) => request.source.fields.find((field) => revisionKey(field) === revisionKey(change))?.value !== change.value);
-  return { id: request.id, changes };
+  });
+  for (const change of changes) {
+    if (revisionGroupKeys(change, request.source).some((key) => !changes.some((other) => revisionKey(other) === key && other.value === change.value))) throw new Error("Whole-class activities must change together for every grade.");
+  }
+  return { id: request.id, changes: changes.filter((change) => revisionGroupKeys(change, request.source).some((key) => request.source.fields.find((field) => revisionKey(field) === key)?.value !== change.value)) };
 }
 export function revisionContextMatches(source: RevisionSource, current: RevisionSource) {
   return JSON.stringify([source.context, source.slots, source.references]) === JSON.stringify([current.context, current.slots, current.references]);
 }
 export function revisionConflicts(source: RevisionSource, current: RevisionSource, proposal: RevisionProposal) {
-  return proposal.changes.filter((change) => !revisionContextMatches(source, current) || source.fields.find((field) => revisionKey(field) === revisionKey(change))?.value !== current.fields.find((field) => revisionKey(field) === revisionKey(change))?.value).map(revisionKey);
+  return [...new Set(proposal.changes.filter((change) => !revisionContextMatches(source, current) || source.fields.find((field) => revisionKey(field) === revisionKey(change))?.value !== current.fields.find((field) => revisionKey(field) === revisionKey(change))?.value).flatMap((change) => revisionGroupKeys(change, source)))];
 }
 export function redactRevisionRequest(request: RevisionRequest, redact: (text: string) => string): RevisionRequest {
   return { ...request, instruction: redact(request.instruction), source: { ...request.source, context: { ...request.source.context, title: redact(request.source.context.title) }, references: Object.fromEntries(Object.entries(request.source.references).map(([field, grades]) => [field, Object.fromEntries(Object.entries(grades).map(([grade, value]) => [grade, redact(value)]))])), fields: request.source.fields.map((field) => ({ ...field, value: redact(field.value) })) } };

@@ -1,5 +1,6 @@
 import type { SavedPlan } from "@/lib/teaching-types";
-import { revisionFields, revisionKey, revisionContextMatches, revisionConflicts, validateRevisionProposal, type RevisionChange, type RevisionRequest, type RevisionSource } from "../supabase/functions/_shared/lesson-revisions";
+import { slotIsWholeClass } from "@/lib/lesson-plan";
+import { revisionFields, revisionGroupKeys, revisionKey, revisionContextMatches, revisionConflicts, validateRevisionProposal, type RevisionChange, type RevisionRequest, type RevisionSource } from "../supabase/functions/_shared/lesson-revisions";
 export * from "../supabase/functions/_shared/lesson-revisions";
 
 export function revisionSource(plan: SavedPlan): RevisionSource {
@@ -11,7 +12,7 @@ export function revisionSource(plan: SavedPlan): RevisionSource {
     if (kind === "slot") for (const slot of plan.slots) fields.push({ field: name, slotId: slot.id, value: slot.teacherFocus });
     if (kind === "task") for (const slot of plan.slots) for (const grade of plan.grades) fields.push({ field: name, slotId: slot.id, grade, value: slot.gradeTasks[grade] || "" });
   }
-  return { context: { planId: plan.id, classId: plan.classId, title: plan.title, subject: plan.subject, grades: [...plan.grades], language: plan.language || "", duration: plan.duration, startTime: plan.startTime || "", quarter: plan.quarter, date: plan.teachingDate || "", model: plan.multigradeModel || "" }, slots: plan.slots.map((slot) => ({ id: slot.id, time: slot.time, stage: slot.stage || "", durationMinutes: slot.durationMinutes || 10, wholeClass: !!slot.wholeClass })), references: Object.fromEntries(["competencies", "competencyCodes", "contentStandards", "performanceStandards"].map((field) => [field, Object.fromEntries(plan.grades.map((grade) => [grade, (plan[field as keyof SavedPlan] as Record<string, string> | undefined)?.[grade] || ""]))])), fields };
+  return { context: { planId: plan.id, classId: plan.classId, title: plan.title, subject: plan.subject, grades: [...plan.grades], language: plan.language || "", duration: plan.duration, startTime: plan.startTime || "", quarter: plan.quarter, date: plan.teachingDate || "", model: plan.multigradeModel || "" }, slots: plan.slots.map((slot) => ({ id: slot.id, time: slot.time, stage: slot.stage || "", durationMinutes: slot.durationMinutes || 10, wholeClass: slotIsWholeClass(slot) })), references: Object.fromEntries(["competencies", "competencyCodes", "contentStandards", "performanceStandards"].map((field) => [field, Object.fromEntries(plan.grades.map((grade) => [grade, (plan[field as keyof SavedPlan] as Record<string, string> | undefined)?.[grade] || ""]))])), fields };
 }
 function writeChanges(plan: SavedPlan, changes: RevisionChange[]): SavedPlan {
   let next = { ...plan };
@@ -32,7 +33,7 @@ export function applyRevision(plan: SavedPlan, request: RevisionRequest, changes
 export function undoRevision(plan: SavedPlan, before: SavedPlan, applied: RevisionChange[]) {
   const current = revisionSource(plan);
   const original = revisionSource(before);
-  const undo = applied.filter((change) => current.fields.find((field) => revisionKey(field) === revisionKey(change))?.value === change.value).flatMap((change) => original.fields.find((field) => revisionKey(field) === revisionKey(change)) || []);
+  const undo = applied.filter((change) => revisionGroupKeys(change, original).every((key) => current.fields.find((field) => revisionKey(field) === key)?.value === change.value)).flatMap((change) => original.fields.find((field) => revisionKey(field) === revisionKey(change)) || []);
   if (!revisionContextMatches(original, current)) {
     return { plan, skipped: applied.length };
   }

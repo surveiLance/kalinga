@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyRevision, redactRevisionRequest, revisionConflicts, revisionSource, undoRevision, validateRevisionProposal, validateRevisionRequest } from "@/lib/lesson-revisions";
+import { applyRevision, redactRevisionRequest, revisionConflicts, revisionGroupKeys, revisionSource, undoRevision, validateRevisionProposal, validateRevisionRequest } from "@/lib/lesson-revisions";
 import type { SavedPlan } from "@/lib/teaching-types";
 
 export const planFixture: SavedPlan = { id: "plan-one", classId: "class-one", title: "Plants", subject: "Science", quarter: "Quarter 1", grades: ["3", "4"], duration: "60 minutes", language: "English", startTime: "8:00 AM", objectives: { "3": "Name plant parts", "4": "Explain plant functions" }, competencies: { "3": "Verified reference", "4": "Another verified reference" }, materials: "Leaves", reflection: "Actual classroom observation", slots: [{ id: "s1", time: "8:00 AM", stage: "Motivation", durationMinutes: 60, wholeClass: false, teacherFocus: "Guide Grade 3", gradeTasks: { "3": "Observe leaves", "4": "Draw leaves" } }], savedAt: "today" };
@@ -69,5 +69,16 @@ describe("reviewable lesson revisions", () => {
     expect(undone.plan.objectives?.["3"]).toBe("My later edit");
     expect(undone.plan.materials).toBe("Pencils");
     expect(undone.plan.reflection).toBe("Actual classroom observation");
+  });
+  it("treats a shared whole-class activity as one group so exports cannot hide partial edits", () => {
+    const together = { ...planFixture, slots: [{ ...planFixture.slots[0], wholeClass: true, gradeTasks: { "3": "Observe together", "4": "Observe together" } }] };
+    const request = { ...makeRequest(), scope: "experience" as const, source: revisionSource(together) };
+    const change = { field: "gradeTasks" as const, slotId: "s1", grade: "3", value: "Discuss leaves together" };
+    expect(() => validateRevisionProposal({ id: request.id, changes: [change] }, request)).toThrow();
+    expect(revisionGroupKeys(change, request.source)).toHaveLength(2);
+    const proposal = validateRevisionProposal({ id: request.id, changes: [change, { ...change, grade: "4" }] }, request);
+    expect(applyRevision(together, request, proposal.changes).plan.slots[0].gradeTasks).toEqual({ "3": "Discuss leaves together", "4": "Discuss leaves together" });
+    const edited = { ...together, slots: [{ ...together.slots[0], gradeTasks: { "3": "Later edit", "4": "Observe together" } }] };
+    expect(revisionConflicts(request.source, revisionSource(edited), proposal)).toHaveLength(2);
   });
 });
