@@ -34,9 +34,18 @@ describe("Gabay's real-workspace walkthrough", () => {
     const placed = placeWalkthrough({ left: 40, top: 160, width: 280, height: 200 }, { width: 1200, height: 800 }, { width: 360, height: 300 });
     expect(placed.left).toBeGreaterThanOrEqual(336);
     expect(placed.top + 300).toBeLessThanOrEqual(784);
+    expect(placed.dock).not.toBe(true);
   });
-  it("keeps the coach inside a narrow viewport with a bottom-sheet layout", () => {
+  it("reserves layout space rather than covering a large form when no floating position fits", () => {
+    const placed = placeWalkthrough({ left: 200, top: 250, width: 880, height: 440 }, { width: 1280, height: 720 }, { width: 380, height: 450 });
+    expect(placed.dock).toBe(true);
+  });
+  it("avoids nearby controls even when the highlighted target itself has room beside it", () => {
+    const placed = placeWalkthrough({ left: 40, top: 160, width: 200, height: 40 }, { width: 1200, height: 800 }, { width: 360, height: 300 }, [{ left: 250, top: 150, width: 650, height: 600 }]);
+    expect(placed.dock).toBe(true);
+  });
+  it("uses an in-flow dock instead of an overlapping bottom sheet on narrow screens", () => {
     const placed = placeWalkthrough({ left: 20, top: 100, width: 350, height: 70 }, { width: 390, height: 700 }, { width: 360, height: 280 });
-    expect(placed).toEqual({ left: 12, top: 336, width: 366 });
+    expect(placed.dock).toBe(true);
   });
 });

@@ -42,16 +42,16 @@ export function nextWalkthroughStep(step: number, visible: string[], alreadyVisi
   return walkthroughSteps[safeStep(step)].after?.some((target) => visible.includes(target) && !alreadyVisible.includes(target)) ? safeStep(step + 1) : safeStep(step);
 }
 type Rect = { left: number; top: number; width: number; height: number };
-export function placeWalkthrough(target: Rect | null, viewport: { width: number; height: number }, card: { width: number; height: number }) {
+export function placeWalkthrough(target: Rect | null, viewport: { width: number; height: number }, card: { width: number; height: number }, controls: Rect[] = []) {
   const gap = 16;
   const width = viewport.width < 640 ? viewport.width - 24 : Math.min(card.width, viewport.width - 32);
   const bottom = Math.max(12, viewport.height - card.height - (viewport.width < 640 ? 84 : gap));
-  if (viewport.width < 640) return { left: 12, top: bottom, width };
-  if (!target) return { left: viewport.width - width - gap, top: bottom, width };
+  if (viewport.width < 640) return { left: 12, top: bottom, width, dock: true };
+  if (!target) return { left: viewport.width - width - gap, top: bottom, width, dock: true };
   const top = Math.max(gap, Math.min(target.top, bottom));
-  if (target.left + target.width + gap + width <= viewport.width - gap) return { left: target.left + target.width + gap, top, width };
-  if (target.left - gap - width >= gap) return { left: target.left - gap - width, top, width };
-  if (target.top + target.height + gap + card.height < viewport.height - gap) return { left: Math.max(gap, Math.min(target.left, viewport.width - width - gap)), top: target.top + target.height + gap, width };
-  if (target.top - card.height - gap > gap) return { left: Math.max(gap, Math.min(target.left, viewport.width - width - gap)), top: target.top - card.height - gap, width };
-  return { left: viewport.width - width - gap, top: bottom, width };
+  const aligned = Math.max(gap, Math.min(target.left, viewport.width - width - gap));
+  const candidates = [{ left: target.left + target.width + gap, top }, { left: target.left - gap - width, top }, { left: aligned, top: target.top + target.height + gap }, { left: aligned, top: target.top - card.height - gap }];
+  const safe = candidates.find((candidate) => candidate.left >= gap && candidate.top >= gap && candidate.left + width <= viewport.width - gap && candidate.top + card.height <= viewport.height - gap && ![target, ...controls].some((control) => candidate.left < control.left + control.width + 4 && candidate.left + width > control.left - 4 && candidate.top < control.top + control.height + 4 && candidate.top + card.height > control.top - 4));
+  if (safe) return { ...safe, width, dock: false };
+  return { left: viewport.width - width - gap, top: bottom, width, dock: true };
 }
