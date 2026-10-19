@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { GabayThinking } from "@/components/gabay-thinking";
 import { requestGabayRevision } from "@/lib/gabay-ai";
-import { createRevisionLifecycle } from "@/lib/revision-lifecycle";
+import { createRevisionLifecycle, revisionReviewState } from "@/lib/revision-lifecycle";
 import { revisionContextMatches, revisionConflicts, revisionFields, revisionGroupKeys, revisionKey, revisionScopes, revisionSource, validateRevisionRequest, type RevisionScope, type RevisionRequest, type RevisionProposal, type RevisionChange } from "@/lib/lesson-revisions";
 import type { SavedPlan } from "@/lib/teaching-types";
 
@@ -19,6 +19,11 @@ export function LessonRevisionPanel({ plan, initialScope, onClose, onApply }: { 
   const [lifecycle] = useState(createRevisionLifecycle);
   const source = revisionSource(plan);
   const contextKey = JSON.stringify([source.context, source.slots, source.references]);
+  const [reviewContext, setReviewContext] = useState(contextKey);
+  if (reviewContext !== contextKey) {
+    const cleared = revisionReviewState({ contextKey: reviewContext, loading: !!state.loading, selected: [...selected] }, contextKey, false);
+    setReviewContext(cleared.contextKey); setState({ loading: cleared.loading, error: "The lesson setup changed. Request new suggestions for this lesson." }); setSelected(new Set(cleared.selected));
+  }
   const validContext = !state.request || revisionContextMatches(state.request.source, source);
   const busy = !!state.loading && validContext;
   const conflicts = state.request && state.proposal ? revisionConflicts(state.request.source, source, state.proposal) : [];

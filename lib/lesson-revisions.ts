@@ -20,7 +20,7 @@ function writeChanges(plan: SavedPlan, changes: RevisionChange[]): SavedPlan {
     const kind = revisionFields[change.field][2];
     if (kind === "text") next = { ...next, [change.field]: change.value };
     if (kind === "grade") next = { ...next, [change.field]: { ...(next[change.field as keyof SavedPlan] as Record<string, string>), [change.grade!]: change.value } };
-    if (kind === "slot" || kind === "task") next = { ...next, slots: next.slots.map((slot) => slot.id !== change.slotId ? slot : kind === "slot" ? { ...slot, teacherFocus: change.value } : { ...slot, gradeTasks: { ...slot.gradeTasks, [change.grade!]: change.value } }) };
+    if (kind === "slot" || kind === "task") next = { ...next, slots: next.slots.map((slot) => slot.id !== change.slotId ? slot : kind === "slot" ? { ...slot, wholeClass: slotIsWholeClass(slot), teacherFocus: change.value } : { ...slot, wholeClass: slotIsWholeClass(slot), gradeTasks: { ...slot.gradeTasks, [change.grade!]: change.value } }) };
   }
   return next;
 }

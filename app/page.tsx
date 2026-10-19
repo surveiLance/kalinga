@@ -7,6 +7,7 @@ import { GabayMascot } from "@/components/gabay-mascot";
 import { GabayThinking } from "@/components/gabay-thinking";
 import { LessonRevisionPanel } from "@/components/lesson-revision-panel";
 import { leaveLesson, deleteLesson } from "@/lib/lesson-navigation";
+import { lessonObservations, preserveLessonObservations, hasInstructionalEdits } from "@/lib/lesson-document";
 import { applyRevision, undoRevision, type RevisionRequest, type RevisionChange, type RevisionScope } from "@/lib/lesson-revisions";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -2268,8 +2269,9 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
   const [exitTasks, setExitTasks] = useState<Record<GradeLevel, string>>(initialPlan?.exitTasks || emptyByGrade(selectedClass?.grades || []));
   const [successCriteria, setSuccessCriteria] = useState<Record<GradeLevel, string>>(initialPlan?.successCriteria || emptyByGrade(selectedClass?.grades || []));
   const [reflectionQuestions, setReflectionQuestions] = useState<Record<GradeLevel, string>>(initialPlan?.reflectionQuestions || emptyByGrade(selectedClass?.grades || []));
-  const [remediations, setRemediations] = useState<Record<GradeLevel, string>>(initialPlan?.remediations || Object.fromEntries((selectedClass?.grades || []).map((grade) => [grade, initialPlan?.remediation || ""])));
-  const [enrichments, setEnrichments] = useState<Record<GradeLevel, string>>(initialPlan?.enrichments || Object.fromEntries((selectedClass?.grades || []).map((grade) => [grade, initialPlan?.enrichment || ""])));
+  const [remediations, setRemediations] = useState<Record<GradeLevel, string>>(initialPlan?.remediations || emptyByGrade(selectedClass?.grades || []));
+  const [enrichments, setEnrichments] = useState<Record<GradeLevel, string>>(initialPlan?.enrichments || emptyByGrade(selectedClass?.grades || []));
+  const [observations, setObservations] = useState(() => lessonObservations(initialPlan));
   const [nextSessionNotes, setNextSessionNotes] = useState(initialPlan?.nextSessionNotes || "");
   const [schoolHeadName, setSchoolHeadName] = useState(initialPlan?.schoolHeadName || "");
   const [draftNotes, setDraftNotes] = useState(initialPlan?.draftNotes || "");
@@ -2486,6 +2488,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
   }
 
   function applyPlanFields(source: SavedPlan) {
+    setObservations(lessonObservations(source));
     const pick = (record?: Record<GradeLevel, string>) => Object.fromEntries(grades.map((grade) => [grade, record?.[grade] || ""]));
     setSharedTheme(source.sharedTheme || "");
     setLearnerContext(source.learnerContext || "");
@@ -2526,19 +2529,18 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
     return {
       id: planId, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${targetMinutes} minutes`, startTime, language, teachingDate,
       ...built, sharedTheme: draft.sharedTheme, multigradeModel, learnerContext: draft.learnerContext, materials: draft.materials,
-      reflection: Object.values(built.reflectionQuestions).filter(Boolean).join("\n"), remediation: Object.values(built.remediations).filter(Boolean).join("\n"), enrichment: Object.values(built.enrichments).filter(Boolean).join("\n"),
+      ...observations,
       nextSessionNotes: draft.nextSessionNotes, schoolHeadName, draftNotes, slots: builtSlots, savedAt: "just now",
     };
   }
 
-  const currentPlan: SavedPlan | null = selectedClass ? {
+  const currentPlan: SavedPlan | null = selectedClass ? preserveLessonObservations({
     id: planId, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${targetMinutes} minutes`, startTime, language, teachingDate,
     competencies, competencyCodes, contentStandards, performanceStandards, sharedTheme, multigradeModel, objectives, learnerContext, materials,
     formativeAssessments, exitTasks, successCriteria, reflectionQuestions, remediations, enrichments,
-    reflection: Object.values(reflectionQuestions).filter(Boolean).join("\n"), remediation: Object.values(remediations).filter(Boolean).join("\n"), enrichment: Object.values(enrichments).filter(Boolean).join("\n"),
     nextSessionNotes, schoolHeadName, draftNotes, slots, savedAt: "just now",
-  } : null;
-  const hasPlanContent = Boolean(initialPlan || saved || currentPlan && (planHasTeacherContent(currentPlan) || slots.some((slot) => Object.values(slot.gradeTasks).some((task) => task.trim() && !["Shared introduction", "Guided lesson", "Independent task"].includes(task)))));
+  }, observations) : null;
+  const hasPlanContent = Boolean(initialPlan || saved || currentPlan && (planHasTeacherContent(currentPlan) || hasInstructionalEdits(slots, createSchedule(grades, startTime, duration))));
   useEffect(() => { latestPlan.current = currentPlan; });
   useEffect(() => { planMounted.current = true; return () => { planMounted.current = false; }; }, []);
 
@@ -2733,6 +2735,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
             {gradeRow("Enrichment", "enrichments", "Extension for learners who are ready")}
           </tbody></table>
           <p><b>Notes for Next Session / Whole-School Follow-Up:</b> <EditCell compact label="Notes for the next session" value={nextSessionNotes} placeholder="What should continue or change next time" onChange={(value) => { setNextSessionNotes(value); touch(); }} /></p>
+          <details className="recorded-lesson-notes"><summary>Recorded classroom notes · not changed by Gabay</summary>{(["reflection", "remediation", "enrichment"] as const).map((field) => <label key={field}>{field === "reflection" ? "Actual reflection" : field === "remediation" ? "Remediation carried out" : "Enrichment carried out"}<textarea value={observations[field]} onChange={(event) => { setObservations((current) => ({ ...current, [field]: event.target.value })); touch(); }} /></label>)}</details>
         </section>
 
         <footer className="ilaw-print-signatures"><div><span>Prepared by:</span><b>{teacherName}</b><small>Classroom Adviser</small></div><div><span>Checked by:</span><input className="cell-input signature" aria-label="School head name" value={schoolHeadName} placeholder="School head name" onChange={(event) => { setSchoolHeadName(event.target.value); touch(); }} /><small>School Head</small></div></footer>

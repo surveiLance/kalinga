@@ -1,3 +1,6 @@
+export function revisionReviewState<T extends { contextKey: string; loading: boolean; selected: string[] }>(state: T, contextKey: string, current: boolean) {
+  return state.contextKey === contextKey && current ? state : { contextKey, loading: false, selected: [] as string[] };
+}
 export function createRevisionLifecycle() {
   let id = 0;
   let controller: AbortController | undefined;

@@ -183,7 +183,7 @@ Deno.serve(async (request) => {
   const { data: quota, error: quotaError } = await supabase.rpc("claim_gabay_request", {
     window_seconds: positiveEnvNumber("GABAY_RATE_WINDOW_SECONDS", 300),
     max_requests: positiveEnvNumber("GABAY_RATE_MAX_REQUESTS", 30),
-  }).maybeSingle();
+  }).maybeSingle<{ allowed: boolean; retry_after_seconds: number }>();
   // Fail open. The limiter guards cost, not access — the session check above is
   // the security boundary. A limiter that takes Gabay down when the limiter
   // itself misbehaves is worse than no limiter, so log and let the request pass.

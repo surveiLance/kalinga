@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestGabayRevision } from "@/lib/gabay-ai";
 import { revisionSource } from "@/lib/lesson-revisions";
-import { revisionTaskKind, revisionPrompt } from "../supabase/functions/_shared/gabay-revision";
+import { revisionTaskKind, revisionPrompt, generateRevision } from "../supabase/functions/_shared/gabay-revision";
 const backend = vi.hoisted(() => ({ configured: true, session: true, replies: [] as Array<{ data: unknown; error: unknown }>, calls: [] as unknown[] }));
 vi.mock("@/lib/supabase/client", () => ({ isSupabaseConfigured: true, getSupabaseBrowserClient: () => !backend.configured ? null : { auth: { getSession: async () => ({ data: { session: backend.session ? {} : null } }) }, functions: { invoke: async (_: string, options: unknown) => { backend.calls.push(options); return backend.replies.shift() || { data: null, error: null }; } } } }));
 const request = { id: "r1", instruction: "Use leaves", scope: "experience" as const, source: revisionSource({ id: "p", classId: "c", title: "Plants", subject: "Science", grades: ["3"], duration: "60 minutes", quarter: "Quarter 1", materials: "Paper", slots: [{ id: "s1", time: "8:00 AM", durationMinutes: 60, teacherFocus: "Guide Grade 3", gradeTasks: { "3": "Observe" } }], savedAt: "today" }) };
@@ -9,6 +9,15 @@ const context = { view: "plan", gradeLevels: ["3"], classId: "c", offline: false
 const capabilities = { data: { revisionVersion: 1 }, error: null };
 beforeEach(() => { backend.configured = true; backend.session = true; backend.calls = []; backend.replies = []; });
 describe("revision boundary", () => {
+  it("validates actual inference responses and handles provider rate limits", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ id: request.id, changes: [{ field: "materials", value: "Leaves" }] }) } }] })));
+    expect(await generateRevision(request, "test-key", "test-model", fetcher)).toMatchObject({ status: 200, proposal: { changes: [{ field: "materials", value: "Leaves" }] } });
+    expect(fetcher.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+    fetcher.mockResolvedValueOnce(new Response("", { status: 429 }));
+    expect(await generateRevision(request, "test-key", "test-model", fetcher)).toMatchObject({ status: 429 });
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '{"id":"r1","changes":[{"field":"title","value":"Changed"}]}' } }] })));
+    await expect(generateRevision(request, "test-key", "test-model", fetcher)).rejects.toThrow();
+  });
   it("rejects unknown tasks rather than falling through to chat", () => {
     expect(revisionTaskKind(undefined)).toBe("chat");
     expect(revisionTaskKind({ type: "full-plan" })).toBe("full-plan");

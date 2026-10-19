@@ -37,9 +37,13 @@ describe("reviewable lesson revisions", () => {
     const request = makeRequest();
     request.instruction = "Help PrivateName";
     request.source.fields[0].value = "PrivateName needs support";
+    request.source.context.subject = "Reading with PrivateName";
+    request.source.slots[0].stage = "Read with PrivateName";
     const result = redactRevisionRequest(request, (value) => value.replaceAll("PrivateName", "[learner]"));
     expect(result.instruction).toBe("Help [learner]");
     expect(result.source.fields[0].value).toBe("[learner] needs support");
+    expect(result.source.context.subject).toBe("Reading with [learner]");
+    expect(result.source.slots[0].stage).toBe("Read with [learner]");
     expect(result.source.context.classId).toBe("class-one");
     expect(request.source.fields[0].value).toBe("PrivateName needs support");
   });
@@ -80,5 +84,14 @@ describe("reviewable lesson revisions", () => {
     expect(applyRevision(together, request, proposal.changes).plan.slots[0].gradeTasks).toEqual({ "3": "Discuss leaves together", "4": "Discuss leaves together" });
     const edited = { ...together, slots: [{ ...together.slots[0], gradeTasks: { "3": "Later edit", "4": "Observe together" } }] };
     expect(revisionConflicts(request.source, revisionSource(edited), proposal)).toHaveLength(2);
+  });
+  it("can undo a revision that makes legacy grade activities identical", () => {
+    const legacy = { ...planFixture, slots: [{ ...planFixture.slots[0], wholeClass: undefined }] };
+    const request = { ...makeRequest(), scope: "experience" as const, source: revisionSource(legacy) };
+    const change = { field: "gradeTasks" as const, slotId: "s1", grade: "3", value: "Draw leaves" };
+    const applied = applyRevision(legacy, request, [change]);
+    const undone = undoRevision(applied.plan, legacy, applied.applied);
+    expect(undone.skipped).toBe(0);
+    expect(undone.plan.slots[0].gradeTasks["3"]).toBe("Observe leaves");
   });
 });

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { LessonRevisionPanel } from "@/components/lesson-revision-panel";
-import { createRevisionLifecycle } from "@/lib/revision-lifecycle";
+import { createRevisionLifecycle, revisionReviewState } from "@/lib/revision-lifecycle";
 import type { SavedPlan } from "@/lib/teaching-types";
 const plan: SavedPlan = { id: "p", classId: "c", title: "Plants", subject: "Science", grades: ["3"], duration: "60 minutes", quarter: "Quarter 1", slots: [{ id: "s", time: "8:00 AM", teacherFocus: "Guide", gradeTasks: { "3": "Observe leaves" } }], savedAt: "today" };
 describe("lesson revision panel", () => {
@@ -26,5 +26,15 @@ describe("lesson revision panel", () => {
     lifecycle.cancel();
     expect(second.signal.aborted).toBe(true);
     expect(lifecycle.isCurrent(second.id)).toBe(false);
+  });
+  it("permanently invalidates a cancelled review even when setup returns to its old values", () => {
+    const lifecycle = createRevisionLifecycle();
+    const first = lifecycle.start();
+    const state = { contextKey: "English", loading: true, selected: ["field"] };
+    expect(revisionReviewState(state, "English", lifecycle.isCurrent(first.id))).toEqual(state);
+    lifecycle.cancel();
+    const reset = revisionReviewState(state, "Filipino", lifecycle.isCurrent(first.id));
+    expect(reset).toEqual({ contextKey: "Filipino", loading: false, selected: [] });
+    expect(revisionReviewState(reset, "English", lifecycle.isCurrent(first.id))).toEqual({ contextKey: "English", loading: false, selected: [] });
   });
 });

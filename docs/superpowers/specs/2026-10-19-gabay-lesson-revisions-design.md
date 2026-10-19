@@ -1,6 +1,6 @@
 # Gabay lesson revisions
 
-Status: proposed design for teacher review; not implemented.
+Status: implemented and locally verified on 19 October 2026. Live revision inference remains pending Supabase Edge Function deployment and a signed-in smoke test; the frontend capability gate safely handles older backends.
 
 ## Purpose and scope
 
