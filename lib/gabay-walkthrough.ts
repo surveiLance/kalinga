@@ -42,6 +42,15 @@ export function nextWalkthroughStep(step: number, visible: string[], alreadyVisi
   return walkthroughSteps[safeStep(step)].after?.some((target) => visible.includes(target) && !alreadyVisible.includes(target)) ? safeStep(step + 1) : safeStep(step);
 }
 type Rect = { left: number; top: number; width: number; height: number };
+export function clipWalkthroughHighlight(target: Rect, clips: Rect[]) {
+  const left = Math.max(...clips.map((clip) => clip.left));
+  const top = Math.max(...clips.map((clip) => clip.top));
+  const right = Math.min(...clips.map((clip) => clip.left + clip.width));
+  const bottom = Math.min(...clips.map((clip) => clip.top + clip.height));
+  if (target.width <= 0 || target.height <= 0 || Math.max(target.left, left) >= Math.min(target.left + target.width, right) || Math.max(target.top, top) >= Math.min(target.top + target.height, bottom)) return null;
+  const x = Math.max(left, target.left - 5); const y = Math.max(top, target.top - 5);
+  return { left: x, top: y, width: Math.min(right, target.left + target.width + 5) - x, height: Math.min(bottom, target.top + target.height + 5) - y };
+}
 export function placeWalkthrough(target: Rect | null, viewport: { width: number; height: number }, card: { width: number; height: number }, controls: Rect[] = []) {
   const gap = 16;
   const width = viewport.width < 640 ? viewport.width - 24 : Math.min(card.width, viewport.width - 32);

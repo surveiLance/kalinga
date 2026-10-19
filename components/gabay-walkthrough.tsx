@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GabayMascot } from "@/components/gabay-mascot";
-import { canRestoreWalkthroughFocus, nextWalkthroughStep, placeWalkthrough, walkthroughProgress, walkthroughSteps, type WalkthroughStatus } from "@/lib/gabay-walkthrough";
+import { canRestoreWalkthroughFocus, clipWalkthroughHighlight, nextWalkthroughStep, placeWalkthrough, walkthroughProgress, walkthroughSteps, type WalkthroughStatus } from "@/lib/gabay-walkthrough";
 
 export function WalkthroughOffer({ onStart, onDismiss }: { onStart: () => void; onDismiss: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -42,6 +42,7 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
     let frame = 0;
     let lastTarget: HTMLElement | null = null;
     let stopped = false;
+    const observed = new Set<HTMLElement>();
     function measure() {
       if (stopped) return;
       const dialog = [...document.querySelectorAll<HTMLElement>("dialog[open], [role='dialog'][aria-modal='true']")].filter((element) => element.getClientRects().length).at(-1);
@@ -60,7 +61,29 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
       targetRef.current = target;
       if (target && target !== lastTarget && !minimized) { lastTarget = target; target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }); }
       const bounds = target?.getBoundingClientRect();
-      const rect = bounds ? { left: Math.max(8, bounds.left - 5), top: Math.max(8, bounds.top - 5), width: Math.min(bounds.width + 10, window.innerWidth - Math.max(8, bounds.left - 5) - 8), height: Math.max(0, Math.min(bounds.bottom + 5, window.innerHeight - 8) - Math.max(8, bounds.top - 5)) } : null;
+      const viewport = { left: window.visualViewport?.offsetLeft || 0, top: window.visualViewport?.offsetTop || 0, width: window.visualViewport?.width || window.innerWidth, height: window.visualViewport?.height || window.innerHeight };
+      const clips = [{ left: viewport.left + 8, top: viewport.top + 8, width: viewport.width - 16, height: viewport.height - 16 }];
+      const tracked = new Set<HTMLElement>(target ? [target] : []);
+      if (cardRef.current) tracked.add(cardRef.current);
+      for (let parent = target?.parentElement; parent; parent = parent.parentElement) {
+        const style = window.getComputedStyle(parent);
+        const x = /auto|scroll|hidden|clip/.test(style.overflowX); const y = /auto|scroll|hidden|clip/.test(style.overflowY);
+        tracked.add(parent);
+        if (x || y) {
+          const box = parent.getBoundingClientRect();
+          clips.push({ left: x ? box.left + parent.clientLeft : viewport.left, top: y ? box.top + parent.clientTop : viewport.top, width: x ? parent.clientWidth : viewport.width, height: y ? parent.clientHeight : viewport.height });
+        }
+        if (parent.matches("dialog[open]")) break;
+      }
+      const footer = target?.closest(".class-setup-card")?.querySelector<HTMLElement>(".class-wizard-actions");
+      if (footer && !footer.contains(target)) {
+        tracked.add(footer);
+        const box = footer.getBoundingClientRect();
+        if (box.width > 0 && box.height > 0) clips.push({ left: viewport.left, top: viewport.top, width: viewport.width, height: Math.max(0, box.top - viewport.top - 5) });
+      }
+      for (const element of observed) if (!tracked.has(element)) { resize.unobserve(element); observed.delete(element); }
+      for (const element of tracked) if (!observed.has(element)) { resize.observe(element); observed.add(element); }
+      const rect = bounds ? clipWalkthroughHighlight(bounds, clips) : null;
       const cardHeight = cardRef.current?.offsetHeight || 360;
       const controls = [...(dialog || document).querySelectorAll<HTMLElement>("button, input, select, textarea, summary, a[href], iframe, [role='button']")].filter((element) => !element.closest(".walkthrough-layer, [inert], [hidden], [aria-hidden='true']") && element.getClientRects().length).map((element) => { const bounds = element.getBoundingClientRect(); return { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height }; });
       const position = placeWalkthrough(rect, { width: window.innerWidth, height: window.visualViewport?.height || window.innerHeight }, { width: 380, height: cardHeight }, controls);
@@ -88,9 +111,11 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "hidden", "aria-hidden", "inert", "data-tour", "data-walkthrough-layout", "class"] });
     const resize = new ResizeObserver(schedule);
     if (cardRef.current) resize.observe(cardRef.current);
-    window.addEventListener("resize", schedule); window.addEventListener("scroll", schedule, true); window.visualViewport?.addEventListener("resize", schedule);
+    function layoutEnd(event: Event) { if (event.target instanceof HTMLElement && !event.target.closest(".walkthrough-layer")) schedule(); }
+    window.addEventListener("resize", schedule); window.addEventListener("scroll", schedule, true); window.visualViewport?.addEventListener("resize", schedule); window.visualViewport?.addEventListener("scroll", schedule);
+    document.addEventListener("animationend", layoutEnd, true); document.addEventListener("transitionend", layoutEnd, true);
     schedule();
-    return () => { stopped = true; window.cancelAnimationFrame(frame); observer.disconnect(); resize.disconnect(); window.removeEventListener("resize", schedule); window.removeEventListener("scroll", schedule, true); window.visualViewport?.removeEventListener("resize", schedule); };
+    return () => { stopped = true; window.cancelAnimationFrame(frame); observer.disconnect(); resize.disconnect(); window.removeEventListener("resize", schedule); window.removeEventListener("scroll", schedule, true); window.visualViewport?.removeEventListener("resize", schedule); window.visualViewport?.removeEventListener("scroll", schedule); document.removeEventListener("animationend", layoutEnd, true); document.removeEventListener("transitionend", layoutEnd, true); };
   }, [step, item, onProgress, location?.host, minimized]);
   useEffect(() => () => { activeDock.current?.classList.remove("walkthrough-dock-active"); activeDock.current?.closest("dialog")?.removeAttribute("data-walkthrough-layout"); }, []);
   useEffect(() => { if (!minimized) cardRef.current?.querySelector<HTMLHeadingElement>("h2")?.focus({ preventScroll: true }); }, [location?.host, minimized]);

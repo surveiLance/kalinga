@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { readWalkthroughStatus, walkthroughProgress, walkthroughSteps, nextWalkthroughStep, placeWalkthrough, canRestoreWalkthroughFocus } from "@/lib/gabay-walkthrough";
+import { readWalkthroughStatus, walkthroughProgress, walkthroughSteps, nextWalkthroughStep, placeWalkthrough, canRestoreWalkthroughFocus, clipWalkthroughHighlight } from "@/lib/gabay-walkthrough";
 describe("Gabay's real-workspace walkthrough", () => {
+  it("clips the highlight to the visible scroll area above a sticky form footer", () => {
+    expect(clipWalkthroughHighlight({ left: 20, top: -100, width: 900, height: 1000 }, [{ left: 0, top: 0, width: 1280, height: 720 }, { left: 20, top: 25, width: 900, height: 670 }, { left: 20, top: 25, width: 900, height: 580 }])).toEqual({ left: 20, top: 25, width: 900, height: 580 });
+  });
+  it("pads a visible control without shifting its highlight away from the control", () => {
+    expect(clipWalkthroughHighlight({ left: 60, top: 80, width: 200, height: 40 }, [{ left: 8, top: 8, width: 1264, height: 704 }])).toEqual({ left: 55, top: 75, width: 210, height: 50 });
+  });
+  it("hides the highlight when the actual target is outside its scrollport", () => {
+    expect(clipWalkthroughHighlight({ left: 20, top: 602, width: 500, height: 80 }, [{ left: 20, top: 100, width: 500, height: 500 }])).toBeNull();
+    expect(clipWalkthroughHighlight({ left: -200, top: 100, width: 100, height: 50 }, [{ left: 8, top: 8, width: 374, height: 828 }])).toBeNull();
+  });
   it("restores focus only to a usable trigger, not the document body or a removed popup", () => {
     expect(canRestoreWalkthroughFocus({ tagName: "BODY", isConnected: true }, true)).toBe(false);
     expect(canRestoreWalkthroughFocus({ tagName: "BUTTON", isConnected: false }, true)).toBe(false);
