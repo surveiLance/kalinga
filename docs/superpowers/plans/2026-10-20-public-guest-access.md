@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-20-guest-testing-design.md`
 
+**Execution status:** Native execution approved. Tasks 1–4 implemented and locally verified; Task 5 review and deployment checks in progress. Public guest access remains off until release prerequisites are completed.
+
 ## Global Constraints
 
 - Public, name-only guest entry; no invitation or email confirmation for guests. Names are not account credentials.
