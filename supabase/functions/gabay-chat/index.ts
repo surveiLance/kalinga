@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { redactGabayPII } from "../_shared/gabay-privacy.ts";
 import { validateRevisionRequest, validateRevisionProposal, redactRevisionRequest } from "../_shared/lesson-revisions.ts";
 import { revisionTaskKind, generateRevision } from "../_shared/gabay-revision.ts";
+import { runGuestGabayTask } from "../_shared/guest-access.ts";
 
 type PageContext = {
   view?: string;
@@ -178,8 +179,10 @@ Deno.serve(async (request) => {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Invalid JSON object");
     taskKind = revisionTaskKind(payload.task);
   } catch { return json({ error: "Invalid request or unknown Gabay task" }, 400, origin); }
+  return runGuestGabayTask(supabase, userData.user.is_anonymous === true, taskKind, async () => {
   if (taskKind === "revision-capabilities") return json({ revisionVersion: 1 }, 200, origin);
 
+  if (userData.user.is_anonymous !== true) {
   const { data: quota, error: quotaError } = await supabase.rpc("claim_gabay_request", {
     window_seconds: positiveEnvNumber("GABAY_RATE_WINDOW_SECONDS", 300),
     max_requests: positiveEnvNumber("GABAY_RATE_MAX_REQUESTS", 30),
@@ -198,6 +201,7 @@ Deno.serve(async (request) => {
     });
   }
 
+  }
   const rawMessage = cleanText(payload.message, MAX_MESSAGE_LENGTH);
   if (!rawMessage) return json({ error: "A message is required" }, 400, origin);
   const pageContext = safeContext(payload.pageContext);
@@ -409,4 +413,8 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
     return json({ draft: { type: "assessment", formativeAssessment, exitTask, successCriteria }, connected: true }, 200, origin);
   }
   return json({ reply, connected: true }, 200, origin);
+  }, (decision) => new Response(JSON.stringify({ error: decision.status === 429 ? "Guest Gabay limit reached. Please try again later." : decision.status === 403 ? "Complete guest setup to use Gabay." : "Guest Gabay is temporarily unavailable. Your work is unchanged." }), {
+    status: decision.status,
+    headers: { ...corsHeaders(origin), "Content-Type": "application/json", ...(decision.retryAfter ? { "Retry-After": String(decision.retryAfter) } : {}) },
+  }));
 });
