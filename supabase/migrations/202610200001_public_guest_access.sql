@@ -47,7 +47,7 @@ begin
     new.display_name := member.display_name;
     new.mention_tag := member.mention_tag;
   else
-    if new.mention_tag ~ '^@guest_[a-f0-9]{32}$' then
+    if new.mention_tag ~* '^@guest_[a-f0-9]{32}$' then
       if tg_op='INSERT' or new.mention_tag is distinct from old.mention_tag then raise exception 'Guest handles are reserved'; end if;
     elsif new.mention_tag is null or (tg_op='UPDATE' and new.display_name is distinct from old.display_name) then
       new.mention_tag := public.teacher_mention_tag(new.display_name,new.id);
@@ -74,7 +74,7 @@ begin
   -- Serialize handle allocation against other enrollments, including forced collisions.
   perform pg_advisory_xact_lock(hashtextextended('kalinga-guest-handle',0));
   tag := '@guest_' || replace(auth.uid()::text,'-','');
-  while exists(select 1 from public.profiles where mention_tag=tag) or exists(select 1 from public.guest_memberships where mention_tag=tag) loop
+  while exists(select 1 from public.profiles where lower(mention_tag)=tag) or exists(select 1 from public.guest_memberships where lower(mention_tag)=tag) loop
     tag := '@guest_' || replace(gen_random_uuid()::text,'-','');
   end loop;
   insert into public.guest_memberships(user_id,display_name,mention_tag) values(auth.uid(),clean_name,tag);

@@ -77,6 +77,7 @@ select pg_temp.assert_true('guest reply and mention notify the correct guest onc
 select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',false);
 select pg_temp.assert_true('permanent access preserved', public.guest_has_access() and (select count(*) from public.classes)=1);
 select pg_temp.assert_denied('permanent user cannot claim guest namespace', $$update public.profiles set mention_tag='@guest_ffffffffffffffffffffffffffffffff' where id=auth.uid()$$);
+select pg_temp.assert_denied('permanent user cannot claim uppercase guest namespace', $$update public.profiles set mention_tag='@GUEST_AAAA0000000000000000000000000001' where id=auth.uid()$$);
 reset role;
 update public.guest_memberships set active=false where user_id='aaaa0000-0000-0000-0000-000000000002';
 set role authenticated;

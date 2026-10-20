@@ -40,6 +40,13 @@ describe('guest account setup', () => {
     expect(api.created()).toBe(1);
     expect(workspaceStorageKey(`teacher-${guest.id}`, 'pending-writes')).not.toBe(workspaceStorageKey('prototype', 'pending-writes'));
   });
+  it('does not replace a permanent account signed in while capabilities are loading', async () => {
+    const api = backend({ user: null });
+    let sessionReads = 0;
+    api.client.auth.getSession = (async () => ({ data: { session: ++sessionReads === 1 ? null : { user: { ...guest, is_anonymous: false } } }, error: null })) as typeof api.client.auth.getSession;
+    expect((await startGuestSession(api.client, 'Ana')).status).toBe('unavailable');
+    expect(api.created()).toBe(0);
+  });
   it('does not replace permanent sessions or create accounts when backend entry is disabled', async () => {
     const regular = backend({ user: { ...guest, is_anonymous: false } });
     expect((await startGuestSession(regular.client, 'Ana')).status).toBe('unavailable');

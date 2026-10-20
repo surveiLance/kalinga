@@ -41,6 +41,10 @@ export async function startGuestSession(client: SupabaseClient, value: string, c
     if (user && !user.is_anonymous) return { status: "unavailable", message: "You are already signed in. Use your existing workspace instead of replacing it." };
     const capabilities = await client.rpc("guest_access_capabilities");
     if (capabilities.error || capabilities.data?.version !== 1 || capabilities.data?.enabled !== true) return unavailable();
+    const latest = await client.auth.getSession();
+    if (latest.error) return unavailable();
+    user = latest.data.session?.user;
+    if (user && !user.is_anonymous) return { status: "unavailable", message: "You are already signed in. Use your existing workspace instead of replacing it." };
     if (!user) {
       const created = await client.auth.signInAnonymously({ options: { data: { display_name: name.name }, captchaToken } });
       if (created.error || !created.data.user?.is_anonymous) return { status: "unavailable", message: "Guest sign-in did not complete. Check your connection and verification, then retry." };

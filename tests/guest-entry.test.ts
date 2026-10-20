@@ -6,6 +6,7 @@ describe('guest name entry', () => {
   it('asks for a name without email/password and explains browser session limits', () => {
     const html = renderToStaticMarkup(createElement(GuestEntry, { configured: true, onContinue: async () => ({ ok: true }), onCancel: () => {} }));
     expect(html).toContain('Your name'); expect(html).toMatch(/maxlength="80"/i);
+    expect(html).toContain('type="text"');
     expect(html).not.toContain('type="email"'); expect(html).not.toContain('type="password"');
     expect(html).toContain('clearing browser data'); expect(html).toContain('Back to sign in');
   });
