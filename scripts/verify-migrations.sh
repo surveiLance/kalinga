@@ -70,3 +70,28 @@ for file in supabase/tests/guest-access.sql supabase/tests/guest-usage.sql; do
   [ -f "$file" ] || continue
   run -f "$file"
 done
+if [ -f supabase/migrations/202610200002_guest_usage_limits.sql ]; then
+  race_guest_a="set role authenticated; select set_config('request.jwt.claim.sub','aaaa0000-0000-0000-0000-000000000001',false);"
+  race_guest_b="set role authenticated; select set_config('request.jwt.claim.sub','aaaa0000-0000-0000-0000-000000000003',false);"
+  run -c "$race_guest_a select public.claim_guest_gabay_request();" > "$DATA_DIR/race-a.log" 2>&1 &
+  race_pid_a=$!
+  run -c "$race_guest_b select public.claim_guest_gabay_request();" > "$DATA_DIR/race-b.log" 2>&1 &
+  race_pid_b=$!
+  wait "$race_pid_a"
+  wait "$race_pid_b"
+  run -c "do \$\$ begin if (select used from public.guest_ai_days where usage_date=(now() at time zone 'UTC')::date)<>200 then raise exception 'FAIL concurrent global AI cap'; end if; end \$\$;"
+  echo "ok concurrent AI calls cannot overshoot the shared cap"
+  for race_kind in question upload; do
+    run -c "$race_guest_b select public.test_guest_race('$race_kind');" > "$DATA_DIR/race-a.log" 2>&1 &
+    race_pid_a=$!
+    run -c "$race_guest_b select public.test_guest_race('$race_kind');" > "$DATA_DIR/race-b.log" 2>&1 &
+    race_pid_b=$!
+    wait "$race_pid_a"
+    wait "$race_pid_b"
+  done
+  run -c "do \$\$ begin
+    if (select count(*) from public.teacher_discussions where title='Race question')<>1 then raise exception 'FAIL concurrent questions'; end if;
+    if (select count(*) from storage.objects where name like '%/race-%')<>1 then raise exception 'FAIL concurrent uploads'; end if;
+  end \$\$;"
+  echo "ok concurrent questions and uploads cannot overshoot their caps"
+fi
