@@ -1,6 +1,6 @@
 # Public guest testing and screen-aware guidance
 
-Status: proposed design, awaiting user review. No live authentication settings changed.
+Status: design approved to proceed to implementation planning on 20 October 2026. No live authentication settings changed.
 
 ## Outcome
 
