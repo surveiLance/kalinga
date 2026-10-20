@@ -55,6 +55,7 @@ language plpgsql security definer set search_path='' as $$ begin
     if not public.guest_has_access() or new.metadata->>'mimetype' is distinct from 'application/pdf'
       or not coalesce(new.metadata->>'size','') ~ '^[0-9]{1,10}$' then raise exception 'Choose a PDF up to 20 MB'; end if;
     if (new.metadata->>'size')::bigint>20971520 then raise exception 'The PDF must be 20 MB or smaller'; end if;
+    if not public.claim_guest_usage('uploads',10,3600) then raise exception 'Guest uploads limit reached. Please try later.'; end if;
   end if;
   return new;
 end $$;

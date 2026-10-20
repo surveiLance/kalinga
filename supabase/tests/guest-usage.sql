@@ -1,5 +1,7 @@
 \set ON_ERROR_STOP on
--- Helpers are session-local; this file also runs independently of guest-access.sql.
+-- Each test file runs in its own psql session; reset usage from the identity fixtures.
+delete from public.guest_usage;
+delete from public.guest_ai_days;
 create or replace function pg_temp.assert_true(label text, condition boolean) returns void language plpgsql as $$ begin
  if condition is distinct from true then raise exception 'FAIL %',label; end if; raise notice 'ok %',label; end $$;
 create or replace function pg_temp.assert_denied(label text, statement text) returns void language plpgsql as $$ declare denied boolean:=false; begin
@@ -53,6 +55,7 @@ do $$ begin for i in 1..10 loop
  insert into storage.objects(bucket_id,name,metadata) values('teacher-resources',auth.uid()||'/'||i||'.pdf','{"mimetype":"application/pdf","size":100}');
 end loop; end $$;
 select pg_temp.assert_denied('eleventh upload denied',$$insert into storage.objects(bucket_id,name,metadata) values('teacher-resources',auth.uid()||'/extra.pdf','{"mimetype":"application/pdf","size":100}')$$);
+select pg_temp.assert_denied('updating an existing upload cannot bypass its quota',$$update storage.objects set metadata='{"mimetype":"application/pdf","size":101}' where name=auth.uid()||'/1.pdf'$$);
 reset role;
 drop policy "Local upload fixture" on storage.objects;
 -- Leave one shared AI slot for the concurrent test in verify-migrations.sh.

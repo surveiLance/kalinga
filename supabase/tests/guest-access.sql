@@ -50,6 +50,9 @@ select pg_temp.assert_true('enrolled guest can read shared PDF', (select count(*
 insert into public.teacher_discussions(author_id,author_name,title,body) values(auth.uid(),'Impersonation','First guest question','Question body');
 select pg_temp.assert_true('guest author name is canonical', (select author_name='Teacher Ana Reyes' from public.teacher_discussions where author_id=auth.uid()));
 select pg_temp.assert_true('private classes remain isolated', (select count(*) from public.classes)=0);
+insert into public.classes(id,teacher_id,name) values('bbbb0000-0000-0000-0000-000000000002',auth.uid(),'Guest private class');
+insert into public.lesson_plans(class_id,teacher_id,title) values('bbbb0000-0000-0000-0000-000000000002',auth.uid(),'Guest private lesson');
+select pg_temp.assert_true('guest can create and read own class and plan', (select count(*) from public.classes)=1 and (select count(*) from public.lesson_plans)=1);
 select public.complete_guest_setup('Other name');
 select pg_temp.assert_true('retry preserves canonical name', public.guest_session_status()->>'display_name'='Ana Reyes');
 update public.profiles set display_name='Impersonation', mention_tag='@ana_reyes_1111' where id=auth.uid();
@@ -60,9 +63,17 @@ insert into public.teacher_discussions(author_id,author_name,title,body) values(
 select pg_temp.assert_true('same-name guest has a distinct handle', (select count(distinct mention_tag) from public.community_teacher_tags(array['aaaa0000-0000-0000-0000-000000000001'::uuid,auth.uid()]))=2);
 select pg_temp.assert_true('private learners remain isolated', (select count(*) from public.learners)=0);
 select pg_temp.assert_true('private plans remain isolated', (select count(*) from public.lesson_plans)=0);
+select pg_temp.assert_true('another guest cannot read the first guest class', (select count(*) from public.classes)=0);
 select set_config('request.jwt.claim.sub','aaaa0000-0000-0000-0000-000000000003',false);
 select public.complete_guest_setup('Ana');
 select pg_temp.assert_true('forced handle collision resolves safely', public.guest_session_status()->>'mention_tag'<>'@guest_aaaa0000000000000000000000000003');
+do $$ declare thread uuid; tag text; begin
+ select id into thread from public.teacher_discussions where author_id='aaaa0000-0000-0000-0000-000000000001' limit 1;
+ select mention_tag into tag from public.community_teacher_tags(array['aaaa0000-0000-0000-0000-000000000001'::uuid]);
+ insert into public.teacher_replies(discussion_id,author_id,author_name,body) values(thread,auth.uid(),'Fake','Hello '||tag);
+end $$;
+select set_config('request.jwt.claim.sub','aaaa0000-0000-0000-0000-000000000001',false);
+select pg_temp.assert_true('guest reply and mention notify the correct guest once', (select count(*) from public.teacher_notifications where actor_id='aaaa0000-0000-0000-0000-000000000003')=1);
 select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',false);
 select pg_temp.assert_true('permanent access preserved', public.guest_has_access() and (select count(*) from public.classes)=1);
 select pg_temp.assert_denied('permanent user cannot claim guest namespace', $$update public.profiles set mention_tag='@guest_ffffffffffffffffffffffffffffffff' where id=auth.uid()$$);
