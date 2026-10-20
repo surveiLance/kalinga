@@ -9,6 +9,7 @@ create schema if not exists storage;
 create table auth.users (
   id uuid primary key default gen_random_uuid(),
   email text,
+  is_anonymous boolean not null default false,
   raw_user_meta_data jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
@@ -23,6 +24,7 @@ create table storage.buckets (
   name text not null,
   public boolean not null default false,
   file_size_limit bigint
+  ,allowed_mime_types text[]
 );
 
 create table storage.objects (
@@ -30,6 +32,7 @@ create table storage.objects (
   bucket_id text references storage.buckets(id),
   name text not null,
   owner uuid,
+  metadata jsonb,
   created_at timestamptz not null default now()
 );
 alter table storage.objects enable row level security;

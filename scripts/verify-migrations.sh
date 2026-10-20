@@ -41,7 +41,7 @@ echo "scaffold ready"
 # Pre-existing migrations, then the history they left behind, then the rest. The
 # split lets the notification backfill run against realistic prior data.
 for file in supabase/migrations/*.sql; do
-  case "$(basename "$file")" in 20260907*) continue ;; esac
+  [[ "$(basename "$file")" < 202609070001 ]] || continue
   run -f "$file" >/dev/null 2>&1
   echo "applied  $(basename "$file")"
 done
@@ -52,7 +52,7 @@ for file in supabase/migrations/20260907*.sql; do
 done
 
 echo
-results="$(psql -d kalinga -tA -f supabase/tests/checks.sql 2>&1 | grep -E '^(ok|FAIL|===)' || true)"
+results="$(psql -d kalinga -tA -f supabase/tests/checks.sql)"
 echo "$results"
 echo
 if echo "$results" | grep -q '^FAIL'; then
@@ -60,3 +60,13 @@ if echo "$results" | grep -q '^FAIL'; then
   exit 1
 fi
 echo "$(echo "$results" | grep -c '^ok') checks passed"
+
+for file in supabase/migrations/*.sql; do
+  [[ "$(basename "$file")" > 202609079999 ]] || continue
+  run -f "$file"
+  echo "applied  $(basename "$file")"
+done
+for file in supabase/tests/guest-access.sql supabase/tests/guest-usage.sql; do
+  [ -f "$file" ] || continue
+  run -f "$file"
+done
