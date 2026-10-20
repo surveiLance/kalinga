@@ -2,11 +2,14 @@
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { GabayMascot } from "@/components/gabay-mascot";
 import { GabayThinking } from "@/components/gabay-thinking";
 import { LessonRevisionPanel } from "@/components/lesson-revision-panel";
 import { GabayWalkthrough, WalkthroughOffer } from "@/components/gabay-walkthrough";
+import { GuestEntry, GuestSignOut } from "@/components/guest-entry";
+import { GuestCaptcha } from "@/components/guest-captcha";
+import { createAccountResolver, guestAccessEnabled, guestCaptchaSiteKey, guestOperationMessage, startGuestSession, type GuestIdentity } from "@/lib/guest-access";
 import { emptyWalkthroughStatus, readWalkthroughStatus, walkthroughProgress, type WalkthroughStatus } from "@/lib/gabay-walkthrough";
 import { leaveLesson, deleteLesson } from "@/lib/lesson-navigation";
 import { lessonObservations, preserveLessonObservations, hasInstructionalEdits } from "@/lib/lesson-document";
@@ -348,6 +351,17 @@ export default function Home() {
   const [classDataReady, setClassDataReady] = useState(false);
   const [hydratedWorkspaceScope, setHydratedWorkspaceScope] = useState("");
   const [teacherAccountId, setTeacherAccountId] = useState("");
+  const [guestIdentity, setGuestIdentity] = useState<GuestIdentity | null>(null);
+  const [guestSetupOpen, setGuestSetupOpen] = useState(false);
+  const [guestDraftName, setGuestDraftName] = useState("");
+  const [guestError, setGuestError] = useState("");
+  const [guestSignOutOpen, setGuestSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const accountResolver = useRef(createAccountResolver());
+  const resolvedAccountId = useRef("");
+  const guestStarting = useRef(false);
+  const offlineDemoActive = useRef(false);
+  const resumeAccount = useRef<(user: User) => void>(() => {});
   const [teacherName, setTeacherName] = useState("Ana");
   const [teacherEmail, setTeacherEmail] = useState("");
   const [schoolName, setSchoolName] = useState("");
@@ -427,15 +441,21 @@ export default function Home() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let active = true;
+    let sessionEventSeen = false;
+    const resolver = accountResolver.current;
 
-    function applyTeacherAccount(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
+    function applyTeacherAccount(user: User, identity?: GuestIdentity) {
       sessionTeacherId.current = user.id;
       const displayName = typeof user.user_metadata?.display_name === "string"
         ? user.user_metadata.display_name
         : typeof user.user_metadata?.full_name === "string"
           ? user.user_metadata.full_name
           : user.email?.split("@")[0] || "Teacher";
-      setTeacherName(displayName);
+      setTeacherName(identity?.displayName || displayName);
+      setGuestIdentity(identity || null);
+      setGuestSetupOpen(false);
+      setGuestError("");
+      resolvedAccountId.current = user.id;
       setTeacherEmail(user.email || "");
       setTeacherAccountId(user.id);
       setEntryMode("authenticated");
@@ -447,9 +467,30 @@ export default function Home() {
       }
     }
 
-    void supabase.auth.getSession().then(({ data }) => {
+    function queueAccount(user: User) {
       if (!active) return;
-      if (data.session?.user) applyTeacherAccount(data.session.user);
+      sessionTeacherId.current = user.id;
+      if (!user.is_anonymous) { resolver.cancel(); applyTeacherAccount(user); return; }
+      if (offlineDemoActive.current) return;
+      if (guestStarting.current) return;
+      if (resolvedAccountId.current !== user.id) setEntryMode("loading");
+      window.setTimeout(() => {
+        if (!active || sessionTeacherId.current !== user.id) return;
+        void resolver.resolve(supabase!, user, (result) => {
+          if (!active || sessionTeacherId.current !== user.id) return;
+          if (result.status === "ready") applyTeacherAccount(user, result.identity);
+          else if (result.status !== "regular") {
+            resolvedAccountId.current = "";
+            setGuestIdentity(null); setTeacherAccountId(""); setEntryMode("signed-out");
+            setGuestSetupOpen(true); setGuestError(result.message);
+          }
+        });
+      }, 0);
+    }
+    resumeAccount.current = queueAccount;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active || sessionEventSeen) return;
+      if (data.session?.user) queueAccount(data.session.user);
       else {
         sessionTeacherId.current = "";
         setTeacherAccountId("");
@@ -459,8 +500,10 @@ export default function Home() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
-      if (session?.user) applyTeacherAccount(session.user);
+      sessionEventSeen = true;
+      if (session?.user) queueAccount(session.user);
       else {
+        resolver.cancel(); resolvedAccountId.current = ""; setGuestIdentity(null);
         sessionTeacherId.current = "";
         setTeacherAccountId("");
         setEntryMode((current) => current === "prototype" ? current : "signed-out");
@@ -469,6 +512,7 @@ export default function Home() {
 
     return () => {
       active = false;
+      resolver.cancel();
       listener.subscription.unsubscribe();
     };
   }, []);
@@ -923,7 +967,34 @@ export default function Home() {
     setView(item.view);
   }
 
-  async function signOut() {
+  async function continueAsGuest(name: string, captchaToken?: string): Promise<AuthActionResult> {
+    offlineDemoActive.current = false;
+    setGuestDraftName(name); setGuestError("");
+    if (!guestAccessEnabled || !guestCaptchaSiteKey || !navigator.onLine) return { ok: false, message: "Guest sign-in needs an internet connection and configured guest access. Use the offline demo if needed." };
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return { ok: false, message: "Guest testing is not configured yet." };
+    guestStarting.current = true;
+    try {
+      const result = await startGuestSession(supabase, name, captchaToken);
+      if (result.status !== "ready") { setGuestError(result.message); return { ok: false, message: result.message }; }
+      const { data, error } = await supabase.auth.getSession();
+      if (error || data.session?.user.id !== result.identity.userId) return { ok: false, message: "Your session changed. Please reopen guest sign-in." };
+      guestStarting.current = false;
+      resumeAccount.current(data.session.user);
+      return { ok: true };
+    } finally { guestStarting.current = false; }
+  }
+
+  async function signOut(confirmedGuest = false) {
+    if (guestIdentity && !confirmedGuest) { setAccountOpen(false); setGuestError(""); setGuestSignOutOpen(true); return; }
+    if (signingOut) return;
+    setSigningOut(true);
+    if (entryMode === "authenticated") {
+      const result = await getSupabaseBrowserClient()?.auth.signOut();
+      if (result?.error) { setSigningOut(false); setGuestError("Sign-out did not complete. Please retry."); setNotice("Sign-out did not complete. Your session is unchanged."); return; }
+    }
+    accountResolver.current.cancel(); resolvedAccountId.current = "";
+    setGuestSignOutOpen(false); setGuestSetupOpen(false); setGuestIdentity(null); setSigningOut(false);
     setAccountOpen(false);
     setView("home");
     setNotice("");
@@ -931,29 +1002,27 @@ export default function Home() {
     setNotificationsOpen(false);
     setReplyNotifications([]);
     setNotificationReadIds([]);
-    if (entryMode === "authenticated") {
-      await getSupabaseBrowserClient()?.auth.signOut();
-    }
     setTeacherAccountId("");
     setEntryMode("signed-out");
   }
 
-  async function signInTeacher(email: string, password: string): Promise<AuthActionResult> {
+  async function signInTeacher(email: string, password: string, captchaToken?: string): Promise<AuthActionResult> {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { ok: false, message: "Supabase is not configured on this device yet." };
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
     if (error) return { ok: false, message: error.message };
     if (!data.user) return { ok: false, message: "We could not open this teacher account." };
     return { ok: true };
   }
 
-  async function createTeacherAccount(name: string, email: string, password: string): Promise<AuthActionResult> {
+  async function createTeacherAccount(name: string, email: string, password: string, captchaToken?: string): Promise<AuthActionResult> {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { ok: false, message: "Supabase is not configured on this device yet." };
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        captchaToken,
         data: { display_name: name.trim() },
         emailRedirectTo: `${window.location.origin}/?confirmed=1`,
       },
@@ -1112,7 +1181,7 @@ export default function Home() {
   }
 
   if (entryMode === "signed-out") {
-    return <LoginScreen name={teacherName} email={teacherEmail} onNameChange={setTeacherName} onEmailChange={setTeacherEmail} onSignIn={signInTeacher} onCreateAccount={createTeacherAccount} onContinue={() => setEntryMode("prototype")} />;
+    return <LoginScreen name={teacherName} email={teacherEmail} onNameChange={setTeacherName} onEmailChange={setTeacherEmail} onSignIn={signInTeacher} onCreateAccount={createTeacherAccount} onGuest={continueAsGuest} guestRequired={guestSetupOpen} guestName={guestDraftName} guestError={guestError} onGuestCancel={() => { setGuestSetupOpen(false); setGuestError(""); }} onContinue={() => { offlineDemoActive.current = true; accountResolver.current.cancel(); setGuestIdentity(null); setTeacherAccountId(""); setGuestSetupOpen(false); setGuestError(""); setEntryMode("prototype"); }} />;
   }
 
   if (!workspaceScope || hydratedWorkspaceScope !== workspaceScope) {
@@ -1142,7 +1211,7 @@ export default function Home() {
         </div>
 
         <div className="account-anchor desktop-account">
-          {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
+          {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} />}
           <button className="profile" type="button" aria-label={`Account options for ${teacherLabel(teacherName)}`} aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
             <span className="avatar">{teacherInitials(teacherName)}</span>
             <span><strong>{teacherLabel(teacherName)}</strong><small>{schoolName.trim() || "Add your school in a lesson plan"}</small></span>
@@ -1170,7 +1239,7 @@ export default function Home() {
             </div>
             <div className="account-anchor mobile-account">
               <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
-              {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} onSignOut={signOut} />}
+              {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} />}
             </div>
           </div>
         </header>
@@ -1178,6 +1247,7 @@ export default function Home() {
         <div className="walkthrough-dock-host" data-walkthrough-host="workspace" />
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
         {showTutorialOffer && <WalkthroughOffer onStart={openWalkthrough} onDismiss={() => saveTutorialProgress({ ...emptyWalkthroughStatus, dismissed: true })} />}
+        {guestSignOutOpen && <GuestSignOut busy={signingOut} error={guestError} onConfirm={() => void signOut(true)} onCancel={() => { setGuestSignOutOpen(false); setGuestError(""); }} />}
         {walkthroughScope === workspaceScope && !tutorialStatus.completed && <GabayWalkthrough key={workspaceScope} step={tutorialStatus.step} motion={gabayMotion} onProgress={saveTutorialProgress} onExit={exitWalkthrough} />}
 
         <div className="content" ref={contentRef}>
@@ -1197,7 +1267,7 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} guestMentionTag={guestIdentity?.mentionTag} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         <GabayGuide onStartWalkthrough={openWalkthrough} open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
@@ -1210,10 +1280,13 @@ export default function Home() {
   );
 }
 
-function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCreateAccount, onContinue }: { name: string; email: string; onNameChange: (name: string) => void; onEmailChange: (email: string) => void; onSignIn: (email: string, password: string) => Promise<AuthActionResult>; onCreateAccount: (name: string, email: string, password: string) => Promise<AuthActionResult>; onContinue: () => void }) {
+function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCreateAccount, onContinue, onGuest, guestRequired, guestName, guestError, onGuestCancel }: { name: string; email: string; onNameChange: (name: string) => void; onEmailChange: (email: string) => void; onSignIn: (email: string, password: string, captchaToken?: string) => Promise<AuthActionResult>; onCreateAccount: (name: string, email: string, password: string, captchaToken?: string) => Promise<AuthActionResult>; onContinue: () => void; onGuest: (name: string, captchaToken?: string) => Promise<AuthActionResult>; guestRequired: boolean; guestName: string; guestError: string; onGuestCancel: () => void }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [formMode, setFormMode] = useState<"sign-in" | "create">("sign-in");
+  const [selectedMode, setFormMode] = useState<"sign-in" | "create" | "guest">(guestRequired ? "guest" : "sign-in");
+  const formMode = guestRequired ? "guest" : selectedMode;
+  const [captchaToken, setCaptchaToken] = useState<string>();
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [formMessage, setFormMessage] = useState("");
   const [formError, setFormError] = useState("");
@@ -1223,12 +1296,14 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
     setSubmitting(true);
     setFormError("");
     setFormMessage("");
-    const result = formMode === "sign-in"
-      ? await onSignIn(email.trim(), password)
-      : await onCreateAccount(name.trim(), email.trim(), password);
-    setSubmitting(false);
-    if (!result.ok) setFormError(result.message || "Something went wrong. Please try again.");
-    else if (result.message) setFormMessage(result.message);
+    try {
+      const result = formMode === "sign-in"
+        ? await onSignIn(email.trim(), password, captchaToken)
+        : await onCreateAccount(name.trim(), email.trim(), password, captchaToken);
+      if (!result.ok) setFormError(result.message || "Something went wrong. Please try again.");
+      else if (result.message) setFormMessage(result.message);
+    } catch { setFormError("Check your connection and try again."); }
+    finally { setSubmitting(false); setCaptchaToken(undefined); setCaptchaAttempt((current) => current + 1); }
   }
 
   function switchMode(mode: "sign-in" | "create") {
@@ -1239,8 +1314,9 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
 
   return (
     <main className="login-screen">
-      <section className="login-panel" aria-labelledby="login-title">
+      <section className="login-panel" aria-labelledby={formMode === "guest" ? "guest-entry-title" : "login-title"}>
         <StackedKalingaLogo />
+        {formMode === "guest" ? <GuestEntry configured={guestAccessEnabled && isSupabaseConfigured && !!guestCaptchaSiteKey} initialName={guestName} message={guestError} onContinue={onGuest} onCancel={() => { onGuestCancel(); setFormMode("sign-in"); }} /> : <>
         <div className="login-copy">
           <p className="eyebrow">TEACHERS’ ASSISTANT</p>
           <h1 id="login-title">{formMode === "sign-in" ? "Welcome back, Teacher" : "Create your teacher account"}</h1>
@@ -1255,12 +1331,15 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
           <div className="login-options"><span>{formMode === "sign-in" ? "Your session stays securely signed in on this device." : "Use at least 6 characters."}</span></div>
           {formError && <p className="auth-feedback error" role="alert">{formError}</p>}
           {formMessage && <p className="auth-feedback success" role="status">{formMessage}</p>}
-          <button className="login-primary" type="submit" disabled={submitting}>{submitting ? "Please wait…" : formMode === "sign-in" ? "Sign in to Kalinga" : "Create teacher account"}</button>
+          {guestCaptchaSiteKey && <GuestCaptcha siteKey={guestCaptchaSiteKey} onToken={setCaptchaToken} attempt={captchaAttempt} />}
+          <button className="login-primary" type="submit" disabled={submitting || (!!guestCaptchaSiteKey && !captchaToken)}>{submitting ? "Please wait…" : formMode === "sign-in" ? "Sign in to Kalinga" : "Create teacher account"}</button>
         </form>
 
         <div className="login-divider"><span>or</span></div>
-        <button className="prototype-button" type="button" onClick={onContinue}>Continue to prototype <span>→</span></button>
-        <p className="demo-note"><span>i</span><b>Demo access</b> Prototype mode stays on this device. Sign in to securely use connected Gabay.</p>
+        {guestAccessEnabled && <button className="prototype-button guest-start-button" type="button" onClick={() => setFormMode("guest")}>Continue as guest <span>→</span></button>}
+        <button className="prototype-button" type="button" onClick={onContinue}>Offline demo <span>→</span></button>
+        <p className="demo-note"><span>i</span><b>Offline demo</b> Stays on this device. It does not connect to Gabay AI or other teachers.</p>
+        </>}
         <p className="login-language">English <i /> Filipino</p>
       </section>
       <KalingaFooterArtwork />
@@ -1314,10 +1393,10 @@ function KalingaFooterArtwork() {
   );
 }
 
-function AccountMenu({ name, email, onSignOut }: { name: string; email: string; onSignOut: () => void }) {
+function AccountMenu({ name, email, guest, onSignOut }: { name: string; email: string; guest: boolean; onSignOut: () => void }) {
   return (
     <div className="account-menu" role="menu" aria-label="Account options">
-      <div className="account-menu-heading"><span className="avatar">{teacherInitials(name)}</span><span><strong>{teacherLabel(name)}</strong><small>{email}</small></span></div>
+      <div className="account-menu-heading"><span className="avatar">{teacherInitials(name)}</span><span><strong>{teacherLabel(name)}</strong><small>{guest ? "Guest · remembered in this browser" : email}</small></span></div>
       <div className="account-menu-options">
         <button type="button" role="menuitem" disabled><span>◎</span> Account settings<small>Coming soon</small></button>
         <button type="button" role="menuitem" disabled><span>?</span> Help &amp; support<small>Coming soon</small></button>
@@ -2798,7 +2877,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     const safeName = submissionFile.name.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "") || "teacher-resource.pdf";
     const storagePath = `${teacherAccountId}/${crypto.randomUUID()}-${safeName}`;
     const upload = await supabase.storage.from("teacher-resources").upload(storagePath, submissionFile, { contentType: "application/pdf", upsert: false });
-    if (upload.error) { setSubmitting(false); setLibraryError("The PDF could not be uploaded. Apply the latest Supabase migration, then try again."); return; }
+    if (upload.error) { setSubmitting(false); setLibraryError(guestOperationMessage(upload.error, "The PDF could not be uploaded. Check your connection, access, or upload limit, then retry.")); return; }
     const metadata = {
       subject: submission.subject.trim() || "General", grades: submission.grades.trim() || "Grade levels not specified",
       type: submission.type.trim() || "Teacher resource", description: submission.description.trim(),
@@ -2853,7 +2932,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     setSubmitting(true);
     const { data, error } = await supabase.from("resource_comments").insert({ resource_id: previewResource.id, teacher_id: teacherAccountId, teacher_name: teacherLabel(teacherName), body: commentInput.trim() }).select("id,resource_id,teacher_id,teacher_name,body,created_at").single();
     setSubmitting(false);
-    if (error || !data) { setLibraryError("Your comment could not be posted. Please try again."); return; }
+    if (error || !data) { setLibraryError(guestOperationMessage(error, "Your comment could not be posted. Please try again.")); return; }
     setComments((current) => [...current, { id: String(data.id), resourceId: String(data.resource_id), teacherId: String(data.teacher_id), teacherName: String(data.teacher_name), body: String(data.body), createdAt: String(data.created_at) }]);
     setCommentInput(""); setLibraryError("");
   }
@@ -2865,7 +2944,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
       <div className="resource-submission-sections">
         <fieldset><legend><span>1</span> PDF and title</legend><label>PDF file <small>Required · PDF only · up to 20 MB</small><input required type="file" accept=".pdf,application/pdf" onChange={(event) => setSubmissionFile(event.target.files?.[0])} /></label><label>Resource title<input required minLength={4} maxLength={200} value={submission.title} onChange={(event) => setSubmission((current) => ({ ...current, title: event.target.value }))} placeholder="A clear, specific title" /></label></fieldset>
         <fieldset><legend><span>2</span> Classroom fit</legend><div className="resource-submission-grid"><label>Subject<select value={submission.subject} onChange={(event) => setSubmission((current) => ({ ...current, subject: event.target.value }))}>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}<option>General</option></select></label><label>Grade levels<input required value={submission.grades} onChange={(event) => setSubmission((current) => ({ ...current, grades: event.target.value }))} placeholder="e.g. Grades 3–5" /></label><label>Material type<select value={submission.type} onChange={(event) => setSubmission((current) => ({ ...current, type: event.target.value }))}><option>Activity sheet</option><option>Teacher guide</option><option>Lesson exemplar</option><option>Assessment</option><option>Reading material</option><option>Presentation</option><option>Other</option></select></label><label>Tags <small>Comma-separated</small><input value={submission.tags} onChange={(event) => setSubmission((current) => ({ ...current, tags: event.target.value }))} placeholder="Low-cost, multigrade, offline" /></label><label className="wide">What is this and how should it be used?<textarea required minLength={20} maxLength={1200} value={submission.description} onChange={(event) => setSubmission((current) => ({ ...current, description: event.target.value }))} placeholder="Briefly explain the activity, materials needed, and anything another teacher should check first." /></label></div></fieldset>
-        <fieldset><legend><span>3</span> Sharing and transparency</legend><label>Who can open this PDF?<select value={submission.visibility} onChange={(event) => setSubmission((current) => ({ ...current, visibility: event.target.value as ResourceSubmission["visibility"] }))}><option value="shared">All signed-in Kalinga teachers</option><option value="private">Only me</option></select></label><div className="submission-transparency"><p><b>Shown on the resource card</b><span>Uploaded by {teacherLabel(teacherName)} · {submission.visibility === "shared" ? "Shared with signed-in teachers" : "Private to your account"} · Community upload, not reviewed</span></p><p><b>Not shared automatically</b><span>Your classes, learners, attendance, and lesson-plan records are never added to the PDF submission.</span></p></div>{submission.visibility === "shared" && <div className="rights-check"><input id="resource-sharing-rights" type="checkbox" aria-labelledby="resource-sharing-rights-label" checked={sharingRightsConfirmed} onChange={(event) => setSharingRightsConfirmed(event.target.checked)} /><span id="resource-sharing-rights-label"><b>I made this resource or have permission to share it.</b><small>I understand other signed-in teachers can open it and discuss it.</small></span></div>}</fieldset>
+        <fieldset><legend><span>3</span> Sharing and transparency</legend><label>Who can open this PDF?<select value={submission.visibility} onChange={(event) => setSubmission((current) => ({ ...current, visibility: event.target.value as ResourceSubmission["visibility"] }))}><option value="shared">Connected Kalinga users (including guests)</option><option value="private">Only me</option></select></label><div className="submission-transparency"><p><b>Shown on the resource card</b><span>Uploaded by {teacherLabel(teacherName)} · {submission.visibility === "shared" ? "Shared with connected users, including guests" : "Private to your account"} · Community upload, not reviewed</span></p><p><b>Not shared automatically</b><span>Your classes, learners, attendance, and lesson-plan records are never added to the PDF submission.</span></p></div>{submission.visibility === "shared" && <div className="rights-check"><input id="resource-sharing-rights" type="checkbox" aria-labelledby="resource-sharing-rights-label" checked={sharingRightsConfirmed} onChange={(event) => setSharingRightsConfirmed(event.target.checked)} /><span id="resource-sharing-rights-label"><b>I made this resource or have permission to share it.</b><small>I understand connected users, including public guests, can open it and discuss it.</small></span></div>}</fieldset>
       </div>
       <footer><button className="secondary-button" type="button" onClick={() => setSubmissionOpen(false)}>Cancel</button><button className="primary-button" type="submit" disabled={submitting || !submissionFile || !submission.title.trim() || !submission.description.trim() || (submission.visibility === "shared" && !sharingRightsConfirmed)}>{submitting ? "Uploading…" : submission.visibility === "shared" ? "Publish resource" : "Upload privately"}</button></footer>
     </form>}
@@ -3026,9 +3105,11 @@ function communityTime(value: string) {
   return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 }
 
-function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscussionId, initialResourceId, onRequestSignIn, onOpenLibrary, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; openDiscussionId: string; initialResourceId: string; onRequestSignIn: () => void; onOpenLibrary: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function CommunityView({ authenticated, teacherAccountId, teacherName, guestMentionTag, openDiscussionId, initialResourceId, onRequestSignIn, onOpenLibrary, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; guestMentionTag?: string; openDiscussionId: string; initialResourceId: string; onRequestSignIn: () => void; onOpenLibrary: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [tab, setTab] = useState<"all" | "mine">("all");
   const [discussions, setDiscussions] = useState<TeacherDiscussion[]>([]);
+  const [canonicalTags, setCanonicalTags] = useState<Record<string, string>>({});
+  const [legacyTags, setLegacyTags] = useState(false);
   const [replies, setReplies] = useState<TeacherReply[]>([]);
   const [selectedDiscussionId, setSelectedDiscussionId] = useState(openDiscussionId);
   const [loading, setLoading] = useState(authenticated);
@@ -3089,9 +3170,22 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
   const attachableResources = [...teacherResources, ...starterResources];
   const selectedDiscussion = visibleDiscussions.find((item) => item.id === selectedDiscussionId) || visibleDiscussions[0];
   const selectedReplies = replies.filter((item) => item.discussionId === selectedDiscussion?.id);
-  const teacherTags = [...new Map([...discussions.map((item) => ({ name: item.authorName, id: item.authorId })), ...replies.map((item) => ({ name: item.authorName, id: item.authorId }))].map((item) => [item.id, teacherMention(item.name, item.id)])).entries()]
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!authenticated || !supabase) return;
+    let active = true;
+    const ids = [...new Set([teacherAccountId, ...discussions.map((item) => item.authorId), ...replies.map((item) => item.authorId)])].filter(Boolean).slice(0, 100);
+    void supabase.rpc("community_teacher_tags", { teacher_ids: ids }).then(({ data, error }) => {
+      if (!active) return;
+      if (error) { setLegacyTags(error.code === "PGRST202" && !guestAccessEnabled); return; }
+      setLegacyTags(false);
+      if (Array.isArray(data)) setCanonicalTags(Object.fromEntries(data.filter((row) => typeof row.id === "string" && typeof row.mention_tag === "string").map((row) => [row.id, row.mention_tag])));
+    });
+    return () => { active = false; };
+  }, [authenticated, teacherAccountId, discussions, replies]);
+  const teacherTags = [...new Map([...discussions.map((item) => ({ name: item.authorName, id: item.authorId })), ...replies.map((item) => ({ name: item.authorName, id: item.authorId }))].map((item) => [item.id, canonicalTags[item.id] || (legacyTags ? teacherMention(item.name, item.id) : "")])).entries()]
     .filter(([id]) => id !== teacherAccountId)
-    .map(([, tag]) => tag)
+    .map(([, tag]) => tag).filter(Boolean)
     .slice(0, 8);
 
   useEffect(() => {
@@ -3110,7 +3204,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     setSubmitting(true);
     const { data, error } = await supabase.from("teacher_discussions").insert({ author_id: teacherAccountId, author_name: teacherLabel(teacherName), title: questionTitle.trim(), body: encodeCommunityMessage(questionBody, questionResourceId), subject: questionSubject === "General" ? null : questionSubject, grade_levels: questionGrades.split(",").map((grade) => grade.trim()).filter(Boolean) }).select("id,author_id,author_name,school_name,title,body,subject,grade_levels,created_at").single();
     setSubmitting(false);
-    if (error || !data) { setCommunityError("Your question could not be posted. Please check your connection and try again."); return; }
+    if (error || !data) { setCommunityError(guestOperationMessage(error, "Your question could not be posted. Please check your connection and try again.")); return; }
     const message = decodeCommunityMessage(String(data.body));
     const item: TeacherDiscussion = { id: String(data.id), authorId: String(data.author_id), authorName: String(data.author_name), schoolName: data.school_name ? String(data.school_name) : "", title: String(data.title), body: message.body, resourceId: message.resourceId, subject: data.subject ? String(data.subject) : "General", gradeLevels: Array.isArray(data.grade_levels) ? data.grade_levels.map(String) : [], createdAt: String(data.created_at) };
     setDiscussions((current) => [item, ...current.filter((discussion) => discussion.id !== item.id)]); setSelectedDiscussionId(item.id); setQuestionTitle(""); setQuestionBody(""); setQuestionGrades(""); setQuestionResourceId(""); setComposerOpen(false); setTab("all"); setCommunityError("");
@@ -3124,7 +3218,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
     setSubmitting(true);
     const { data, error } = await supabase.from("teacher_replies").insert({ discussion_id: selectedDiscussion.id, author_id: teacherAccountId, author_name: teacherLabel(teacherName), body: encodeCommunityMessage(reply, replyResourceId) }).select("id,discussion_id,author_id,author_name,body,created_at").single();
     setSubmitting(false);
-    if (error || !data) { setCommunityError("Your reply could not be sent. Please try again."); return; }
+    if (error || !data) { setCommunityError(guestOperationMessage(error, "Your reply could not be sent. Please try again.")); return; }
     const message = decodeCommunityMessage(String(data.body));
     const item: TeacherReply = { id: String(data.id), discussionId: String(data.discussion_id), authorId: String(data.author_id), authorName: String(data.author_name), body: message.body, resourceId: message.resourceId, createdAt: String(data.created_at) };
     setReplies((current) => [...current.filter((entry) => entry.id !== item.id), item]); setReply(""); setReplyResourceId(""); setCommunityError("");
@@ -3152,7 +3246,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
   if (!authenticated) return <div data-tour="community-page" className="view-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
   return <div data-tour="community-page" className="view-page community-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
-    <aside className="community-explainer"><span>@</span><p><b>Your tag is {teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><button type="button" onClick={onOpenLibrary}>Upload or manage resources →</button></aside>
+    <aside className="community-explainer"><span>@</span><p><b>Your tag is {guestMentionTag || canonicalTags[teacherAccountId] || teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><button type="button" onClick={onOpenLibrary}>Upload or manage resources →</button></aside>
     {composerOpen && <form className="community-composer" onSubmit={submitQuestion}>
       <header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header>
       <div>
@@ -3162,7 +3256,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, openDiscu
         <label className="wide">Classroom context<textarea required minLength={4} maxLength={3000} value={questionBody} onChange={(event) => setQuestionBody(event.target.value)} placeholder="What have you tried? Add a teacher tag if you want their attention." /></label>
         <div className="community-compose-tools wide"><label>Attach your resource <small>Shared PDFs only</small><select value={questionResourceId} onChange={(event) => setQuestionResourceId(event.target.value)}><option value="">No attachment</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.subject} · {resource.title}</option>)}</select></label><div><small>Tag a teacher</small>{teacherTags.length ? teacherTags.map((tag) => <button type="button" onClick={() => setQuestionBody((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>) : <span>Teacher tags appear after another account posts.</span>}</div></div>
       </div>
-      <footer><small>Shared with signed-in Kalinga teachers. Keep learner names and private records out.</small><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Posting…" : "Post question"}</button></footer>
+      <footer><small>Shared with connected Kalinga users, including public guests. Display names are not verified teacher identities. Keep learner names and private records out.</small><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Posting…" : "Post question"}</button></footer>
     </form>}
     <div className="community-toolbar"><div className="community-tabs"><button className={tab === "all" ? "active" : ""} type="button" onClick={() => setTab("all")}>All questions <span>{discussions.length}</span></button><button className={tab === "mine" ? "active" : ""} type="button" onClick={() => setTab("mine")}>My questions <span>{discussions.filter((item) => item.authorId === teacherAccountId).length}</span></button></div><small><i /> Live room · new replies appear automatically</small></div>
     {communityError && <p className="community-error" role="status">{communityError}</p>}
