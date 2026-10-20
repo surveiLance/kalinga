@@ -41,6 +41,10 @@ export function walkthroughProgress(step: number, action: "next" | "back" | "pau
 export function nextWalkthroughStep(step: number, visible: string[], alreadyVisible: string[] = []) {
   return walkthroughSteps[safeStep(step)].after?.some((target) => visible.includes(target) && !alreadyVisible.includes(target)) ? safeStep(step + 1) : safeStep(step);
 }
+export function canAdvanceWalkthrough(step: number, visible: string[]) {
+  const item = walkthroughSteps[safeStep(step)];
+  return item.targets.some((target) => visible.includes(target)) && (!item.after || item.after.some((target) => visible.includes(target)));
+}
 type Rect = { left: number; top: number; width: number; height: number };
 export function clipWalkthroughHighlight(target: Rect, clips: Rect[]) {
   const left = Math.max(...clips.map((clip) => clip.left));

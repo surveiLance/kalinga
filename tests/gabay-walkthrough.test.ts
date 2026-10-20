@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { readWalkthroughStatus, walkthroughProgress, walkthroughSteps, nextWalkthroughStep, placeWalkthrough, canRestoreWalkthroughFocus, clipWalkthroughHighlight } from "@/lib/gabay-walkthrough";
+import { readWalkthroughStatus, walkthroughProgress, walkthroughSteps, nextWalkthroughStep, placeWalkthrough, canRestoreWalkthroughFocus, clipWalkthroughHighlight, canAdvanceWalkthrough } from "@/lib/gabay-walkthrough";
 describe("Gabay's real-workspace walkthrough", () => {
+  it("does not let Next move past class setup before the teacher opens the next real step", () => {
+    expect(canAdvanceWalkthrough(2, ["class-details", "class-details-next"])).toBe(false);
+    expect(canAdvanceWalkthrough(3, ["class-schedule"])).toBe(false);
+    expect(canAdvanceWalkthrough(4, ["class-learners", "class-save"])).toBe(false);
+    expect(canAdvanceWalkthrough(2, ["class-details", "class-schedule"])).toBe(true);
+  });
+  it("pauses Next on the wrong page but lets teachers move through hints on the open lesson", () => {
+    expect(canAdvanceWalkthrough(7, ["nav-toggle", "community-page"])).toBe(false);
+    expect(canAdvanceWalkthrough(7, ["plan-setup", "plan-document"])).toBe(true);
+    expect(canAdvanceWalkthrough(5, ["nav-plan", "class-page"])).toBe(false);
+  });
   it("clips the highlight to the visible scroll area above a sticky form footer", () => {
     expect(clipWalkthroughHighlight({ left: 20, top: -100, width: 900, height: 1000 }, [{ left: 0, top: 0, width: 1280, height: 720 }, { left: 20, top: 25, width: 900, height: 670 }, { left: 20, top: 25, width: 900, height: 580 }])).toEqual({ left: 20, top: 25, width: 900, height: 580 });
   });
