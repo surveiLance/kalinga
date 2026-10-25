@@ -1,5 +1,9 @@
 import { GabayMascot } from "@/components/gabay-mascot";
 
+export function isGabayThinking(replying: boolean, lastMessageRole?: "teacher" | "gabay") {
+  return replying && lastMessageRole === "teacher";
+}
+
 export function GabayThinking({ motion = true }: { motion?: boolean }) {
   return <div className={`gabay gabay-thinking${motion ? "" : " motion-paused"}`} role="status">
     <span className="sr-only">Gabay is thinking</span>
