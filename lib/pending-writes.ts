@@ -6,7 +6,7 @@ type AttendanceMap = Record<string, Record<string, string>>;
 type AttendanceRow = { learnerId: string; grade: string; status: string; note: string };
 
 export type PendingChange<C = SyncClass, P = SyncPlan> =
-  | { kind: "profile"; schoolName: string }
+  | { kind: "profile"; schoolName: string; displayName?: string }
   | { kind: "class"; classId: string; value: C }
   | { kind: "delete-class"; classId: string }
   | { kind: "plan"; classId: string; value: P }
@@ -40,7 +40,7 @@ export function readPendingWrites<C extends SyncClass, P extends SyncPlan>(store
   const parsed: unknown = JSON.parse(stored);
   if (!Array.isArray(parsed) || !parsed.every((item: unknown) => {
     if (!record(item) || item.scope !== scope || typeof item.id !== "string" || !Number.isInteger(item.attempts) || Number(item.attempts) < 0 || typeof item.nextAttemptAt !== "number" || !Number.isFinite(item.nextAttemptAt) || typeof item.error !== "string") return false;
-    if (item.kind === "profile") return typeof item.schoolName === "string";
+    if (item.kind === "profile") return typeof item.schoolName === "string" && (item.displayName === undefined || typeof item.displayName === "string");
     if (typeof item.classId !== "string") return false;
     if (item.kind === "delete-class") return true;
     if (item.kind === "class") return record(item.value) && item.value.id === item.classId && Array.isArray(item.value.learners) && item.value.learners.every((learner: unknown) => record(learner) && typeof learner.id === "string" && typeof learner.grade === "string");
@@ -62,6 +62,10 @@ function changeKey<C extends SyncClass, P extends SyncPlan>(change: PendingChang
 export function enqueuePendingWrite<C extends SyncClass, P extends SyncPlan>(queue: PendingWrite<C, P>[], scope: string, change: PendingChange<C, P>, id: string, now: number): PendingWrite<C, P>[] {
   if (queue.some((item) => item.scope !== scope)) throw new Error("Workspace scope mismatch.");
   let next = queue;
+  if (change.kind === "profile") {
+    const previous = next.find((item) => item.kind === "profile");
+    if (previous?.kind === "profile" && change.displayName === undefined && previous.displayName !== undefined) change = { ...change, displayName: previous.displayName };
+  }
   if (change.kind === "delete-class") {
     const deletedClassId = change.classId;
     next = next.filter((item) => item.kind === "profile" || item.classId !== deletedClassId);

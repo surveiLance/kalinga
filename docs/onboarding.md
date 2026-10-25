@@ -11,7 +11,7 @@ An offline-first **teacher's assistant for multigrade classrooms in last-mile Ph
 - **Frontend:** Next.js 16.2, React 19.2, TypeScript 5.9, Tailwind 4. Deployed on **Vercel**, auto-deploys from `main`. Live: https://kalinga-gules.vercel.app
 - **Backend:** **Supabase** (project ref `aoiufmxzeenjrrtbkdwi`) — Postgres + row-level security, Auth, Storage, Realtime, and Edge Functions (Deno).
 - **AI:** **Groq** (`openai/gpt-oss-20b`) called *only* through the `gabay-chat` Supabase Edge Function, so the model key never reaches the browser.
-- **Tests:** Vitest (120 passing at time of writing).
+- **Tests:** Vitest (224 passing on 25 October 2026).
 
 ## Repo shape (unusual — read this)
 
@@ -74,6 +74,8 @@ End commit messages with a `Co-Authored-By:` line for your AI assistant if it ma
 
 The planner is solid: topic-required AI drafting, complete-or-reject validation (a partial AI draft never blanks existing work), per-grade redraft, editable-in-place document, PDF + Word export, plan index with select/delete, mobile layout (one grade at a time). Recently hardened: server-side PII redaction, A4 Word export, profile sync through the queue.
 
-**Roadmap / known-missing:** a service worker for true offline *boot* (currently local-first only once loaded), CSV/XLSX class-list import, DOCX lesson-plan import, password reset, and a curated MATATAG competency table so Gabay selects codes instead of generating them.
+**Account and export updates:** Name/school settings, help and password-recovery UI are implemented; see `docs/account-controls.md` for hosted recovery configuration and verification limits. Source-derived ILAW typography/table details are in `docs/ilaw-format.md`.
+
+**Roadmap / known-missing:** a service worker for true offline *boot* (currently local-first only once loaded), CSV/XLSX class-list import, DOCX lesson-plan import, and a curated MATATAG competency table so Gabay selects codes instead of generating them.
 
 **Ask before large refactors.** Small, verified, working changes that match the existing style are the norm here.

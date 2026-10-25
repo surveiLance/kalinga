@@ -26,6 +26,11 @@ function entryOfKind<K extends PendingChange["kind"]>(queue: TestQueue, kind: K,
 }
 
 describe("enqueuePendingWrite", () => {
+  it("preserves queued teacher-name edits when a later school-only job arrives", () => {
+    const queue = queueWith({ kind: "profile", schoolName: "School A", displayName: "Ana Reyes" }, { kind: "profile", schoolName: "School B" });
+    expect(entryOfKind(queue, "profile")).toMatchObject({ displayName: "Ana Reyes", schoolName: "School B" });
+    expect(readPendingWrites(JSON.stringify(queue), scope)).toEqual(queue);
+  });
   it("collapses repeated school-name edits into the latest profile change", () => {
     const queue = queueWith(
       { kind: "profile", schoolName: "Old School" },

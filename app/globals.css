@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+
 :root {
   --surface: #f3f0ea;
   --surface-raised: #fffefa;
@@ -122,7 +123,7 @@ p { text-wrap: pretty; }
 .account-menu-heading strong, .account-menu-heading small { display: block; }.account-menu-heading strong { font-size: 12px; }.account-menu-heading small { margin-top: 3px; color: var(--muted); font-size: 8px; }
 .account-menu-options { padding: 7px 0; border-bottom: 1px solid var(--line); }
 .account-menu button { width: 100%; min-height: 44px; border: 0; border-radius: 9px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 6px; color: var(--ink); background: transparent; text-align: left; font-size: 10px; font-weight: 700; }
-.account-menu-options button { padding: 9px 7px; opacity: .52; cursor: not-allowed; }.account-menu-options button > span { color: var(--muted); font-size: 14px; text-align: center; }.account-menu-options button small { color: #969ba4; font-size: 7px; font-weight: 650; }
+.account-menu-options button { padding: 9px 7px; cursor: pointer; }.account-menu-options button:disabled { opacity: .52; cursor: not-allowed; }.account-menu-options button > span { color: var(--muted); font-size: 14px; text-align: center; }.account-menu-options button small { color: #969ba4; font-size: 7px; font-weight: 650; }
 .account-menu .signout-button { margin-top: 7px; padding: 10px 7px; color: #b33e1b; cursor: pointer; }.account-menu .signout-button:hover { background: #fff0e9; }.signout-button span { text-align: center; }
 .mobile-account { display: none; }
 .mobile-account-button { width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; color: #8d3415; background: #f6cbb8; font-size: 10px; font-weight: 800; cursor: pointer; }
@@ -1968,3 +1969,83 @@ html { scroll-behavior: smooth; }
 @media print { .walkthrough-dock-host { display: none !important; } }
 .guest-entry > h1 { margin: 12px 0; color: var(--ink); font-size: 34px; line-height: 1.15; }.guest-entry > p:not(.eyebrow) { color: var(--muted); line-height: 1.6; }.guest-session-note { margin: 18px 0; padding: 16px; border: 1px solid #c5ddd4; border-radius: 12px; background: #eef7f2; color: #335c55; font-size: 13px; line-height: 1.6; }.guest-session-note p { margin: 5px 0 0; }.guest-captcha { min-height: 68px; max-width: 100%; }.guest-start-button { margin-bottom: 10px; border-color: #7bb5ab; color: var(--support); background: #eef7f2; }.guest-signout-dialog { width: min(480px, calc(100vw - 32px)); padding: 28px; border: 1px solid #cbd9cf; border-radius: 18px; color: var(--ink); background: #fffdf8; }.guest-signout-dialog::backdrop { background: #172d3d88; }.guest-signout-dialog h2 { margin: 0 0 14px; font-size: 25px; }.guest-signout-dialog p { line-height: 1.65; }.guest-signout-dialog > div { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
 .guest-entry .login-form input { min-height: 48px; font-size: 16px; }.guest-entry .login-form label { font-size: 14px; }.guest-entry h1:focus { outline: none; }
+
+.account-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #bdd5cb; border-radius: 16px; color: #202a3d; background: #fffdf8; box-shadow: 0 22px 70px #162f3440; }
+.account-dialog[open] { display: flex; flex-direction: column; }
+.account-dialog::backdrop { background: #182c355e; backdrop-filter: blur(3px); }
+.account-dialog > header { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 24px; border-bottom: 1px solid #d2e2d8; background: #edf7f2; }
+.account-dialog h2 { margin: 4px 0 0; font-family: var(--font-ui); font-size: 26px; line-height: 1.2; }
+.account-dialog > header button { flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid #c9dcd3; border-radius: 8px; color: #226b61; background: #fffdf8; font-size: 26px; cursor: pointer; }
+.account-dialog-body { min-height: 0; padding: 24px; overflow-y: auto; overscroll-behavior: contain; font-size: 15px; line-height: 1.5; }
+.account-dialog-body > p { margin: 0 0 18px; }
+.account-form { display: grid; gap: 16px; }
+.account-form > p { margin: 0; }
+.account-form label { display: grid; gap: 7px; font-size: 15px; font-weight: 700; }
+.account-form input { width: 100%; min-width: 0; min-height: 48px; padding: 11px 12px; border: 1px solid #c7c8c0; border-radius: 8px; color: #202a3d; background: #fff; font: inherit; font-size: 16px; font-weight: 400; }
+.account-form input:read-only { background: #eeeae2; color: #596375; }
+.account-form small, .account-email small { color: #606d7a; font-size: 13px; line-height: 1.5; font-weight: 400; }
+.account-email { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.account-save-note { padding-top: 12px; border-top: 1px solid #dedbd2; font-size: 13px; color: #606d7a; }
+.account-feedback { padding: 12px; border: 1px solid #c3dcd2; border-radius: 8px; color: #1b6256; background: #edf7f1; font-size: 14px; line-height: 1.5; }
+.account-feedback.error { color: #913c24; background: #fff1e9; border-color: #e4b9a7; }
+.account-text-button { min-height: 44px; padding: 8px 0; border: 0; color: #176a62; background: transparent; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; text-align: left; }
+.account-text-button:disabled { opacity: .6; cursor: wait; }
+.account-dialog > footer { padding: 16px 24px; border-top: 1px solid #dedbd2; display: flex; justify-content: end; }
+.account-help details { padding: 16px 0; border-bottom: 1px solid #dedbd2; }
+.account-help summary { min-height: 36px; color: #205d55; font-weight: 750; cursor: pointer; }
+.account-help details p { margin: 10px 0 0; }
+.password-recovery h1 { font-size: 34px; line-height: 1.2; }
+.password-recovery > p { margin: 16px 0; }
+
+.ilaw-export-document.ilaw-export-inline, .ilaw-export-document { font-family: var(--ilaw-font, "Times New Roman", serif); font-size: var(--ilaw-body-size, 11pt); }
+.ilaw-export-document.ilaw-export-inline { max-width: 210mm; padding: .5in; }
+.ilaw-export-document .ilaw-print-title { border: 0; padding-bottom: 6pt; }
+.ilaw-export-document .ilaw-print-title p { font-family: var(--ilaw-font); font-size: var(--ilaw-title-size); font-weight: 700; letter-spacing: normal; }
+.ilaw-export-document .ilaw-print-title h1, .ilaw-export-document .ilaw-title-input { font-family: var(--ilaw-font); font-size: var(--ilaw-lesson-title-size); }
+.ilaw-export-document th, .ilaw-export-document td { border: .5pt solid #000; padding: 4pt 5pt; line-height: 1; }
+.ilaw-export-document th { color: #fff; background: var(--ilaw-i); font-weight: 700; }
+.ilaw-export-document .ilaw-print-meta th:nth-child(1) { width: 31.57%; }
+.ilaw-export-document .ilaw-print-meta td:nth-child(2) { width: 32.14%; }
+.ilaw-export-document .ilaw-print-meta th:nth-child(3) { width: 14.84%; }
+.ilaw-export-document .ilaw-print-meta td:nth-child(4) { width: 21.45%; }
+.ilaw-export-document .ilaw-print-section h2 { margin: 8pt 0 0; padding: 5pt 7.5pt; background: var(--ilaw-i); font-family: var(--ilaw-font); font-size: var(--ilaw-body-size); font-weight: 700; text-transform: uppercase; }
+.ilaw-export-document .ilaw-print-section:nth-of-type(2) h2 { background: var(--ilaw-l); }
+.ilaw-export-document .ilaw-print-section:nth-of-type(3) h2 { background: var(--ilaw-a); }
+.ilaw-export-document .ilaw-print-section:nth-of-type(4) h2 { background: var(--ilaw-w); }
+.ilaw-export-document .ilaw-print-section h2 span { width: auto; height: auto; color: #fff; background: transparent; font-family: inherit; }
+.ilaw-export-document .ilaw-print-section thead th { text-align: center; }
+.ilaw-export-document .ilaw-print-section thead th:first-child { background: #444; }
+.ilaw-export-document .ilaw-print-section > table:not(.ilaw-flow-table) th:first-child { width: 21.02%; }
+.ilaw-export-document .ilaw-print-section thead th:nth-child(2) { background: var(--ilaw-a); }
+.ilaw-export-document .ilaw-print-section thead th:nth-child(3) { background: var(--ilaw-l); }
+.ilaw-export-document .ilaw-print-section thead th:nth-child(5) { background: var(--ilaw-w); }
+.ilaw-export-document .ilaw-flow-table thead th:nth-child(-n+2) { background: #444; }
+.ilaw-export-document .ilaw-flow-table thead th:nth-child(3) { background: var(--ilaw-a); }
+.ilaw-export-document .ilaw-flow-table thead th:nth-child(4) { background: var(--ilaw-l); }
+.ilaw-export-document .ilaw-flow-table thead th:nth-child(5) { background: var(--ilaw-i); }
+.ilaw-export-document .ilaw-flow-table thead th:nth-child(6) { background: var(--ilaw-w); }
+.ilaw-export-document .ilaw-flow-table thead th:nth-child(7) { background: var(--ilaw-a); }
+.ilaw-export-document .ilaw-flow-table thead th:nth-child(8) { background: var(--ilaw-l); }
+.ilaw-export-document .ilaw-flow-table th:first-child { width: 10.51%; }
+.ilaw-export-document .ilaw-flow-table th:nth-child(2) { width: 18.15%; }
+.ilaw-export-document .ilaw-flow-table tbody td:nth-child(2) { background: var(--ilaw-i); color: #fff; font-weight: 700; }
+.ilaw-export-document .flow-stage .edit-cell, .ilaw-export-document .flow-stage .edit-cell.compact + .edit-cell.compact, .ilaw-export-document .ilaw-flow-table tbody td:nth-child(2) small { color: inherit; }
+.ilaw-export-document .flow-stage .edit-cell::placeholder { color: #d8dfee; }
+.ilaw-export-document .flow-stage .edit-cell:focus { color: #111; }
+.ilaw-export-document .flow-stage .whole-class-toggle { color: #fff; }
+.ilaw-export-document .ilaw-shared-table th:first-child { width: 21.02%; }
+.ilaw-export-document .ilaw-shared-theme td { font-family: "Century Gothic", sans-serif; font-size: 8pt; font-weight: 700; }
+.ilaw-export-document .ilaw-shared-table + table { margin-top: 0; }
+.ilaw-export-document .ilaw-print-signatures { margin-top: 20pt; gap: 30pt; }
+.ilaw-export-document .ilaw-print-signatures span { font-style: italic; }
+.ilaw-export-document .ilaw-print-signatures small { font-size: 11pt; }
+@media print {
+  .plan-page.ilaw-print-mode .ilaw-export-document:not(.ilaw-editor) { font-family: var(--ilaw-font); font-size: var(--ilaw-body-size); }
+  .ilaw-print-mode .ilaw-export-document:not(.ilaw-editor) th, .ilaw-print-mode .ilaw-export-document:not(.ilaw-editor) td { line-height: 1; padding: 4pt 5pt; }
+  .ilaw-print-mode .ilaw-export-document:not(.ilaw-editor) .ilaw-print-section h2 { font-size: var(--ilaw-body-size); }
+}
+@media screen and (max-width: 720px) {
+  .ilaw-export-document.ilaw-export-inline { padding: 18px 12px 24px; }
+  .ilaw-export-document.ilaw-editor.narrow .ilaw-print-meta th, .ilaw-export-document.ilaw-editor.narrow .ilaw-print-meta td { width: auto; }
+  .account-dialog > header, .account-dialog-body { padding: 18px; }
+}

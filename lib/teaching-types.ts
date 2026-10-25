@@ -57,6 +57,8 @@ export type PlanSlot = {
 };
 
 export type SavedPlan = {
+  teacherName?: string;
+  schoolName?: string;
   id: string;
   classId: string;
   title: string;

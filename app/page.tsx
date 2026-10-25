@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { GabayMascot } from "@/components/gabay-mascot";
@@ -9,6 +9,9 @@ import { LessonRevisionPanel } from "@/components/lesson-revision-panel";
 import { GabayWalkthrough, WalkthroughOffer } from "@/components/gabay-walkthrough";
 import { GuestEntry, GuestSignOut } from "@/components/guest-entry";
 import { GuestCaptcha } from "@/components/guest-captcha";
+import { AccountDialog, PasswordRecoveryScreen, type AccountPanel } from "@/components/account-controls";
+import { createProfileReadGate, normalizeAccountDetails, prepareAccountUpdate, type AccountResult } from "@/lib/account-controls";
+import { ILAW_FORMAT, ILAW_SECTION_COLORS } from "@/lib/ilaw-format";
 import { createAccountResolver, guestAccessEnabled, guestCaptchaSiteKey, guestOperationMessage, startGuestSession, type GuestIdentity } from "@/lib/guest-access";
 import { emptyWalkthroughStatus, readWalkthroughStatus, walkthroughProgress, type WalkthroughStatus } from "@/lib/gabay-walkthrough";
 import { leaveLesson, deleteLesson } from "@/lib/lesson-navigation";
@@ -36,6 +39,7 @@ type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
 type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string; read?: boolean };
 type NotificationRow = { id: string; kind: string; title: string; body: string; discussion_id: string; read_at: string | null; created_at: string };
+const ilawDocumentStyle = { "--ilaw-font": `"${ILAW_FORMAT.fontFamily}", serif`, "--ilaw-body-size": `${ILAW_FORMAT.bodySizePt}pt`, "--ilaw-title-size": `${ILAW_FORMAT.titleSizePt}pt`, "--ilaw-lesson-title-size": `${ILAW_FORMAT.lessonTitleSizePt}pt`, "--ilaw-i": `#${ILAW_SECTION_COLORS.I}`, "--ilaw-l": `#${ILAW_SECTION_COLORS.L}`, "--ilaw-a": `#${ILAW_SECTION_COLORS.A}`, "--ilaw-w": `#${ILAW_SECTION_COLORS.W}` } as CSSProperties;
 
 type RemoteClassRow = {
   id: string;
@@ -336,6 +340,10 @@ export default function Home() {
   const [view, setView] = useState<View>("home");
   const [entryMode, setEntryMode] = useState<EntryMode>(isSupabaseConfigured ? "loading" : "signed-out");
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountPanel, setAccountPanel] = useState<AccountPanel | null>(null);
+  const [recoveryAccountId, setRecoveryAccountId] = useState("");
+  const [profileReadyScope, setProfileReadyScope] = useState("");
+  const profileReadGate = useRef(createProfileReadGate());
   const [gabayOpen, setGabayOpen] = useState(false);
   const [gabayMotion, setGabayMotion] = useState(true);
   const [gabayEventMessage, setGabayEventMessage] = useState("");
@@ -357,6 +365,7 @@ export default function Home() {
   const [guestError, setGuestError] = useState("");
   const [guestSignOutOpen, setGuestSignOutOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const guestAccount = Boolean(guestIdentity);
   const accountResolver = useRef(createAccountResolver());
   const resolvedAccountId = useRef("");
   const guestStarting = useRef(false);
@@ -451,7 +460,9 @@ export default function Home() {
         : typeof user.user_metadata?.full_name === "string"
           ? user.user_metadata.full_name
           : user.email?.split("@")[0] || "Teacher";
-      setTeacherName(identity?.displayName || displayName);
+      const sameAccount = resolvedAccountId.current === user.id;
+      if (!sameAccount) { setAccountPanel(null); setProfileReadyScope(""); }
+      setTeacherName((current) => identity?.displayName || (sameAccount && current.trim() ? current : displayName));
       setGuestIdentity(identity || null);
       setGuestSetupOpen(false);
       setGuestError("");
@@ -501,6 +512,8 @@ export default function Home() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       sessionEventSeen = true;
+      if (_event === "PASSWORD_RECOVERY" && session?.user && !session.user.is_anonymous) setRecoveryAccountId(session.user.id);
+      else setRecoveryAccountId((current) => current === session?.user.id ? current : "");
       if (session?.user) queueAccount(session.user);
       else {
         resolver.cancel(); resolvedAccountId.current = ""; setGuestIdentity(null);
@@ -532,17 +545,23 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (entryMode !== "authenticated" || !teacherAccountId) return;
+    if (entryMode !== "authenticated" || !teacherAccountId || hydratedWorkspaceScope !== workspaceScope) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let active = true;
-    void supabase.from("profiles").select("school_name").eq("id", teacherAccountId).maybeSingle().then(({ data }) => {
-      const remote = typeof data?.school_name === "string" ? data.school_name.trim() : "";
-      // Never clobber something the teacher typed while this was in flight.
-      if (active && remote) setSchoolName((current) => current.trim() ? current : remote);
-    });
-    return () => { active = false; };
-  }, [entryMode, teacherAccountId]);
+    const gate = profileReadGate.current;
+    void gate.read(() => supabase.from("profiles").select("display_name,school_name").eq("id", teacherAccountId).maybeSingle(), ({ data, error }) => {
+      if (!active || error) return;
+      setProfileReadyScope(workspaceScope);
+      if (!data) return;
+      try {
+        const queued = loadPendingWrites(workspaceScope).find((item) => item.kind === "profile");
+        if (queued?.kind !== "profile") setSchoolName(typeof data.school_name === "string" ? data.school_name : "");
+        if (!guestAccount && !(queued?.kind === "profile" && queued.displayName !== undefined) && typeof data.display_name === "string" && data.display_name.trim()) setTeacherName(data.display_name);
+      } catch { /* Keep the device profile when its pending queue cannot be read. */ }
+    }).catch(() => { /* Keep the device copy if the profile cannot refresh. */ });
+    return () => { active = false; gate.invalidate(); };
+  }, [entryMode, teacherAccountId, hydratedWorkspaceScope, workspaceScope, guestAccount]);
 
   useEffect(() => {
     if (!workspaceScope) return;
@@ -584,7 +603,7 @@ export default function Home() {
         setSavedResourceIds(workspace.savedResourceIds);
         setAttendanceRecords(workspace.attendance);
         setAttendanceNotes(workspace.attendanceNotes);
-        if (workspaceScope === "prototype" && storedTeacherName) setTeacherName(storedTeacherName);
+        if (!guestAccount && storedTeacherName) setTeacherName(storedTeacherName);
         if (workspaceScope === "prototype" && storedTeacherEmail) setTeacherEmail(storedTeacherEmail);
         setSchoolName(storedSchoolName || "");
         if (storedGabayMotion) setGabayMotion(storedGabayMotion !== "false");
@@ -599,7 +618,7 @@ export default function Home() {
       }
     }, 0);
     return () => window.clearTimeout(hydrationTimer);
-  }, [workspaceScope]);
+  }, [workspaceScope, guestAccount]);
 
   useEffect(() => {
     if (!classDataReady || !workspaceScope || hydratedWorkspaceScope !== workspaceScope || storageError) return;
@@ -683,7 +702,7 @@ export default function Home() {
         try {
           checkSession();
           if (item.kind === "profile") {
-            const { error } = await supabase!.from("profiles").upsert({ id: teacherAccountId, school_name: item.schoolName.trim() || null }).abortSignal(controller.signal);
+            const { error } = await supabase!.from("profiles").upsert({ id: teacherAccountId, school_name: item.schoolName.trim() || null, ...(item.displayName !== undefined ? { display_name: item.displayName } : {}) }).abortSignal(controller.signal);
             if (error) throw error;
           }
           if (item.kind === "class") await saveClassToCloud(supabase!, teacherAccountId, item.value, controller.signal, checkSession);
@@ -990,12 +1009,15 @@ export default function Home() {
     if (signingOut) return;
     setSigningOut(true);
     if (entryMode === "authenticated") {
-      const result = await getSupabaseBrowserClient()?.auth.signOut();
-      if (result?.error) { setSigningOut(false); setGuestError("Sign-out did not complete. Please retry."); setNotice("Sign-out did not complete. Your session is unchanged."); return; }
+      try {
+        const result = await getSupabaseBrowserClient()?.auth.signOut();
+        if (!result || result.error) throw new Error("Sign-out failed");
+      } catch { setSigningOut(false); setGuestError("Sign-out did not complete. Please retry."); setNotice("Sign-out did not complete. Your session is unchanged."); return; }
     }
     accountResolver.current.cancel(); resolvedAccountId.current = "";
     setGuestSignOutOpen(false); setGuestSetupOpen(false); setGuestIdentity(null); setSigningOut(false);
     setAccountOpen(false);
+    setAccountPanel(null); setRecoveryAccountId("");
     setView("home");
     setNotice("");
     setAuthWelcomeMessage("");
@@ -1091,10 +1113,34 @@ export default function Home() {
     queueChanges([{ kind: "class", classId: sample.id, value: sample }], "The sample class is saved on this device and will sync when your connection returns.");
   }
 
-  function updateSchoolName(name: string) {
-    setSchoolName(name);
-    queueChanges([{ kind: "profile", schoolName: name }], "Your school name is saved on this device and will sync when your connection returns.");
+  async function saveAccountDetails(name: string, school: string): Promise<AccountResult> {
+    const details = normalizeAccountDetails(guestIdentity?.displayName || name, school);
+    if (!details.ok) return details;
+    if (!classDataReady || hydratedWorkspaceScope !== workspaceScope || !workspaceScope || storageError) return { ok: false, message: "Wait for your workspace to load and resolve any device-storage warning before saving." };
+    if (entryMode === "authenticated" && sessionTeacherId.current !== teacherAccountId) return { ok: false, message: "Your account changed. Reopen account settings." };
+    const prepared = prepareAccountUpdate(savedPlans, teacherName, schoolName, entryMode === "authenticated", cloudLoaded, profileReadyScope === workspaceScope);
+    if (!prepared.ok) return prepared;
+    const plans = prepared.plans;
+    profileReadGate.current.invalidate();
+    try {
+      const changes: PendingChange<TeachingClass, SavedPlan>[] = [{ kind: "profile", schoolName: details.school, ...(!guestIdentity ? { displayName: details.name } : {}) }, ...plans.filter((plan, index) => plan.teacherName !== savedPlans[index].teacherName || plan.schoolName !== savedPlans[index].schoolName).map((plan) => ({ kind: "plan" as const, classId: plan.classId, value: plan }))];
+      if (entryMode === "authenticated") {
+        const queue = changes.reduce((current, change) => enqueuePendingWrite(current, workspaceScope, change, crypto.randomUUID(), Date.now()), loadPendingWrites(workspaceScope));
+        setPendingWrites(persistPendingWrites(workspaceScope, queue));
+      }
+      persistDeviceWorkspace(workspaceScope, { classes, plans, savedResourceIds, attendance: attendanceRecords, attendanceNotes });
+      window.localStorage.setItem(workspaceStorageKey(workspaceScope, "teacher-name"), details.name);
+      window.localStorage.setItem(workspaceStorageKey(workspaceScope, "school-name"), details.school);
+      setSavedPlans(plans); setTeacherName(details.name); setSchoolName(details.school);
+      wakeSync.current();
+      return { ok: true, message: entryMode === "authenticated" ? "Saved on this device. The sync status shows when your account details reach the cloud." : "Saved in this browser for the offline demo." };
+    } catch {
+      setStorageError("Device storage could not finish saving your account details. Keep this page open and free space before retrying.");
+      return { ok: false, message: "Device storage could not finish saving. Your form is still here; do not clear browser data." };
+    }
   }
+
+  function openAccountPanel(panel: AccountPanel) { setAccountOpen(false); setAccountPanel(panel); }
 
   function deletePlan(planId: string) {
     const removed = savedPlans.find((item) => item.id === planId);
@@ -1106,6 +1152,7 @@ export default function Home() {
   }
 
   function savePlan(plan: SavedPlan) {
+    plan = { ...plan, teacherName: plan.teacherName ?? savedPlans.find((item) => item.id === plan.id)?.teacherName ?? teacherName, schoolName: plan.schoolName ?? savedPlans.find((item) => item.id === plan.id)?.schoolName ?? schoolName };
     setSavedPlans((current) => [plan, ...current.filter((item) => item.id !== plan.id)]);
     // Not setEditingPlanId: that id is part of the planner's key, and changing it
     // mid-edit remounts the planner and throws the teacher back to the first tab.
@@ -1176,6 +1223,8 @@ export default function Home() {
     updateSidebar("navigate");
   }
 
+  if (recoveryAccountId) return <PasswordRecoveryScreen key={recoveryAccountId} accountId={recoveryAccountId} onComplete={() => { setRecoveryAccountId(""); window.history.replaceState(null, "", window.location.pathname); }} onCancel={() => { void signOut(); }} />;
+
   if (entryMode === "loading") {
     return <main className="login-screen"><section className="login-panel auth-loading" aria-live="polite"><StackedKalingaLogo /><p>Opening your teaching space…</p></section><KalingaFooterArtwork /></main>;
   }
@@ -1211,7 +1260,7 @@ export default function Home() {
         </div>
 
         <div className="account-anchor desktop-account">
-          {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} />}
+          {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} />}
           <button className="profile" type="button" aria-label={`Account options for ${teacherLabel(teacherName)}`} aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
             <span className="avatar">{teacherInitials(teacherName)}</span>
             <span><strong>{teacherLabel(teacherName)}</strong><small>{schoolName.trim() || "Add your school in a lesson plan"}</small></span>
@@ -1239,7 +1288,7 @@ export default function Home() {
             </div>
             <div className="account-anchor mobile-account">
               <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
-              {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} />}
+              {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} />}
             </div>
           </div>
         </header>
@@ -1267,9 +1316,10 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSchoolNameChange={updateSchoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} guestMentionTag={guestIdentity?.mentionTag} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onAskGabay={() => setGabayOpen(true)} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} guestMentionTag={guestIdentity?.mentionTag} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
+        {accountPanel && <AccountDialog key={`${workspaceScope}:${accountPanel}`} kind={accountPanel} name={teacherName} school={schoolName} email={teacherEmail} guest={!!guestIdentity} authenticated={entryMode === "authenticated"} onClose={() => setAccountPanel(null)} onSave={saveAccountDetails} />}
         <GabayGuide onStartWalkthrough={openWalkthrough} open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -1285,6 +1335,7 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
   const [showPassword, setShowPassword] = useState(false);
   const [selectedMode, setFormMode] = useState<"sign-in" | "create" | "guest">(guestRequired ? "guest" : "sign-in");
   const formMode = guestRequired ? "guest" : selectedMode;
+  const [resetOpen, setResetOpen] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string>();
   const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -1329,6 +1380,7 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
           <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="teacher@school.edu.ph" autoComplete="email" required /></label>
           <label>Password<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} autoComplete={formMode === "sign-in" ? "current-password" : "new-password"} required /><button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? "Hide" : "Show"}</button></span></label>
           <div className="login-options"><span>{formMode === "sign-in" ? "Your session stays securely signed in on this device." : "Use at least 6 characters."}</span></div>
+          {formMode === "sign-in" && <button className="account-text-button" type="button" onClick={() => setResetOpen(true)} disabled={submitting}>Forgot password?</button>}
           {formError && <p className="auth-feedback error" role="alert">{formError}</p>}
           {formMessage && <p className="auth-feedback success" role="status">{formMessage}</p>}
           {guestCaptchaSiteKey && <GuestCaptcha siteKey={guestCaptchaSiteKey} onToken={setCaptchaToken} attempt={captchaAttempt} />}
@@ -1340,6 +1392,7 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
         <button className="prototype-button" type="button" onClick={onContinue}>Offline demo <span>→</span></button>
         <p className="demo-note"><span>i</span><b>Offline demo</b> Stays on this device. It does not connect to Gabay AI or other teachers.</p>
         </>}
+        {resetOpen && <AccountDialog kind="reset" name={name} school="" email={email} guest={false} authenticated={false} onClose={() => setResetOpen(false)} onSave={async () => ({ ok: false })} />}
         <p className="login-language">English <i /> Filipino</p>
       </section>
       <KalingaFooterArtwork />
@@ -1393,13 +1446,13 @@ function KalingaFooterArtwork() {
   );
 }
 
-function AccountMenu({ name, email, guest, onSignOut }: { name: string; email: string; guest: boolean; onSignOut: () => void }) {
+function AccountMenu({ name, email, guest, onSignOut, onSettings, onHelp }: { name: string; email: string; guest: boolean; onSignOut: () => void; onSettings: () => void; onHelp: () => void }) {
   return (
     <div className="account-menu" role="menu" aria-label="Account options">
       <div className="account-menu-heading"><span className="avatar">{teacherInitials(name)}</span><span><strong>{teacherLabel(name)}</strong><small>{guest ? "Guest · remembered in this browser" : email}</small></span></div>
       <div className="account-menu-options">
-        <button type="button" role="menuitem" disabled><span>◎</span> Account settings<small>Coming soon</small></button>
-        <button type="button" role="menuitem" disabled><span>?</span> Help &amp; support<small>Coming soon</small></button>
+        <button type="button" role="menuitem" onClick={onSettings}><span>◎</span> Account settings</button>
+        <button type="button" role="menuitem" onClick={onHelp}><span>?</span> Help &amp; support</button>
       </div>
       <button className="signout-button" type="button" role="menuitem" onClick={onSignOut}><span>↪</span> Sign out</button>
     </div>
@@ -2093,12 +2146,14 @@ function TeachingView({ plan, teachingClass, onBack, onEdit, onAttendance, onGab
   </div>;
 }
 
-function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = false }: { plan: SavedPlan; teachingClass: TeachingClass; teacherName: string; schoolName: string; inline?: boolean }) {
+function IlawPlanPrint({ plan, teachingClass, teacherName: defaultTeacherName, schoolName: defaultSchoolName, inline = false }: { plan: SavedPlan; teachingClass: TeachingClass; teacherName: string; schoolName: string; inline?: boolean }) {
+  const teacherName = plan.teacherName ?? defaultTeacherName;
+  const schoolName = plan.schoolName ?? defaultSchoolName;
   const printedDate = plan.teachingDate ? new Date(`${plan.teachingDate}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" }) : "";
   const lines = (value?: string) => (value || "—").split(/\r?\n/).map((line, index) => <Fragment key={index}>{index > 0 && <br />}{line}</Fragment>);
   const gradeRow = (label: string, values?: Record<GradeLevel, string>, extra?: Record<GradeLevel, string>) => <tr><th>{label}</th>{plan.grades.map((grade) => <td key={grade}>{lines(values?.[grade])}{extra?.[grade]?.trim() && <small>{extra[grade]}</small>}</td>)}</tr>;
   const gradeHead = <thead><tr><th />{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead>;
-  return <article className={`ilaw-export-document${inline ? " ilaw-export-inline" : ""}`}>
+  return <article style={ilawDocumentStyle} className={`ilaw-export-document${inline ? " ilaw-export-inline" : ""}`}>
     <header className="ilaw-print-title"><p>{planTitleLine(plan.grades)}</p><h1>{plan.title}</h1></header>
     <table className="ilaw-print-meta"><tbody>
       <tr><th>School</th><td>{schoolName.trim() || "—"}</td><th>Grade Levels</th><td>{gradeList(plan.grades)}</td></tr>
@@ -2108,7 +2163,7 @@ function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = 
       <tr><th>Multigrade Model</th><td colSpan={3}>{plan.multigradeModel || "—"}</td></tr>
     </tbody></table>
     <section data-tour="plan-intentions" className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
-      {plan.sharedTheme?.trim() && <p><b>Shared Sub-theme:</b> {lines(plan.sharedTheme)}</p>}
+      {plan.sharedTheme?.trim() && <table className="ilaw-shared-table ilaw-shared-theme"><tbody><tr><th>Shared Sub-theme</th><td>{lines(plan.sharedTheme)}</td></tr></tbody></table>}
       <table>{gradeHead}<tbody>
         {gradeRow("Pamantayang Pangnilalaman (Content Standard)", plan.contentStandards)}
         {gradeRow("Pamantayan sa Pagganap (Performance Standard)", plan.performanceStandards)}
@@ -2117,7 +2172,7 @@ function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = 
       </tbody></table>
     </section>
     <section className="ilaw-print-section"><h2><span>L</span> Learning Experience</h2>
-      <div className="ilaw-print-notes"><p><b>Learner Context:</b> {lines(plan.learnerContext)}</p><p><b>Instructional Materials and Resources:</b> {lines(plan.materials)}</p></div>
+      <table className="ilaw-shared-table"><tbody><tr><th>Learner Context</th><td>{lines(plan.learnerContext)}</td></tr><tr><th>Instructional Materials and Resources</th><td>{lines(plan.materials)}</td></tr></tbody></table>
       <p><b>Flow of the Lesson</b></p>
       <table className="ilaw-flow-table"><thead><tr><th>Time</th><th>Stage</th>{plan.grades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
         {plan.slots.map((slot) => <tr key={slot.id}>
@@ -2133,7 +2188,7 @@ function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = 
       <table>{gradeHead}<tbody>
         {gradeRow("Formative", plan.formativeAssessments)}
         {gradeRow("Exit Task", plan.exitTasks)}
-        {gradeRow("Rubrics", plan.successCriteria)}
+        {gradeRow("Success Criteria", plan.successCriteria)}
       </tbody></table>
     </section>
     <section className="ilaw-print-section ways-forward-print-section"><h2><span>W</span> Ways Forward</h2>
@@ -2142,7 +2197,7 @@ function IlawPlanPrint({ plan, teachingClass, teacherName, schoolName, inline = 
         {gradeRow("Remediation", plan.remediations)}
         {gradeRow("Enrichment", plan.enrichments)}
       </tbody></table>
-      <p><b>Notes for Next Session / Whole-School Follow-Up:</b> {lines(plan.nextSessionNotes)}</p>
+      <table className="ilaw-shared-table"><tbody><tr><th>Notes for Next Session / Whole-School Follow-Up</th><td>{lines(plan.nextSessionNotes)}</td></tr></tbody></table>
     </section>
     <footer className="ilaw-print-signatures"><div><span>Prepared by:</span><b>{teacherName}</b><small>Classroom Adviser</small></div><div><span>Checked by:</span><b>{plan.schoolHeadName || " "}</b><small>School Head</small></div></footer>
   </article>;
@@ -2236,7 +2291,9 @@ function useIsNarrow(query = "(max-width: 720px)") {
   return narrow;
 }
 
-function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId, initialPlan, teacherName, schoolName, onSchoolNameChange, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; persistedPlans: SavedPlan[]; onAllPlans: () => void; onDelete: (id: string) => void; activeClassId: string; initialPlan?: SavedPlan; teacherName: string; schoolName: string; onSchoolNameChange: (name: string) => void; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId, initialPlan, teacherName: defaultTeacherName, schoolName: defaultSchoolName, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; persistedPlans: SavedPlan[]; onAllPlans: () => void; onDelete: (id: string) => void; activeClassId: string; initialPlan?: SavedPlan; teacherName: string; schoolName: string; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+  const [teacherName] = useState(initialPlan?.teacherName ?? defaultTeacherName);
+  const [schoolName, setPlanSchoolName] = useState(initialPlan?.schoolName ?? defaultSchoolName);
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const emptyByGrade = (list: GradeLevel[]) => Object.fromEntries(list.map((grade) => [grade, ""]));
@@ -2523,7 +2580,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
     setSlots(builtSlots);
     touch();
     return {
-      id: planId, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${targetMinutes} minutes`, startTime, language, teachingDate,
+      id: planId, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${targetMinutes} minutes`, startTime, language, teachingDate, teacherName, schoolName,
       ...built, sharedTheme: draft.sharedTheme, multigradeModel, learnerContext: draft.learnerContext, materials: draft.materials,
       ...observations,
       nextSessionNotes: draft.nextSessionNotes, schoolHeadName, draftNotes, slots: builtSlots, savedAt: "just now",
@@ -2531,7 +2588,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
   }
 
   const currentPlan: SavedPlan | null = selectedClass ? preserveLessonObservations({
-    id: planId, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${targetMinutes} minutes`, startTime, language, teachingDate,
+    id: planId, classId: selectedClass.id, title: lessonTitle.trim() || "Untitled lesson", subject, quarter, grades, duration: `${targetMinutes} minutes`, startTime, language, teachingDate, teacherName, schoolName,
     competencies, competencyCodes, contentStandards, performanceStandards, sharedTheme, multigradeModel, objectives, learnerContext, materials,
     formativeAssessments, exitTasks, successCriteria, reflectionQuestions, remediations, enrichments,
     nextSessionNotes, schoolHeadName, draftNotes, slots, savedAt: "just now",
@@ -2665,10 +2722,10 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
 
       {narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}
 
-      {selectedClass && <article data-tour="plan-document" className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
+      {selectedClass && <article style={ilawDocumentStyle} data-tour="plan-document" className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
         <header className="ilaw-print-title"><p>{planTitleLine(grades)}</p><input className="ilaw-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); touch(); }} /></header>
         <table className="ilaw-print-meta"><tbody>
-          <tr><th>School</th><td><input className="cell-input" aria-label="School" value={schoolName} placeholder="School name" onChange={(event) => onSchoolNameChange(event.target.value)} /></td><th>Grade Levels</th><td>{gradeList(grades)}</td></tr>
+          <tr><th>School</th><td><input className="cell-input" aria-label="School" value={schoolName} placeholder="School name" onChange={(event) => { setPlanSchoolName(event.target.value); touch(); }} /></td><th>Grade Levels</th><td>{gradeList(grades)}</td></tr>
           <tr><th>Teacher</th><td>{teacherName}</td><th>Learning Area</th><td>{subject || "—"}</td></tr>
           <tr><th>Teaching Date</th><td>{printedDate || "Not set"}</td><th>Quarter/Term</th><td>{quarter}</td></tr>
           <tr><th>Time / Sessions</th><td>1 session, {targetMinutes} minutes · {startTime}</td><th>No. of Learners</th><td>{learnerCountSummary(selectedClass, grades)}</td></tr>
@@ -2676,7 +2733,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
         </tbody></table>
 
         <section data-tour="plan-intentions" className="ilaw-print-section"><h2><span>I</span> Intentions</h2>
-          <p><b>Shared Sub-theme:</b> <EditCell compact label="Shared sub-theme" value={sharedTheme} placeholder="The theme every grade works under this session" onChange={(value) => { setSharedTheme(value); touch(); }} /></p>
+          <table className="ilaw-shared-table ilaw-shared-theme"><tbody><tr><th>Shared Sub-theme</th><td><EditCell compact label="Shared sub-theme" value={sharedTheme} placeholder="The theme every grade works under this session" onChange={(value) => { setSharedTheme(value); touch(); }} /></td></tr></tbody></table>
           <table><thead><tr><th />{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
             {gradeRow("Pamantayang Pangnilalaman (Content Standard)", "contentStandards", "Naipamamalas ng mag-aaral ang…")}
             {gradeRow("Pamantayan sa Pagganap (Performance Standard)", "performanceStandards", "Nagagamit ng mag-aaral ang…")}
@@ -2686,10 +2743,10 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
         </section>
 
         <section className="ilaw-print-section"><h2><span>L</span> Learning Experience</h2>
-          <div className="ilaw-print-notes">
-            <p><b>Learner Context:</b> <EditCell compact label="Learner context" value={learnerContext} placeholder="Who these learners are and what they bring to this lesson" onChange={(value) => { setLearnerContext(value); touch(); }} /></p>
-            <p><b>Instructional Materials and Resources:</b> <EditCell compact label="Instructional materials and resources" value={materials} placeholder={"Mga Kagamitan: …\nMga Sanggunian: …"} onChange={(value) => { setMaterials(value); touch(); }} /></p>
-          </div>
+          <table className="ilaw-shared-table"><tbody>
+            <tr><th>Learner Context</th><td><EditCell compact label="Learner context" value={learnerContext} placeholder="Who these learners are and what they bring to this lesson" onChange={(value) => { setLearnerContext(value); touch(); }} /></td></tr>
+            <tr><th>Instructional Materials and Resources</th><td><EditCell compact label="Instructional materials and resources" value={materials} placeholder={"Mga Kagamitan: …\nMga Sanggunian: …"} onChange={(value) => { setMaterials(value); touch(); }} /></td></tr>
+          </tbody></table>
           {narrow ? <div className="flow-blocks">
             {slots.map((slot, index) => <article className="flow-block" key={slot.id}>
               <header><b>{slot.time}</b><label><input type="number" min={1} max={240} aria-label="Minutes" value={slot.durationMinutes || 10} onChange={(event) => updateSlot(slot.id, { durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /> min</label><span className="flow-block-index">Block {index + 1}</span></header>
@@ -2720,7 +2777,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
           <table><thead><tr><th />{shownGrades.map((grade) => <th key={grade}>{gradeLabel(grade).toUpperCase()}</th>)}</tr></thead><tbody>
             {gradeRow("Formative", "formativeAssessments", "How you will check understanding during the lesson", (grade) => redraftButton("assessment", grade))}
             {gradeRow("Exit Task", "exitTasks", "What each learner hands in or shows")}
-            {gradeRow("Rubrics", "successCriteria", "What a learner can do with this topic when they have got it")}
+            {gradeRow("Success Criteria", "successCriteria", "What a learner can do with this topic when they have got it")}
           </tbody></table>
         </section>
 
@@ -2730,7 +2787,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
             {gradeRow("Remediation", "remediations", "Support for learners below the target")}
             {gradeRow("Enrichment", "enrichments", "Extension for learners who are ready")}
           </tbody></table>
-          <p><b>Notes for Next Session / Whole-School Follow-Up:</b> <EditCell compact label="Notes for the next session" value={nextSessionNotes} placeholder="What should continue or change next time" onChange={(value) => { setNextSessionNotes(value); touch(); }} /></p>
+          <table className="ilaw-shared-table"><tbody><tr><th>Notes for Next Session / Whole-School Follow-Up</th><td><EditCell compact label="Notes for the next session" value={nextSessionNotes} placeholder="What should continue or change next time" onChange={(value) => { setNextSessionNotes(value); touch(); }} /></td></tr></tbody></table>
           <details className="recorded-lesson-notes"><summary>Recorded classroom notes · not changed by Gabay</summary>{(["reflection", "remediation", "enrichment"] as const).map((field) => <label key={field}>{field === "reflection" ? "Actual reflection" : field === "remediation" ? "Remediation carried out" : "Enrichment carried out"}<textarea value={observations[field]} onChange={(event) => { setObservations((current) => ({ ...current, [field]: event.target.value })); touch(); }} /></label>)}</details>
         </section>
 

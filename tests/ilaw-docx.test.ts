@@ -67,10 +67,34 @@ function readZipEntry(buffer: Buffer, name: string) {
 
 async function documentXml(document: ReturnType<typeof buildIlawDocument>) {
   const buffer = await Packer.toBuffer(document);
-  return { buffer, xml: readZipEntry(buffer, "word/document.xml") };
+  return { buffer, xml: readZipEntry(buffer, "word/document.xml"), styles: readZipEntry(buffer, "word/styles.xml") };
+}
+
+function rows(xml: string) {
+  return xml.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || [];
+}
+
+function paragraphContaining(xml: string, value: string) {
+  return (xml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).find((paragraph) => paragraph.includes(value)) || "";
 }
 
 describe("ILAW Word export", () => {
+  it("keeps section-banner spacing attached to the following table rather than orphaning the heading", async () => {
+    const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, 'T', 'S'));
+    for (const section of ['LEARNING EXPERIENCE', 'ASSESSMENT', 'WAYS FORWARD']) {
+      const afterBanner = xml.slice(xml.indexOf(section)).split('</w:tbl>')[1];
+      expect(afterBanner.match(/^<w:p>[\s\S]*?<\/w:p>/)?.[0], section).toContain('<w:keepNext/>');
+    }
+  });
+  it("keeps teaching stages navy and signature names centered like the reference form", async () => {
+    const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, "Jocelyn E. Mallorca", "Kasilayan Elementary School"));
+    const row = rows(xml).find((candidate) => candidate.includes('Guide Grade 3')) || '';
+    const cells = [...row.matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)].map((match) => match[0]);
+    expect(cells[0]).not.toContain('w:fill="1F3864"');
+    expect(cells[1]).toContain('w:fill="1F3864"');
+    expect(paragraphContaining(xml, 'JOCELYN E. MALLORCA')).toContain('<w:jc w:val="center"/>');
+    expect(paragraphContaining(xml, 'DEXTER T. ORLANDEZ')).toContain('<w:jc w:val="center"/>');
+  });
   it("packs to a real .docx", async () => {
     const { buffer } = await documentXml(buildIlawDocument(plan, teachingClass, "Jocelyn E. Mallorca", "Kasilayan Elementary School"));
     expect(buffer.length).toBeGreaterThan(4_000);
@@ -81,6 +105,106 @@ describe("ILAW Word export", () => {
     const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, "Jocelyn E. Mallorca", "Kasilayan Elementary School"));
     expect(xml).toMatch(/<w:pgSz[^>]*w:w="11906"[^>]*w:h="16838"/);
     expect(xml).toMatch(/<w:pgMar[^>]*w:top="720"[^>]*w:right="720"[^>]*w:bottom="720"[^>]*w:left="720"/);
+    expect(xml).toMatch(/<w:pgMar[^>]*w:header="709"[^>]*w:footer="709"/);
+  });
+
+  it("uses the reference's effective Times New Roman body and 12-point title", async () => {
+    const { xml, styles } = await documentXml(buildIlawDocument(plan, teachingClass, "T", "S"));
+    // The source theme default is Calibri 11, but its Normal paragraph style
+    // overrides that to Times New Roman 10. Its body runs then specify 11pt.
+    expect(styles.match(/<w:docDefaults>[\s\S]*?<\/w:docDefaults>/)?.[0]).toMatch(/w:ascii="Calibri"/);
+    const normal = styles.match(/<w:style[^>]*w:styleId="Normal"[\s\S]*?<\/w:style>/)?.[0] || "";
+    expect(normal).toContain('w:ascii="Times New Roman"');
+    expect(normal).toContain('<w:sz w:val="20"/>');
+    const body = paragraphContaining(xml, "Naipamamalas ng mag-aaral ang kahusayan sa pagbigkas.");
+    expect(body).toContain('w:ascii="Times New Roman"');
+    expect(body).toContain('<w:sz w:val="22"/>');
+    expect(body).toMatch(/<w:spacing[^>]*w:line="240"[^>]*w:lineRule="auto"/);
+    const title = paragraphContaining(xml, "DAILY LESSON PLAN FOR GRADE");
+    expect(title).toContain('<w:sz w:val="24"/>');
+    expect(title).toContain('<w:jc w:val="center"/>');
+    expect(xml).not.toContain('w:ascii="Arial"');
+  });
+
+  it("puts the shared fields inside bordered rows while retaining their complete contents", async () => {
+    const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, "T", "S"));
+    for (const [label, value] of [
+      ["Shared Sub-theme", plan.sharedTheme!],
+      ["Learner Context", plan.learnerContext!],
+      ["Instructional Materials and Resources", plan.materials!],
+      ["Notes for Next Session / Whole-School Follow-Up", plan.nextSessionNotes!],
+    ]) {
+      const row = rows(xml).find((candidate) => candidate.includes(label)) || "";
+      expect(row, `missing bordered row: ${label}`).toContain(value);
+      expect(row.match(/<w:tcBorders>/g)).toHaveLength(2);
+      expect(row).toContain('w:val="single"');
+    }
+    const theme = paragraphContaining(xml, plan.sharedTheme!);
+    expect(theme).toContain('w:ascii="Century Gothic"');
+    expect(theme).toContain('<w:sz w:val="16"/>');
+  });
+
+  it("uses the reference's section colors, thin borders and padded cells", async () => {
+    const { xml } = await documentXml(buildIlawDocument(plan, teachingClass, "T", "S"));
+    for (const [title, fill] of [["INTENTIONS", "1F3864"], ["LEARNING EXPERIENCE", "2E6B2E"], ["ASSESSMENT", "8C5A1E"], ["WAYS FORWARD", "7A2048"]]) {
+      const row = rows(xml).find((candidate) => candidate.includes(title)) || "";
+      expect(row).toContain(`w:fill="${fill}"`);
+      expect(row).toContain('<w:sz w:val="22"/>');
+      expect(row).toContain('w:color="000000" w:sz="4"');
+    }
+    const bodyRow = rows(xml).find((candidate) => candidate.includes("Pamantayang Pangnilalaman")) || "";
+    expect(bodyRow).toContain('w:fill="1F3864"');
+    expect(bodyRow).toMatch(/<w:top w:type="dxa" w:w="80"\/>/);
+    expect(bodyRow).toMatch(/<w:left w:type="dxa" w:w="100"\/>/);
+    expect(xml).not.toContain('<w:trHeight');
+  });
+
+  it("preserves line breaks, empty lines, indentation and XML-sensitive teacher text", async () => {
+    const multiline = { ...plan, materials: "First & second\r\n\r\n  Indented <third>\nFourth" };
+    const { xml } = await documentXml(buildIlawDocument(multiline, teachingClass, "T", "S"));
+    const paragraph = paragraphContaining(xml, "First &amp; second");
+    expect(paragraph.match(/<w:br\/>/g)).toHaveLength(3);
+    expect(paragraph).toContain('xml:space="preserve">  Indented &lt;third&gt;');
+    expect(paragraph).toContain("Fourth");
+  });
+
+  it.each([{ grades: ["Kindergarten"] }, { grades: ["3", "4"] }, { grades: ["2", "3", "4"] }, { grades: ["1", "2", "3", "4", "5", "6"] }])("fits every table grid within the printable page for $grades", async ({ grades }) => {
+    const variable = { ...plan, grades, slots: [{ ...plan.slots[0], wholeClass: true, gradeTasks: Object.fromEntries(grades.map((grade) => [grade, "Shared task"])) }] };
+    const { xml } = await documentXml(buildIlawDocument(variable, teachingClass, "T", "S"));
+    const tables = xml.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || [];
+    for (const table of tables) {
+      const widths = [...table.matchAll(/<w:gridCol w:w="(\d+)"\/>/g)].map((match) => Number(match[1]));
+      expect(widths.every((width) => width > 0)).toBe(true);
+      expect(widths.reduce((sum, width) => sum + width, 0)).toBe(10466);
+      expect(table).toContain('<w:tblLayout w:type="fixed"/>');
+    }
+    const gradeTables = tables.filter((table) => table.includes('<w:tblHeader/>'));
+    expect(gradeTables).toHaveLength(4);
+    for (const table of gradeTables) {
+      const header = rows(table)[0];
+      for (const grade of grades) expect(header).toContain(grade === "Kindergarten" ? "KINDERGARTEN" : `GRADE ${grade}`);
+    }
+    const flow = gradeTables.find((table) => table.includes("Shared task")) || "";
+    const sharedRow = rows(flow).find((row) => row.includes("Shared task")) || "";
+    expect(sharedRow).toContain(`<w:gridSpan w:val="${grades.length}"/>`);
+    const flowWidths = [...flow.matchAll(/<w:gridCol w:w="(\d+)"\/>/g)].map((match) => Number(match[1]));
+    expect(sharedRow).toContain(`<w:tcW w:type="dxa" w:w="${flowWidths.slice(2).reduce((sum, width) => sum + width, 0)}"/>`);
+  });
+
+  it("exports the saved teacher and school snapshots with legacy argument fallback", async () => {
+    const snapshot = { ...plan, teacherName: "Saved Teacher", schoolName: "Saved School" };
+    const { xml } = await documentXml(buildIlawDocument(snapshot, teachingClass, "Current Teacher", "Current School"));
+    expect(xml).toContain("Saved Teacher");
+    expect(xml).toContain("SAVED TEACHER");
+    expect(xml).toContain("Saved School");
+    expect(xml).not.toContain("Current Teacher");
+    expect(xml).not.toContain("Current School");
+    const { xml: legacy } = await documentXml(buildIlawDocument(plan, teachingClass, "Current Teacher", "Current School"));
+    expect(legacy).toContain("Current Teacher");
+    expect(legacy).toContain("Current School");
+    const { xml: intentionallyBlank } = await documentXml(buildIlawDocument({ ...plan, teacherName: "", schoolName: "" }, teachingClass, "Current Teacher", "Current School"));
+    expect(intentionallyBlank).not.toContain("Current Teacher");
+    expect(intentionallyBlank).not.toContain("Current School");
   });
 
   it("carries every section of the DepEd form", async () => {
@@ -90,10 +214,16 @@ describe("ILAW Word export", () => {
       "INTENTIONS", "LEARNING EXPERIENCE", "ASSESSMENT", "WAYS FORWARD",
       "Pamantayang Pangnilalaman", "Pamantayan sa Pagganap", "Learning Competencies and Codes", "F3PB-Ia-1",
       "Flow of the Lesson", "Whole-Class Motivation", "Bilugan ang mga pangatnig.",
-      "Exit Task", "Rubrics", "Reflection Questions", "Remediation", "Enrichment",
+      "Exit Task", "Success Criteria", "Reflection Questions", "Remediation", "Enrichment",
       "Prepared by:", "Checked by:", "JOCELYN E. MALLORCA", "DEXTER T. ORLANDEZ", "School Head",
     ]) {
       expect(xml, `missing: ${expected}`).toContain(expected);
+    }
+    for (const values of [plan.contentStandards, plan.performanceStandards, plan.competencies, plan.competencyCodes, plan.objectives, plan.formativeAssessments, plan.exitTasks, plan.successCriteria, plan.reflectionQuestions, plan.remediations, plan.enrichments]) {
+      for (const value of Object.values(values || {}).filter(Boolean)) expect(xml, `missing teacher content: ${value}`).toContain(value);
+    }
+    for (const slot of plan.slots) {
+      for (const value of [slot.time, slot.stage, slot.teacherFocus, ...Object.values(slot.gradeTasks)].filter(Boolean)) expect(xml).toContain(value);
     }
   });
 
