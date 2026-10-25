@@ -11,7 +11,7 @@ An offline-first **teacher's assistant for multigrade classrooms in last-mile Ph
 - **Frontend:** Next.js 16.2, React 19.2, TypeScript 5.9, Tailwind 4. Deployed on **Vercel**, auto-deploys from `main`. Live: https://kalinga-gules.vercel.app
 - **Backend:** **Supabase** (project ref `aoiufmxzeenjrrtbkdwi`) — Postgres + row-level security, Auth, Storage, Realtime, and Edge Functions (Deno).
 - **AI:** **Groq** (`openai/gpt-oss-20b`) called *only* through the `gabay-chat` Supabase Edge Function, so the model key never reaches the browser.
-- **Tests:** Vitest (224 passing on 25 October 2026).
+- **Tests:** Vitest (227 passing on 25 October 2026).
 
 ## Repo shape (unusual — read this)
 
