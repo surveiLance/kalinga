@@ -17,7 +17,7 @@ export function ClassWorkspaceHeader({ classes, selectedClass, onSelectClass, on
       </div>
     </header>
     <div className="class-primary-actions" role="group" aria-label="Class actions">
-      <button className="primary-button" type="button" onClick={onAttendance}>Take attendance</button>
+      <button data-tour="class-attendance" className="primary-button" type="button" onClick={onAttendance}>Take attendance</button>
       <button className="secondary-button" type="button" onClick={onPlan}>Plan a lesson</button>
       <button className="secondary-button" type="button" onClick={onResources}>Find resources</button>
     </div>

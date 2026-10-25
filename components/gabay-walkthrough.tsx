@@ -3,41 +3,33 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GabayMascot } from "@/components/gabay-mascot";
-import { canAdvanceWalkthrough, canRestoreWalkthroughFocus, clipWalkthroughHighlight, nextWalkthroughStep, placeWalkthrough, walkthroughProgress, walkthroughSteps, type WalkthroughStatus } from "@/lib/gabay-walkthrough";
+import { canRestoreWalkthroughFocus, clipWalkthroughHighlight, placeWalkthrough } from "@/lib/gabay-walkthrough";
+import { pageGuideLabels, pageGuideSteps, type PageGuidePage, type PageGuideStep } from "@/lib/page-guides";
 
-export function WalkthroughOffer({ onStart, onDismiss }: { onStart: () => void; onDismiss: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+export function WalkthroughOffer({ pageLabel, onShown, onStart, onDismiss }: { pageLabel: string; onShown: () => void; onStart: () => void; onDismiss: () => void }) {
   const titleId = useId();
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialog?.showModal();
-    return () => { dialog?.close(); previous?.focus(); };
-  }, []);
-  return <dialog ref={dialogRef} className="walkthrough-offer" aria-modal="true" aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); onDismiss(); }}><GabayMascot size="hero" motion={false} /><p className="eyebrow">A LITTLE HELP GETTING STARTED</p><h2 id={titleId}>Let Gabay show you around</h2><p>I’ll point out where to click as you set up a class and prepare a lesson.</p><p><b>You stay in control.</b> This is your real workspace: I won’t fill, generate, save, or post anything for you.</p><div><button type="button" className="primary-button" onClick={onStart}>Start with Gabay</button><button type="button" className="secondary-button" onClick={onDismiss}>Not now</button></div><small>Optional, skippable, and available again from Gabay’s menu. No AI connection needed.</small></dialog>;
+  useEffect(() => { onShown(); }, [onShown]);
+  return <section className="page-guide-offer" aria-labelledby={titleId}><GabayMascot size="medium" motion={false} /><div><p className="eyebrow">GABAY · {pageLabel}</p><h2 id={titleId}>Want me to show you how this page works?</h2><p>You stay in control. I’ll explain where to click, without changing your work.</p><small>You can always choose Guide this page beside Ask Gabay.</small></div><div className="page-guide-offer-actions"><button type="button" className="primary-button" onClick={onStart}>Show me</button><button type="button" className="secondary-button" onClick={onDismiss}>Not now</button></div></section>;
 }
 
-export function WalkthroughCard({ step, targetFound, canAdvance = targetFound, onMove, onExit, onLocate, onMinimize }: { step: number; targetFound: boolean; canAdvance?: boolean; onMove: (step: number) => void; onExit: () => void; onLocate: () => void; onMinimize?: () => void }) {
-  const item = walkthroughSteps[step];
+export function WalkthroughCard({ item, pageLabel, step, total, targetFound, onMove, onExit, onLocate, onMinimize }: { item: PageGuideStep; pageLabel: string; step: number; total: number; targetFound: boolean; onMove: (step: number) => void; onExit: () => void; onLocate: () => void; onMinimize?: () => void }) {
   const titleId = useId();
   return <section className="walkthrough-card" aria-labelledby={titleId}>
-    <header><GabayMascot size="medium" motion={false} /><div><b>Gabay’s walkthrough</b><label><span className="sr-only">Jump to a walkthrough section</span><select value={item.chapter} onChange={(event) => onMove(walkthroughSteps.findIndex((entry) => entry.chapter === event.target.value))}>{[...new Set(walkthroughSteps.map((entry) => entry.chapter))].map((chapter) => <option key={chapter}>{chapter}</option>)}</select></label></div><div className="walkthrough-window-actions">{onMinimize && <button type="button" onClick={onMinimize} aria-label="Minimize walkthrough" title="Move Gabay out of the way">−</button>}<button type="button" className="walkthrough-exit" onClick={onExit} aria-label="Exit tour">×</button></div></header>
-    <div className="walkthrough-copy" aria-live="polite" aria-atomic="true"><p className="walkthrough-count">{item.chapter} · {step + 1} of {walkthroughSteps.length}</p><h2 id={titleId} tabIndex={-1}>{targetFound ? item.title : "Let’s find this step"}</h2>{targetFound ? <><p>{item.body}</p>{!canAdvance && <p className="walkthrough-where">Use the app’s controls to continue. I’ll follow when the next screen opens. Or choose Skip step.</p>}</> : <p className="walkthrough-where">{item.where} I’ll wait here, or you can choose Skip step.</p>}</div>
+    <header><GabayMascot size="medium" motion={false} /><div><b>Gabay’s page guide</b><small>{pageLabel}</small></div><div className="walkthrough-window-actions">{onMinimize && <button type="button" onClick={onMinimize} aria-label="Minimize guide" title="Move Gabay out of the way">−</button>}<button type="button" className="walkthrough-exit" onClick={onExit} aria-label="Exit guide">×</button></div></header>
+    <div className="walkthrough-copy" aria-live="polite" aria-atomic="true"><p className="walkthrough-count">{step + 1} of {total}</p><h2 id={titleId} tabIndex={-1}>{targetFound ? item.title : "This control is not visible right now"}</h2>{targetFound ? <p>{item.body}</p> : <p className="walkthrough-where">You can continue through this page’s hints or close the guide. Nothing needs to be filled or saved to finish.</p>}</div>
     <div className="walkthrough-tools">{targetFound && <button className="walkthrough-locate" type="button" onClick={onLocate}>Show the highlighted area</button>}{onMinimize && <button className="walkthrough-locate" type="button" onClick={onMinimize}>Move Gabay aside</button>}</div>
-    <footer><button type="button" className="walkthrough-back" disabled={step === 0} onClick={() => onMove(Math.max(0, step - 1))}>Back</button><button type="button" className="walkthrough-skip" onClick={() => onMove(step + 1)}>Skip step</button><button type="button" className="walkthrough-next" disabled={!canAdvance} onClick={() => onMove(step + 1)}>{step === walkthroughSteps.length - 1 ? "Finish tour" : "Next"}<span aria-hidden="true"> →</span></button></footer>
+    <footer><button type="button" className="walkthrough-back" disabled={step === 0} onClick={() => onMove(Math.max(0, step - 1))}>Back</button><button type="button" className="walkthrough-next" onClick={() => onMove(step + 1)}>{step === total - 1 ? "Finish guide" : "Next"}<span aria-hidden="true"> →</span></button></footer>
   </section>;
 }
 
-export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: number; motion: boolean; onProgress: (status: WalkthroughStatus) => void; onExit: () => void }) {
+export function GabayWalkthrough({ page, motion, onComplete, onExit }: { page: PageGuidePage; motion: boolean; onComplete: () => void; onExit: () => void }) {
   const targetRef = useRef<HTMLElement | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const visibleRef = useRef<string[]>([]);
-  const manualStep = useRef<{ step: number; markers: string[] } | null>(null);
-  const dockedFor = useRef<{ step: number; surface: HTMLElement | null } | null>(null);
+  const [stepId, setStepId] = useState("");
+  const dockedFor = useRef<{ id: string; surface: HTMLElement | null } | null>(null);
   const activeDock = useRef<HTMLElement | null>(null);
   const [minimized, setMinimized] = useState(false);
-  const [location, setLocation] = useState<{ step: number; host: HTMLElement; docked: boolean; matched: boolean; canAdvance: boolean; rect: { left: number; top: number; width: number; height: number } | null; left: number; top: number; width: number } | null>(null);
-  const item = walkthroughSteps[step];
+  const [location, setLocation] = useState<{ itemId: string; items: PageGuideStep[]; host: HTMLElement; docked: boolean; matched: boolean; rect: { left: number; top: number; width: number; height: number } | null; left: number; top: number; width: number } | null>(null);
   useEffect(() => {
     let frame = 0;
     let lastTarget: HTMLElement | null = null;
@@ -51,14 +43,11 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
         const bounds = element.getBoundingClientRect(); const style = window.getComputedStyle(element);
         return bounds.width > 0 && bounds.height > 0 && style.visibility !== "hidden" && style.display !== "none";
       });
-      visibleRef.current = targets.map((element) => element.dataset.tour || "");
-      const guard = manualStep.current?.step === step ? manualStep.current : null;
-      if (guard) guard.markers = guard.markers.filter((marker) => visibleRef.current.includes(marker));
-      const next = nextWalkthroughStep(step, visibleRef.current, guard?.markers);
-      if (next !== step) { manualStep.current = null; onProgress({ version: 2, step: next, completed: false, dismissed: false }); return; }
-      const matched = item.targets.flatMap((id) => targets.filter((element) => element.dataset.tour === id))[0] || null;
+      const items = pageGuideSteps(page, targets.map((element) => element.dataset.tour || ""));
+      const item = items.find((entry) => entry.id === stepId) || items[0];
+      const itemId = item?.id || "";
+      const matched = item?.targets.flatMap((id) => targets.filter((element) => element.dataset.tour === id))[0] || null;
       const target = matched;
-      const canAdvance = canAdvanceWalkthrough(step, visibleRef.current);
       targetRef.current = target;
       if (target && target !== lastTarget && !minimized) { lastTarget = target; target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }); }
       const bounds = target?.getBoundingClientRect();
@@ -89,9 +78,9 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
       const controls = [...(dialog || document).querySelectorAll<HTMLElement>("button, input, select, textarea, summary, a[href], iframe, [role='button']")].filter((element) => !element.closest(".walkthrough-layer, [inert], [hidden], [aria-hidden='true']") && element.getClientRects().length).map((element) => { const bounds = element.getBoundingClientRect(); return { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height }; });
       const position = placeWalkthrough(rect, { width: window.innerWidth, height: window.visualViewport?.height || window.innerHeight }, { width: 380, height: cardHeight }, controls);
       const slot = dialog?.querySelector<HTMLElement>("[data-walkthrough-host]") || (!dialog ? document.querySelector<HTMLElement>("[data-walkthrough-host='workspace']") : null);
-      const heldDock = dockedFor.current?.step === step && dockedFor.current.surface === (dialog || null);
+      const heldDock = dockedFor.current?.id === itemId && dockedFor.current.surface === (dialog || null);
       const docked = !!slot && (minimized || !!dialog || !!position.dock || heldDock);
-      if (docked && !minimized) dockedFor.current = { step, surface: dialog || null };
+      if (docked && !minimized) dockedFor.current = { id: itemId, surface: dialog || null };
       if (activeDock.current !== (docked ? slot : null)) {
         activeDock.current?.classList.remove("walkthrough-dock-active");
         activeDock.current?.closest("dialog")?.removeAttribute("data-walkthrough-layout");
@@ -105,7 +94,7 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
         if (parentDialog && parentDialog.dataset.walkthroughLayout !== layout) parentDialog.dataset.walkthroughLayout = layout;
       }
       const host = docked ? slot! : dialog || document.body;
-      setLocation((previous) => previous?.step === step && previous.host === host && previous.docked === docked && previous.matched === !!matched && previous.canAdvance === canAdvance && JSON.stringify([previous.rect, previous.left, previous.top, previous.width]) === JSON.stringify([rect, position.left, position.top, position.width]) ? previous : { step, host, docked, matched: !!matched, canAdvance, rect, ...position });
+      setLocation((previous) => previous?.itemId === itemId && previous.host === host && previous.docked === docked && previous.matched === !!matched && JSON.stringify([previous.items, previous.rect, previous.left, previous.top, previous.width]) === JSON.stringify([items, rect, position.left, position.top, position.width]) ? previous : { itemId, items, host, docked, matched: !!matched, rect, ...position });
     }
     function schedule() { window.cancelAnimationFrame(frame); frame = window.requestAnimationFrame(measure); }
     const observer = new MutationObserver(schedule);
@@ -117,9 +106,9 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
     document.addEventListener("animationend", layoutEnd, true); document.addEventListener("transitionend", layoutEnd, true);
     schedule();
     return () => { stopped = true; window.cancelAnimationFrame(frame); observer.disconnect(); resize.disconnect(); window.removeEventListener("resize", schedule); window.removeEventListener("scroll", schedule, true); window.visualViewport?.removeEventListener("resize", schedule); window.visualViewport?.removeEventListener("scroll", schedule); document.removeEventListener("animationend", layoutEnd, true); document.removeEventListener("transitionend", layoutEnd, true); };
-  }, [step, item, onProgress, location?.host, minimized]);
+  }, [page, stepId, location?.host, minimized]);
   useEffect(() => () => { activeDock.current?.classList.remove("walkthrough-dock-active"); activeDock.current?.closest("dialog")?.removeAttribute("data-walkthrough-layout"); }, []);
-  useEffect(() => { if (!minimized) cardRef.current?.querySelector<HTMLHeadingElement>("h2")?.focus({ preventScroll: true }); }, [location?.host, minimized]);
+  useEffect(() => { if (!minimized) cardRef.current?.querySelector<HTMLHeadingElement>("h2")?.focus({ preventScroll: true }); }, [location?.host, location?.itemId, minimized]);
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     return () => {
@@ -130,9 +119,11 @@ export function GabayWalkthrough({ step, motion, onProgress, onExit }: { step: n
   }, []);
   useEffect(() => { function escape(event: KeyboardEvent) { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onExit(); } } document.addEventListener("keydown", escape, true); return () => document.removeEventListener("keydown", escape, true); }, [onExit]);
   if (!location) return null;
-  function move(next: number) { manualStep.current = { step: next, markers: [...visibleRef.current] }; onProgress(next >= walkthroughSteps.length ? walkthroughProgress(step, "next") : { version: 2, step: next, completed: false, dismissed: false }); }
+  const step = Math.max(0, location.items.findIndex((entry) => entry.id === location.itemId));
+  const item = location.items[step];
+  function move(next: number) { if (next >= location!.items.length) onComplete(); else setStepId(location!.items[next].id); }
   return createPortal(<div className={`walkthrough-layer${location.docked ? " docked" : ""}${motion ? " motion" : ""}`}>
-    {location.step === step && location.rect && location.rect.height > 0 && <div className="walkthrough-highlight" aria-hidden="true" style={{ left: location.rect.left, top: location.rect.top, width: location.rect.width, height: location.rect.height }} />}
-    {minimized ? <button type="button" className="walkthrough-resume" onClick={() => setMinimized(false)} aria-label="Continue with Gabay"><GabayMascot size="small" motion={false} /><span>Continue tour</span></button> : <div ref={cardRef} className="walkthrough-position" style={location.docked ? undefined : { left: location.left, top: location.top, width: location.width }}><WalkthroughCard step={step} targetFound={location.step === step && location.matched} canAdvance={location.step === step && location.canAdvance} onMove={move} onExit={onExit} onMinimize={() => setMinimized(true)} onLocate={() => targetRef.current?.scrollIntoView({ block: "center", behavior: motion ? "smooth" : "instant" })} /></div>}
+    {location.rect && location.rect.height > 0 && <div className="walkthrough-highlight" aria-hidden="true" style={{ left: location.rect.left, top: location.rect.top, width: location.rect.width, height: location.rect.height }} />}
+    {minimized ? <button type="button" className="walkthrough-resume" onClick={() => setMinimized(false)} aria-label="Continue with Gabay"><GabayMascot size="small" motion={false} /><span>Continue guide</span></button> : <div ref={cardRef} className="walkthrough-position" style={location.docked ? undefined : { left: location.left, top: location.top, width: location.width }}>{item ? <WalkthroughCard item={item} pageLabel={pageGuideLabels[page]} step={step} total={location.items.length} targetFound={location.matched} onMove={move} onExit={onExit} onMinimize={() => setMinimized(true)} onLocate={() => targetRef.current?.scrollIntoView({ block: "center", behavior: motion ? "smooth" : "instant" })} /> : <section className="walkthrough-card"><div className="walkthrough-copy"><h2>Nothing to explain here yet</h2><p>Continue using this page, then choose Guide this page when its controls are available.</p></div><footer><button className="walkthrough-next" type="button" onClick={onExit}>Close guide</button></footer></section>}</div>}
   </div>, location.host);
 }

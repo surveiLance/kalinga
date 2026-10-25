@@ -2,6 +2,16 @@ export type PageGuidePage = "home" | "classes" | "plan" | "teach" | "library" | 
 export type PageGuideStatus = { version: 3; pages: Partial<Record<PageGuidePage, { offered: boolean; completed: boolean }>> };
 export type PageGuideStep = { id: string; title: string; body: string; targets: string[] };
 export const pageGuideLabels: Record<PageGuidePage, string> = { home: "Today", classes: "Classes & learners", plan: "Plan lessons", teach: "Teaching guide", library: "Find resources", attendance: "Attendance", community: "Ask teachers" };
+export type PageGuideSession = { scope: string; page: PageGuidePage };
+export type PageGuideRequest = PageGuideSession & { id: number };
+
+export function isCurrentPageGuide(active: PageGuideSession | null, scope: string, page: PageGuidePage): boolean {
+  return !!scope && active?.scope === scope && active.page === page;
+}
+
+export function isNewPageGuideRequest(request: PageGuideRequest | null, scope: string, page: PageGuidePage, handled: number): boolean {
+  return isCurrentPageGuide(request, scope, page) && request!.id > handled;
+}
 
 export function readPageGuideStatus(value: string | null): PageGuideStatus {
   const status: PageGuideStatus = { version: 3, pages: {} };

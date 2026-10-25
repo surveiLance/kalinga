@@ -1,17 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readWalkthroughStatus, walkthroughProgress, walkthroughSteps, nextWalkthroughStep, placeWalkthrough, canRestoreWalkthroughFocus, clipWalkthroughHighlight, canAdvanceWalkthrough } from "@/lib/gabay-walkthrough";
+import { placeWalkthrough, canRestoreWalkthroughFocus, clipWalkthroughHighlight } from "@/lib/gabay-walkthrough";
 describe("Gabay's real-workspace walkthrough", () => {
-  it("does not let Next move past class setup before the teacher opens the next real step", () => {
-    expect(canAdvanceWalkthrough(2, ["class-details", "class-details-next"])).toBe(false);
-    expect(canAdvanceWalkthrough(3, ["class-schedule"])).toBe(false);
-    expect(canAdvanceWalkthrough(4, ["class-learners", "class-save"])).toBe(false);
-    expect(canAdvanceWalkthrough(2, ["class-details", "class-schedule"])).toBe(true);
-  });
-  it("pauses Next on the wrong page but lets teachers move through hints on the open lesson", () => {
-    expect(canAdvanceWalkthrough(7, ["nav-toggle", "community-page"])).toBe(false);
-    expect(canAdvanceWalkthrough(7, ["plan-setup", "plan-document"])).toBe(true);
-    expect(canAdvanceWalkthrough(5, ["nav-plan", "class-page"])).toBe(false);
-  });
   it("clips the highlight to the visible scroll area above a sticky form footer", () => {
     expect(clipWalkthroughHighlight({ left: 20, top: -100, width: 900, height: 1000 }, [{ left: 0, top: 0, width: 1280, height: 720 }, { left: 20, top: 25, width: 900, height: 670 }, { left: 20, top: 25, width: 900, height: 580 }])).toEqual({ left: 20, top: 25, width: 900, height: 580 });
   });
@@ -27,29 +16,6 @@ describe("Gabay's real-workspace walkthrough", () => {
     expect(canRestoreWalkthroughFocus({ tagName: "BUTTON", isConnected: false }, true)).toBe(false);
     expect(canRestoreWalkthroughFocus({ tagName: "BUTTON", isConnected: true }, false)).toBe(false);
     expect(canRestoreWalkthroughFocus({ tagName: "BUTTON", isConnected: true }, true)).toBe(true);
-  });
-  it("safely reads old progress without treating old practice missions as current steps", () => {
-    expect(readWalkthroughStatus('{"step":5,"completed":true,"dismissed":false}')).toEqual({ version: 2, step: 0, completed: false, dismissed: true });
-    expect(readWalkthroughStatus('{"version":2,"step":-100}').step).toBe(0);
-    expect(readWalkthroughStatus('{"version":2,"step":999}').step).toBe(walkthroughSteps.length - 1);
-    expect(readWalkthroughStatus('null').step).toBe(0);
-    expect(readWalkthroughStatus('broken').completed).toBe(false);
-  });
-  it("moves guidance only after the relevant real screen appears", () => {
-    const step = walkthroughSteps.findIndex((item) => item.id === "class-details");
-    expect(nextWalkthroughStep(step, ["class-details"])).toBe(step);
-    expect(nextWalkthroughStep(step, ["class-schedule"])).toBe(step + 1);
-    expect(nextWalkthroughStep(step, ["plan-saved"])).toBe(step);
-  });
-  it("lets a teacher revisit a step without automatically jumping forward again", () => {
-    const step = walkthroughSteps.findIndex((item) => item.id === "plan-save");
-    expect(nextWalkthroughStep(step, ["plan-saved"], ["plan-saved"])).toBe(step);
-    expect(nextWalkthroughStep(step, ["plan-saved"], [])).toBe(step + 1);
-  });
-  it("can finish or pause without any workspace mutation command", () => {
-    expect(walkthroughProgress(3, "pause")).toEqual({ version: 2, step: 3, completed: false, dismissed: true });
-    expect(walkthroughProgress(walkthroughSteps.length - 1, "next")).toEqual({ version: 2, step: walkthroughSteps.length - 1, completed: true, dismissed: false });
-    expect(walkthroughProgress(0, "back").step).toBe(0);
   });
   it("places a readable coach beside the target without covering it on wide screens", () => {
     const placed = placeWalkthrough({ left: 40, top: 160, width: 280, height: 200 }, { width: 1200, height: 800 }, { width: 360, height: 300 });
