@@ -28,6 +28,16 @@ function announce(scope: string) {
   window.dispatchEvent(new CustomEvent("kalinga:downloads", { detail: scope }));
   try { localStorage.setItem(workspaceStorageKey(scope, "offline-downloads"), crypto.randomUUID()); } catch { /* The PDF transaction already succeeded. */ }
 }
+export function waitForOfflineResourceLink(resolve: () => PromiseLike<string>, signal?: AbortSignal, timeoutMs = 8000): Promise<string> {
+  return new Promise((done, reject) => {
+    if (signal?.aborted) { reject(new Error("Download cancelled.")); return; }
+    const abort = () => { cleanup(); reject(new Error("Download cancelled.")); };
+    const timer = setTimeout(() => { cleanup(); reject(new Error("The PDF link could not be renewed. Reconnect and retry.")); }, timeoutMs);
+    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener("abort", abort); };
+    signal?.addEventListener("abort", abort, { once: true });
+    Promise.resolve().then(resolve).then((url) => { cleanup(); done(url); }, (error) => { cleanup(); reject(error); });
+  });
+}
 export async function listOfflineResources(scope: string) {
   validScope(scope);
   return transaction<OfflineResource[]>("readonly", (tx, done) => {

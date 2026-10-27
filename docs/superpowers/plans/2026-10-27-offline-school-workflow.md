@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-27-offline-school-workflow-design.md` (approved 27 October 2026).
 
+**Status:** Implemented 27 October 2026 in the approved current-checkout workflow. Verification and remaining live/device checks are recorded in `docs/offline-school-workflow.md`. The independent review was partial because the reviewer hit its usage limit; its four reported issues were fixed with regression coverage.
+
 ## Global Constraints
 
 - Preserve `app/page.tsx` view-state navigation and surrounding dense code style; no broad refactor, new state library or build-system switch.
@@ -100,4 +102,4 @@
 
 Coverage maps to all spec sections: Task 1 handles installation/build/update; Task 3 local access/auth/sync; Task 2 download bytes/viewing/storage; Task 4 readiness/guards; Task 5 production acceptance and documented limits. All five Review Focus cases have named tests. Task 4 consumes scoped storage/viewer/access interfaces from Tasks 1-3; no new data type enters the cloud queue. Dependencies are limited to PDF rendering and test tooling. Existing main/untracked files are preserved; no destructive cleanup or live migration is planned.
 
-Execution awaits Lance's plan review and choice of native versus subagent-driven implementation. Recommend native execution with a final independent review: authentication, worker readiness and UI are tightly coupled, so one implementer can keep the state transitions consistent without repeated implementation handoffs.
+Lance approved native execution with a final independent review. Implementation and the regression fix pass are complete; actual Android and live Supabase acceptance remain separate checks.

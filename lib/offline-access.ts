@@ -28,6 +28,20 @@ export function createAccessEpoch() {
   let version = 0;
   return { begin() { return ++version; }, invalidate() { version++; }, current(value: number) { return value === version; } };
 }
+export function createAuthCallbackAccess(href: string) {
+  const url = new URL(href), hash = new URLSearchParams(url.hash.slice(1));
+  const token = hash.get("access_token") || url.searchParams.get("access_token");
+  let pending = !!(token && (hash.get("refresh_token") || url.searchParams.get("refresh_token")) || url.searchParams.get("code")), accountId = "";
+  const clear = () => { pending = false; accountId = ""; };
+  return {
+    accept(event: string, session: { access_token: string; user: { id: string } } | null) {
+      if (event === "SIGNED_OUT") clear();
+      else if (pending && (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") && session && (!token || token === session.access_token)) accountId = session.user.id;
+    },
+    matches(id?: string) { return !!accountId && (!id || accountId === id); },
+    clear,
+  };
+}
 export function classifyAccessFailure(error: unknown): "network" | "auth" | "other" {
   const value = error && typeof error === "object" ? error as { status?: number; code?: string; name?: string } : {};
   if (value.status === 401 || value.status === 403 || /^(PGRST301|PGRST303|bad_jwt|invalid_jwt|refresh_token_not_found|refresh_token_already_used|session_not_found|session_expired|user_banned)$/.test(value.code || "")) return "auth";

@@ -24,6 +24,8 @@ Reconnection verifies cloud identity before resuming cloud reads/sync. Queued re
 
 Explicit sign-out immediately locks offline reopening, including across open tabs. Pending work is retained under its original teacher scope, not deleted. Sign in intentionally as that teacher to recover it. An old cached auth event cannot unlock a sign-out lock. Switching accounts keeps records and downloads separate.
 
+A completed email sign-in/confirmation or recovery callback can unlock the device after Supabase verifies its identity. A confirmation flag alone cannot unlock it. A stale event from another tab cannot remove the current teacher's offline workspace before verification.
+
 Downloaded resource snapshots cannot be remotely revoked while a device is disconnected. A confirmed online denial/deletion removes the app-managed copy after reconnect; a transient outage does not. Do not download materials you lack permission to retain.
 
 ## Storage, updates and security
@@ -38,7 +40,9 @@ An update waits rather than reloading an unsaved document. Save work, close Kali
 
 Automated unit tests exercise worker allowlists/incomplete installs, build inventories, scoped PDF bytes/transaction races/stream limits, local access locks/epochs, authentication error classification and readiness/AI guards. Production Chromium tests use the real built UI, service worker, browser storage, PDF renderer and Word exporter, but intercept Supabase requests with synthetic teacher/class records.
 
-Observed with synthetic network fixtures: regular-account online preparation; expired-token cold offline reopen; teacher PDF reading after its network link is unavailable; first-use offline Word generation; manual lesson edits and Teaching Guide access offline; attendance/note persistence across reopen; same-account mocked reconnect; cross-tab sign-out and locked offline reopening; account-switch isolation; mobile-width PDF rendering. These are **not** claims of a live Supabase test or an actual Android phone test.
+Observed with synthetic network fixtures: regular-account online preparation; expired-token cold offline reopen; teacher PDF reading after its network link is unavailable; first-use offline Word generation; manual lesson edits and Teaching Guide access offline; attendance/note persistence across reopen; same-account mocked reconnect; cross-tab sign-out and locked offline reopening; account-switch isolation; mobile-width PDF rendering; verified email callback after a device lock; stale account-event handling; cancellation during PDF link renewal. Unit tests also cover clean-root server-error fallback and bounded link renewal. These are **not** claims of a live Supabase test or an actual Android phone test.
+
+The independent reviewer reported four issues, all covered by regression fixes, but hit its usage limit before delivering a complete final report. The author verified the reported issues and the final tests; the independent review is therefore partial.
 
 Remaining acceptance: a user-controlled regular test account round-trip against the live Supabase deployment, an actual teacher-representative Android phone (including native Print/PDF), long-duration storage/battery checks, and a real deployment update across browser versions. Desktop phone-width rendering is not Android compatibility evidence. Never put real learner data, passwords or email sign-in links into test fixtures or logs.
 

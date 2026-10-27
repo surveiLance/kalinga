@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, typ
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { OfflineReadiness } from "@/components/offline-readiness";
-import { downloadOfflineResource, getOfflineResource, listOfflineResources, removeOfflineResource, type OfflineResource } from "@/lib/offline-resources";
+import { downloadOfflineResource, getOfflineResource, listOfflineResources, removeOfflineResource, waitForOfflineResourceLink, type OfflineResource } from "@/lib/offline-resources";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { GabayMascot } from "@/components/gabay-mascot";
 import { GabayThinking, isGabayThinking } from "@/components/gabay-thinking";
@@ -23,7 +23,7 @@ import { leaveLesson, deleteLesson } from "@/lib/lesson-navigation";
 import { lessonObservations, preserveLessonObservations, hasInstructionalEdits } from "@/lib/lesson-document";
 import { applyRevision, undoRevision, type RevisionRequest, type RevisionChange, type RevisionScope } from "@/lib/lesson-revisions";
 import { askConnectedGabay, isSupabaseConfigured, requestGabayDraft, type GabayDraft, type GabayPageContext } from "@/lib/gabay-ai";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { clearSupabaseAuthCallback, getSupabaseBrowserClient, hasSupabaseAuthCallback } from "@/lib/supabase/client";
 import { attendanceStatusLabel, attendanceStatuses, isStoredAttendanceStatus, toStoredAttendanceStatus } from "@/lib/attendance";
 import { ilawStages, learnerCountSummary, planHasTeacherContent, planTitleLine, retimeSlots, slotIsWholeClass, slotsTotalMinutes, wholeClassTask, withWholeClassTask } from "@/lib/lesson-plan";
 import { commonGradeLevels, gradeLabel, gradeList, normalizeGradeLevel, sortGradeLevels } from "@/lib/grades";
@@ -466,6 +466,7 @@ export default function Home() {
 
     function lockAccount() {
       epoch.invalidate(); resolver.cancel();
+      clearSupabaseAuthCallback();
       try { lockLocalWorkspace(window.localStorage); } catch { /* Keep the current UI locked even if storage is unavailable. */ }
       sessionTeacherId.current = ""; resolvedAccountId.current = ""; interactiveSignIn.current = ""; verifiedUnlock.current = "";
       setCloudVerifiedTeacherId(""); setTeacherAccountId(""); setGuestIdentity(null); setGabayOpen(false); setAccountPanel(null); setLocalWorkspacePrepared(false);
@@ -513,31 +514,35 @@ export default function Home() {
       }
     }
 
+    function applyVerifiedTeacher(user: User) {
+      const mayUnlock = interactiveSignIn.current === user.id || hasSupabaseAuthCallback(user.id);
+      if (localWorkspaceLocked(window.localStorage) && !mayUnlock) return;
+      verifiedUnlock.current = mayUnlock ? user.id : "";
+      if (mayUnlock) {
+        try { window.localStorage.removeItem(workspaceStorageKey("device", "offline-lock")); } catch { setLocalWorkspacePrepared(false); }
+      }
+      interactiveSignIn.current = ""; clearSupabaseAuthCallback();
+      applyTeacherAccount(user);
+    }
+
     function queueAccount(user: User) {
       if (!active) return;
       if (!user.is_anonymous) {
         resolver.cancel();
-        const eligible = readLocalWorkspace(window.localStorage);
-        if (eligible && eligible.teacherId !== user.id) window.localStorage.removeItem(workspaceStorageKey("device", "offline-workspace"));
-        if (resolvedAccountId.current && resolvedAccountId.current !== user.id) { sessionTeacherId.current = ""; setCloudVerifiedTeacherId(""); setTeacherAccountId(""); setEntryMode("loading"); }
         const version = epoch.begin();
-        const mayUnlock = interactiveSignIn.current === user.id;
+        const mayUnlock = interactiveSignIn.current === user.id || hasSupabaseAuthCallback(user.id);
         if (localWorkspaceLocked(window.localStorage) && !mayUnlock) return;
-        if (!navigator.onLine) { restoreLocalWorkspace(user.id); return; }
+        if (!navigator.onLine) { restoreLocalWorkspace(); return; }
+        if (resolvedAccountId.current && resolvedAccountId.current !== user.id) restoreLocalWorkspace(resolvedAccountId.current);
         window.setTimeout(() => {
           if (!active || !epoch.current(version)) return;
           void verifyTeacherSession(supabase!).then((result) => {
             if (!active || !epoch.current(version) || offlineDemoActive.current) return;
             if (localWorkspaceLocked(window.localStorage) && !mayUnlock) return;
-            if (result.kind === "ready" && result.user.id === user.id && !result.user.is_anonymous) {
-              verifiedUnlock.current = mayUnlock ? user.id : "";
-              if (mayUnlock) {
-                try { window.localStorage.removeItem(workspaceStorageKey("device", "offline-lock")); } catch { setLocalWorkspacePrepared(false); }
-              }
-              interactiveSignIn.current = "";
-              applyTeacherAccount(result.user);
-            } else if (result.kind === "denied") lockAccount();
-            else restoreLocalWorkspace(user.id);
+            if (result.kind === "ready" && !result.user.is_anonymous) applyVerifiedTeacher(result.user);
+            else if (result.kind === "ready") queueAccount(result.user);
+            else if (result.kind === "denied") lockAccount();
+            else restoreLocalWorkspace();
           });
         }, 0);
         return;
@@ -564,12 +569,12 @@ export default function Home() {
     resumeAccount.current = queueAccount;
     async function reconnect() {
       if (!active || offlineDemoActive.current) return;
-      if (localWorkspaceLocked(window.localStorage)) { setEntryMode("signed-out"); return; }
+      if (localWorkspaceLocked(window.localStorage) && !hasSupabaseAuthCallback()) { setEntryMode("signed-out"); return; }
       const version = epoch.begin();
       if (!navigator.onLine) { restoreLocalWorkspace(); return; }
       const result = await verifyTeacherSession(supabase!);
       if (!active || !epoch.current(version)) return;
-      if (result.kind === "ready") { if (result.user.is_anonymous) queueAccount(result.user); else applyTeacherAccount(result.user); }
+      if (result.kind === "ready") { if (result.user.is_anonymous) queueAccount(result.user); else applyVerifiedTeacher(result.user); }
       else if (result.kind === "denied") lockAccount();
       else restoreLocalWorkspace();
     }
@@ -1085,6 +1090,7 @@ export default function Home() {
     setSigningOut(true);
     try { lockLocalWorkspace(window.localStorage); } catch { setNotice("This device could not lock saved access. Free storage and try signing out again."); setSigningOut(false); return; }
     accessEpoch.current.invalidate(); sessionTeacherId.current = ""; interactiveSignIn.current = ""; verifiedUnlock.current = "";
+    clearSupabaseAuthCallback();
     setCloudVerifiedTeacherId(""); setLocalWorkspacePrepared(false); setGabayOpen(false);
     if (entryMode === "authenticated") {
       authSignOutTask.current = getSupabaseBrowserClient()?.auth.signOut({ scope: "local" }).catch(() => {}) || null;
@@ -2916,11 +2922,14 @@ function resourceIcon(subject: string) {
 // out a link that expires while the reader is open.
 const signedResourceUrls = new Map<string, { url: string; expiresAt: number }>();
 
-async function signedResourceUrl(supabase: SupabaseClient, storagePath: string) {
+async function signedResourceUrl(supabase: SupabaseClient, storagePath: string, signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error("Download cancelled.");
   const cached = signedResourceUrls.get(storagePath);
   if (cached && cached.expiresAt > Date.now()) return cached.url;
-  const { data } = await supabase.storage.from("teacher-resources").createSignedUrl(storagePath, 60 * 60);
-  const url = data?.signedUrl || "";
+  const url = await waitForOfflineResourceLink(async () => {
+    const { data } = await supabase.storage.from("teacher-resources").createSignedUrl(storagePath, 60 * 60);
+    return data?.signedUrl || "";
+  }, signal);
   if (url) signedResourceUrls.set(storagePath, { url, expiresAt: Date.now() + 55 * 60_000 });
   return url;
 }
@@ -2995,7 +3004,7 @@ function LibraryView({ scope, classes, activeClassId, authenticated, teacherAcco
     try {
       let url = resource.pdfPath;
       const client = getSupabaseBrowserClient();
-      if (resource.source === "teacher" && client && resource.storagePath) { signedResourceUrls.delete(resource.storagePath); url = await signedResourceUrl(client, resource.storagePath); }
+      if (resource.source === "teacher" && client && resource.storagePath) { signedResourceUrls.delete(resource.storagePath); url = await signedResourceUrl(client, resource.storagePath, controller.signal); }
       if (!url) throw new Error("The PDF link could not be renewed. Reconnect and retry.");
       await downloadOfflineResource(scope, resource, url, { signal: controller.signal, isCurrent: () => downloadActive.current && downloadControllers.current.get(resource.id) === controller, onProgress: ({ received, total }) => { if (downloadActive.current) setDownloadProgress((current) => ({ ...current, [resource.id]: total ? `${Math.min(100, Math.round(received / total * 100))}%` : `${(received / 1048576).toFixed(1)} MB` })); } });
       void navigator.storage?.persist?.().catch(() => false);

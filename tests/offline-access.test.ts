@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAccessEpoch, classifyAccessFailure, lockLocalWorkspace, localWorkspaceLocked, readLocalWorkspace, rememberLocalWorkspace, verifyTeacherSession } from "@/lib/offline-access";
+import { createAccessEpoch, createAuthCallbackAccess, classifyAccessFailure, lockLocalWorkspace, localWorkspaceLocked, readLocalWorkspace, rememberLocalWorkspace, verifyTeacherSession } from "@/lib/offline-access";
 import { workspaceStorageKey } from "@/lib/workspace-keys";
 function storage() { const data = new Map<string, string>(); return { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } }; }
 const record = { version: 1 as const, teacherId: "11111111-1111-4111-8111-111111111111", name: "Ana", email: "ana@example.test", verifiedAt: 1 };
@@ -54,5 +54,29 @@ describe("personal-device offline access", () => {
   it("does not grant one session access based on another user's verification", async () => {
     const result = await verifyTeacherSession({ auth: { getSession: async () => ({ data: { session: { user: { id: "A" } } }, error: null }), getUser: async () => ({ data: { user: { id: "B" } }, error: null }) } });
     expect(result.kind).toBe("signin");
+  });
+  it("only accepts the SDK callback session matching the original link, once", () => {
+    const callback = createAuthCallbackAccess("https://kalinga.test/?confirmed=1#access_token=link-token&refresh_token=link-refresh");
+    callback.accept("INITIAL_SESSION", { access_token: "link-token", user: { id: "A" } });
+    expect(callback.matches("A")).toBe(false);
+    callback.accept("SIGNED_IN", { access_token: "old-token", user: { id: "A" } });
+    expect(callback.matches("A")).toBe(false);
+    callback.accept("SIGNED_IN", { access_token: "link-token", user: { id: "A" } });
+    expect(callback.matches("A")).toBe(true); expect(callback.matches("B")).toBe(false);
+    callback.clear();
+    callback.accept("SIGNED_IN", { access_token: "link-token", user: { id: "A" } });
+    expect(callback.matches("A")).toBe(false);
+  });
+  it("a confirmation flag alone never authorizes unlocking a signed-out device", () => {
+    const callback = createAuthCallbackAccess("https://kalinga.test/?confirmed=1");
+    callback.accept("SIGNED_IN", { access_token: "old-token", user: { id: "A" } });
+    expect(callback.matches("A")).toBe(false);
+  });
+  it("clears callback access on sign-out and supports completed recovery links", () => {
+    const callback = createAuthCallbackAccess("https://kalinga.test/?code=one-use-pkce-code");
+    callback.accept("PASSWORD_RECOVERY", { access_token: "verified-token", user: { id: "A" } });
+    expect(callback.matches("A")).toBe(true);
+    callback.accept("SIGNED_OUT", null);
+    expect(callback.matches("A")).toBe(false);
   });
 });

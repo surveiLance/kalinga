@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext } from "@playwright/test";
+import { test, expect, type BrowserContext, type Route } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 const teacherId = "11111111-1111-4111-8111-111111111111";
 const classId = "22222222-2222-4222-8222-222222222222";
@@ -155,4 +155,59 @@ test("signing in as another teacher never shows the previous teacher's classes o
   await page.getByRole("button", { name: "Find resources", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Downloaded local guide" })).toHaveCount(0);
   await expect(page.getByText("0 PDFs downloaded · 0.0 MB", { exact: true })).toBeVisible();
+});
+
+test("a verified email callback unlocks a signed-out device but a confirmation flag does not", async ({ context, page }) => {
+  await fixtures(context); await page.goto("/");
+  await page.getByLabel("Email address").fill("ana@example.test"); await page.locator('input[autocomplete="current-password"]').fill("fixture-password");
+  await page.getByRole("button", { name: "Sign in to Kalinga", exact: true }).click();
+  await page.getByRole("button", { name: "Keep sidebar open", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Account options for Teacher Ana", exact: true })).toBeVisible();
+  await page.evaluate(() => localStorage.setItem("kalinga:device:offline-lock", "signed-out"));
+  await page.goto("/?confirmed=1");
+  await expect(page.getByRole("heading", { name: "Welcome back, Teacher" })).toBeVisible();
+  const callback = session();
+  const hash = new URLSearchParams({ access_token: callback.access_token, refresh_token: callback.refresh_token, expires_in: "3600", token_type: "bearer", type: "signup" });
+  await page.goto("/");
+  await page.goto(`/?confirmed=1#${hash}`);
+  await expect(page.getByRole("button", { name: "Account options for Teacher Ana", exact: true })).toBeVisible({ timeout: 5000 });
+  expect(await page.evaluate(() => localStorage.getItem("kalinga:device:offline-lock"))).toBeNull();
+});
+
+test("a stale foreign sign-in event preserves the verified teacher's offline workspace", async ({ context, page }) => {
+  await fixtures(context); await page.goto("/");
+  await page.getByLabel("Email address").fill("ana@example.test"); await page.locator('input[autocomplete="current-password"]').fill("fixture-password");
+  await page.getByRole("button", { name: "Sign in to Kalinga", exact: true }).click();
+  await page.getByRole("button", { name: "Keep sidebar open", exact: true }).click();
+  await expect(page.getByText("Ready for offline teaching", { exact: true })).toBeVisible({ timeout: 90000 });
+  const foreign = session({ ...user, id: "66666666-6666-4666-8666-666666666666" });
+  await page.evaluate((value) => {
+    const key = Object.keys(localStorage).find((key) => /^sb-.*-auth-token$/.test(key))!;
+    const channel = new BroadcastChannel(key); channel.postMessage({ event: "SIGNED_IN", session: value }); channel.close();
+  }, foreign);
+  await expect(page.getByRole("button", { name: "Account options for Teacher Ana", exact: true })).toBeVisible({ timeout: 5000 });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("kalinga:device:offline-workspace")), { timeout: 3000 }).toBe(teacherId);
+});
+
+test("cancelling during PDF link renewal releases the controls and ignores a late link", async ({ context, page }) => {
+  await fixtures(context); await page.goto("/");
+  await page.getByLabel("Email address").fill("ana@example.test"); await page.locator('input[autocomplete="current-password"]').fill("fixture-password");
+  await page.getByRole("button", { name: "Sign in to Kalinga", exact: true }).click();
+  await page.getByRole("button", { name: "Keep sidebar open", exact: true }).click();
+  await page.getByRole("button", { name: "Find resources", exact: true }).click();
+  const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Downloaded local guide" }) });
+  await expect(card).toBeVisible();
+  let renewal: Route | undefined; let transfers = 0;
+  await context.route("**/storage/v1/**", async (route) => {
+    if (route.request().method() === "POST") renewal = route;
+    else { transfers++; await route.abort(); }
+  });
+  await card.getByRole("button", { name: "Download for offline", exact: true }).click();
+  await expect.poll(() => !!renewal).toBe(true);
+  await card.getByRole("button", { name: "Cancel download", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Download for offline", exact: true })).toBeVisible({ timeout: 1500 });
+  await renewal!.fulfill({ contentType: "application/json", body: JSON.stringify({ signedURL: "/object/sign/teacher-resources/late.pdf?token=fixture" }) });
+  await expect(page.getByText("Download cancelled. Any earlier copy is unchanged.", { exact: true })).toBeVisible();
+  expect(transfers).toBe(0);
+  await expect(card.getByText("Downloaded on this device")).toHaveCount(0);
 });

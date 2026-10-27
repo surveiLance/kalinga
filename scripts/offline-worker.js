@@ -27,12 +27,16 @@ self.addEventListener("activate", (event) => {
 });
 
 async function navigate(request, url) {
-  try { return await fetch(request, { signal: AbortSignal.timeout(5000) }); }
-  catch {
-    if (url.search) return new Response("Connect to the internet to open this link. Your saved classroom work is unchanged.", { status: 503, headers: { "Content-Type": "text/plain" } });
-    const cache = await caches.open(CACHE);
-    return await cache.match("/offline/shell.html") || new Response("Open Kalinga online once to prepare it for offline use.", { status: 503 });
+  try {
+    const response = await fetch(request, { signal: AbortSignal.timeout(5000) });
+    if (response.status < 500) return response;
   }
+  catch {
+    /* A prepared workspace remains usable when the network is unreachable. */
+  }
+  if (url.search) return new Response("Connect to the internet to open this link. Your saved classroom work is unchanged.", { status: 503, headers: { "Content-Type": "text/plain" } });
+  const cache = await caches.open(CACHE);
+  return await cache.match("/offline/shell.html") || new Response("Open Kalinga online once to prepare it for offline use.", { status: 503 });
 }
 
 self.addEventListener("fetch", (event) => {
