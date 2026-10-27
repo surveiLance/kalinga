@@ -60,7 +60,7 @@ export async function downloadOfflineResource(scope: string, info: OfflineResour
   try {
     const response = await fetch(url, { signal: controller.signal, cache: "no-store", credentials: "omit" });
     if (!response.ok || !/^application\/pdf(?:;|$)/i.test(response.headers.get("content-type") || "") || !response.body) throw new Error("The server did not return a PDF. Reconnect and retry.");
-    const declared = response.headers.get("content-length");
+    const declared = !response.headers.get("content-encoding") || response.headers.get("content-encoding") === "identity" ? response.headers.get("content-length") : null;
     const total = declared ? Number(declared) : undefined;
     if (total !== undefined && (!Number.isFinite(total) || total <= 0 || total > maxBytes)) throw new Error("The PDF must be 20 MB or smaller.");
     const reader = response.body.getReader();

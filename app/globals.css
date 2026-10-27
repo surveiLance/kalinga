@@ -2107,3 +2107,23 @@ html { scroll-behavior: smooth; }
   .class-detail-row > span { grid-column: 1 / -1; grid-row: 2; }
   .classes-page .class-detail-row > button { min-width: 0; grid-column: 2; grid-row: 1; }
 }
+/* Offline availability keeps the existing classroom layout. */
+.offline-workspace-notice { margin: 0; padding: 12px 24px; background: #eef7f5; color: #245d59; border-bottom: 1px solid #c8e2dd; font-size: 14px; }
+.offline-readiness { display: block; padding: 12px; font-size: 13px; }
+.offline-readiness summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.offline-readiness summary span:last-child { min-width: 0; }
+.offline-readiness strong, .offline-readiness small { display: block; overflow-wrap: anywhere; }
+.offline-readiness > div { max-height: 240px; overflow: auto; padding-top: 10px; }
+.offline-readiness p { margin: 8px 0; line-height: 1.5; }
+.resource-offline-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 0; border-top: 1px solid #e5e1d9; }
+.resource-offline-controls p { width: 100%; color: #177970; font-weight: 700; margin: 0; }
+.resource-offline-controls small { display: block; color: #6d7886; font-weight: 400; }
+.resource-offline-controls button:disabled { opacity: .55; cursor: not-allowed; }
+.downloaded-filter { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; margin: 12px 0 20px; font-size: 15px; }
+.downloaded-filter span { color: #6d7886; margin-left: auto; }
+.offline-pdf-viewer { width: 100%; overflow: auto; padding: 12px; background: #f3f1eb; }
+.offline-pdf-viewer canvas { display: block; margin: 12px auto; max-width: 100%; height: auto; background: white; }
+.offline-pdf-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.offline-pdf-controls button { padding: 10px 12px; border: 1px solid #cbd8d4; border-radius: 8px; background: white; color: #176c66; }
+.offline-pdf-controls button:disabled { opacity: .45; }
+.offline-pdf-viewer details { padding: 12px; background: white; line-height: 1.6; }

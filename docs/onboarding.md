@@ -11,7 +11,7 @@ An offline-first **teacher's assistant for multigrade classrooms in last-mile Ph
 - **Frontend:** Next.js 16.2, React 19.2, TypeScript 5.9, Tailwind 4. Deployed on **Vercel**, auto-deploys from `main`. Live: https://kalinga-gules.vercel.app
 - **Backend:** **Supabase** (project ref `aoiufmxzeenjrrtbkdwi`) — Postgres + row-level security, Auth, Storage, Realtime, and Edge Functions (Deno).
 - **AI:** **Groq** (`openai/gpt-oss-20b`) called *only* through the `gabay-chat` Supabase Edge Function, so the model key never reaches the browser.
-- **Tests:** Vitest (227 passing on 25 October 2026).
+- **Tests:** Vitest plus isolated production Chromium checks; see `docs/offline-school-workflow.md` for coverage and live/device verification limits.
 
 ## Repo shape (unusual — read this)
 
@@ -76,6 +76,8 @@ The planner is solid: topic-required AI drafting, complete-or-reject validation 
 
 **Account and export updates:** Name/school settings, help and password-recovery UI are implemented; see `docs/account-controls.md` for hosted recovery configuration and verification limits. Source-derived ILAW typography/table details are in `docs/ilaw-format.md`.
 
-**Roadmap / known-missing:** a service worker for true offline *boot* (currently local-first only once loaded), CSV/XLSX class-list import, DOCX lesson-plan import, and a curated MATATAG competency table so Gabay selects codes instead of generating them.
+**Offline update (27 October):** production application-file preparation, regular-teacher local-only reopening, explicit scoped PDF downloads and a bundled reader are implemented. Keep local-only access separate from verified cloud permissions. Sign-out locks reopening without deleting queued work. Read `docs/offline-school-workflow.md`; actual Android and a live regular-account round-trip still need verification. Build now prepares local viewer assets and generates a service-worker inventory after Next builds; never commit generated `public/offline/` or `public/kalinga-sw.js` files.
+
+**Roadmap / known-missing:** actual-device/live-account offline acceptance, CSV/XLSX class-list import, DOCX lesson-plan import, and a curated MATATAG competency table so Gabay selects codes instead of generating them. Offline AI and background sync while closed are not provided.
 
 **Ask before large refactors.** Small, verified, working changes that match the existing style are the norm here.

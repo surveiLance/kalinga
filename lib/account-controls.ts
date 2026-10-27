@@ -28,6 +28,7 @@ export function createProfileReadGate() {
   };
 }
 export async function requestPasswordReset(client: SupabaseClient | null, email: string, origin: string, captchaToken?: string): Promise<AccountResult> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return { ok: false, message: "Connect to the internet to send a password-reset email." };
   if (!client) return { ok: false, message: "Account recovery is not configured on this device." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return { ok: false, message: "Enter a valid email address." };
   try {

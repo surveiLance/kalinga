@@ -1,8 +1,12 @@
 # Session handoff — continue from here
 
-_Last updated: 2026-10-06. For the durable project overview, read [`docs/onboarding.md`](./onboarding.md) first; this file is just the live state + what's in flight._
+_Last updated: 2026-10-27. For the durable project overview, read [`docs/onboarding.md`](./onboarding.md) first._
 
-## What this session shipped
+## Current offline implementation
+
+See [`docs/offline-school-workflow.md`](./offline-school-workflow.md) and the approved 27 October design/plan under `docs/superpowers/`. Production asset caching, regular-teacher local-only access, scoped PDF downloads/reader and honest readiness are implemented. Vitest and production Chromium fixtures check expiry/cold boot, offline edits/attendance, Word/PDF reading, account isolation, cross-tab sign-out and worker updates. The browser backend is synthetic; actual Android and live-account checks remain outstanding. An existing critical Next.js audit finding is documented for separate follow-up. Normal builds now generate ignored application/PDF-worker assets; do not commit those artifacts.
+
+## Historical session: 6 October
 
 **Commit `eda1890` on `main`** — "Retry full-plan drafts and tighten the printed plan". Two bug fixes, both client/CSS only (no edge-function change). Already pushed; Vercel auto-deploys `main`.
 
@@ -36,8 +40,8 @@ _Last updated: 2026-10-06. For the durable project overview, read [`docs/onboard
 - End commit messages with: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` (adjust to the tool/model actually used).
 
 ## Open / roadmap (not started)
-- Service worker for true offline boot (currently local-first only once loaded).
-- CSV/XLSX class-list import; DOCX lesson-plan import; password reset.
+- Actual Android/live-account acceptance for the implemented offline workflow.
+- CSV/XLSX class-list import; DOCX lesson-plan import. Password-reset UI is implemented; hosted delivery needs user-controlled verification.
 - Curated MATATAG competency table so Gabay selects official codes instead of generating them.
 - **Part 2 bottleneck:** user testing with ≥5 teachers — not yet started. (Part 1 due Oct 8; check-in demo Nov 5; Part 2 final Nov 26.)
 - Possible follow-up if full-plan truncation persists for 3–4 grade classes: the 8000-token cap is a tradeoff (raising it worsens the per-minute rate-limit). Consider a paid Groq tier, or splitting the full-plan generation per grade, rather than just raising the cap.

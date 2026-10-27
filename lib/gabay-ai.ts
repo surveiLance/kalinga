@@ -28,7 +28,7 @@ export type GabayHistoryMessage = {
 
 type GabayResult =
   | { connected: true; reply: string }
-  | { connected: false; reason: "not-configured" | "not-signed-in" | "busy" | "unavailable" };
+  | { connected: false; reason: "not-configured" | "not-signed-in" | "busy" | "unavailable" | "offline" };
 
 export type GabayDraft =
   | { type: "intentions"; competency: string; objective: string }
@@ -63,7 +63,7 @@ export function isCompleteGabayFullPlan(value: unknown, expectedGrades: string[]
 
 type GabayDraftResult =
   | { connected: true; draft: GabayDraft }
-  | { connected: false; reason: "not-configured" | "not-signed-in" | "busy" | "unavailable" };
+  | { connected: false; reason: "not-configured" | "not-signed-in" | "busy" | "unavailable" | "offline" };
 
 export { isSupabaseConfigured };
 
@@ -90,6 +90,7 @@ export async function requestGabayRevision(request: RevisionRequest, pageContext
 
 export async function askConnectedGabay(message: string, pageContext: GabayPageContext, history: GabayHistoryMessage[] = []): Promise<GabayResult> {
   try {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return { connected: false, reason: "offline" };
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { connected: false, reason: "not-configured" };
 
@@ -121,6 +122,7 @@ export async function askConnectedGabay(message: string, pageContext: GabayPageC
 
 export async function requestGabayDraft(type: GabayDraft["type"], pageContext: GabayPageContext, grade: string): Promise<GabayDraftResult> {
   try {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return { connected: false, reason: "offline" };
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { connected: false, reason: "not-configured" };
 

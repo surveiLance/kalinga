@@ -14,7 +14,7 @@
 
 ## 0. Part 1 recap (include in the final PDF)
 
-The full scope, AI insertion points, and architecture are in **[Part 1](part-1.md)** and are required to be part of this submission. In brief: Kalinga is a local-first teacher's assistant for last-mile multigrade classrooms that supports lesson planning, differentiation, attendance, class/learner records, assessment, remediation, resources, and a teacher community. Its AI companion (**Gabay**) drafts lesson plans and gives page-aware guidance using aggregate classroom context, with server-side redaction of known roster names and LRN-like identifiers. Platform: a responsive web app for desktop and phone browsers, Android-first, on Vercel + Supabase + Groq; installable-PWA support remains roadmap work.
+The full scope, AI insertion points, and architecture are in **[Part 1](part-1.md)** and are required to be part of this submission. In brief: Kalinga is a local-first teacher's assistant for last-mile multigrade classrooms that supports lesson planning, differentiation, attendance, class/learner records, assessment, remediation, resources, and a teacher community. Its AI companion (**Gabay**) drafts lesson plans and gives page-aware guidance using aggregate classroom context, with server-side redaction of known roster names and LRN-like identifiers. Platform: a responsive web app for desktop and phone browsers, Android-first, on Vercel + Supabase + Groq; offline application preparation and a PWA manifest are implemented, with actual-device/live-account acceptance pending.
 
 ---
 
@@ -22,7 +22,7 @@ The full scope, AI insertion points, and architecture are in **[Part 1](part-1.m
 
 ### 1.1 What is built (✅ unless noted)
 
-- **Authentication** — Supabase email/password, plus a no-backend "prototype" mode for demos. 🟡 password reset is roadmap.
+- **Authentication** — Supabase email/password, account settings and password-recovery UI, plus a no-backend prototype mode. Hosted recovery delivery needs user-controlled verification.
 - **Classes & learners** — multigrade classes, per-grade rosters, sex counts, meeting schedules.
 - **Attendance** — date-specific, five statuses, notes, per-grade rollups, offline-safe.
 - **Lesson planning (ILAW)** — editable document that matches the DepEd Daily Lesson Plan; per-grade Intentions / Learning Experience / Assessment / Ways Forward; multigrade models; whole-class vs per-grade blocks; a lesson-flow timeline whose block times recompute from durations.
@@ -31,8 +31,8 @@ The full scope, AI insertion points, and architecture are in **[Part 1](part-1.m
 - **Gabay AI** — whole-plan draft, per-grade redraft, page-aware Taglish chat; topic required before drafting; anti-generic-filler prompting; aggregate context plus server-side redaction of known learner names and LRN-like identifiers; per-teacher rate limiting.
 - **Resources** — starter no-printer PDFs, teacher uploads (private/shared), per-resource discussion.
 - **Ask teachers** — discussions, replies, @-mentions, notifications.
-- **Local-first data** — per-teacher local storage, a durable pending-write queue with retry/backoff and reconcile, and an honest sync-status indicator. 🟡 a service worker is still required for offline application boot.
-- **Mobile** — responsive across every screen; one-grade-at-a-time planning on phones. 🟡 installable-PWA service worker and native share are roadmap.
+- **Local-first data** — per-teacher local storage and a durable pending-write queue with retry/backoff and reconcile. Production service-worker preparation supports local-only reopening for eligible regular-teacher workspaces; PDFs are explicitly downloaded into scoped IndexedDB storage. Automated browser checks use synthetic backend fixtures; real Android/live-account acceptance remains outstanding.
+- **Mobile** — responsive layouts, one-grade-at-a-time planning and a PWA manifest/application cache. Local PDF rendering is checked at phone width in desktop Chromium, not yet an actual Android device. Native file sharing remains roadmap.
 
 ### 1.2 Architecture (as implemented)
 
@@ -150,7 +150,7 @@ Discuss, against the evidence: Did Kalinga save planning time? Was the AI draft 
 Grounded in the design and expected findings:
 
 - **Curated MATATAG competencies.** Have Gabay *select* from a verified competency table instead of generating codes — more trustworthy and cheaper. (Highest-value next step.)
-- **True offline boot.** Ship the PWA service worker so the app opens with no signal, not just runs once open; native share of the exported plan.
+- **Offline acceptance.** Verify the implemented cold-boot, downloaded-resource and same-account sync flow on teacher-representative Android phones and a live test account; investigate native sharing of exports.
 - **SF2 / attendance form export.** Kalinga already holds the data; generating the monthly DepEd attendance form is a large, concrete time-saver.
 - **Filipino-quality generation.** Evaluate and, if needed, switch to a stronger model for formal classroom Filipino.
 - **Password reset & onboarding** for real teacher accounts.
@@ -165,7 +165,7 @@ Cost is not yet established. The edge function currently allows up to 8,000 comp
 - **Learner data protection.** Automatic AI context contains aggregate classroom information rather than roster or attendance records. The server redacts known roster names and LRN-like identifiers from teacher-entered text before calling the model, and the interface warns teachers not to paste attendance, health, or other sensitive details. Classroom records are isolated per teacher by RLS and are never deliberately shareable. Residual risk remains because arbitrary free text cannot be guaranteed free of every possible identifier; this must be included in consent and testing. (Aligns with the Data Privacy Act principle of data minimisation.)
 - **AI authority and correctness.** A weak model can produce plausible-but-wrong competency codes or pedagogy. Kalinga labels AI output as an editable *draft*, never as official DepEd content, requires a specific topic before drafting, forbids generic filler, and keeps the teacher's edit as the source of truth. Residual risk: a rushed teacher may submit an unverified draft — mitigated by framing and by the curated-competency roadmap.
 - **Deskilling vs. support.** The aim is to remove blank-page drudgery, not the teacher's judgement; the app is built so the teacher edits every section. Worth monitoring in testing: does the draft anchor teachers to mediocre plans?
-- **Equity and access.** Local-first data handling and Android-first responsive design reduce dependence on continuous connectivity. True offline boot remains necessary: without the planned service worker, a teacher who has not already loaded the app may still be excluded during an outage.
+- **Equity and access.** Local-first data handling and Android-first responsive design reduce dependence on continuous connectivity. The implemented service worker supports reopening after online preparation; first-ever use, browser-storage loss and unavailable downloads can still exclude a teacher during an outage. Actual Android/live-account acceptance is pending.
 - **Consent and attribution in the community.** Shared resources require the teacher to confirm they have the right to share; posts are attributed.
 
 ---

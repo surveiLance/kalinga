@@ -9,7 +9,7 @@ import type { SavedPlan } from "@/lib/teaching-types";
 
 const failureMessage: Record<string, string> = { "not-signed-in": "Sign in to ask Gabay for suggestions. You can still edit the lesson yourself.", "not-configured": "Connected Gabay is unavailable in prototype mode. Your lesson is unchanged.", offline: "You are offline. Keep editing and try again when connected.", busy: "Gabay reached its request limit. Please try again shortly.", unsupported: "Lesson revisions are not available on the connected Gabay service yet. Your lesson is unchanged.", "too-large": "This lesson is too large to revise at once. Shorten long fields before trying again." };
 
-export function LessonRevisionPanel({ plan, initialScope, onClose, onApply }: { plan: SavedPlan; initialScope: RevisionScope; onClose: () => void; onApply: (request: RevisionRequest, changes: RevisionChange[]) => void }) {
+export function LessonRevisionPanel({ plan, initialScope, onClose, onApply, available: cloudAvailable = true }: { plan: SavedPlan; initialScope: RevisionScope; onClose: () => void; onApply: (request: RevisionRequest, changes: RevisionChange[]) => void; available?: boolean }) {
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [scope, setScope] = useState(initialScope);
@@ -45,6 +45,7 @@ export function LessonRevisionPanel({ plan, initialScope, onClose, onApply }: { 
   }
   async function suggest(event: React.FormEvent) {
     event.preventDefault();
+    if (!cloudAvailable || !navigator.onLine) { setState({ error: "Connect and sign in for Gabay's suggestions. Your lesson remains editable." }); return; }
     if (!instruction.trim() || busy) return;
     const pending = lifecycle.start();
     let request: RevisionRequest;

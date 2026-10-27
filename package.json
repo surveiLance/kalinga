@@ -10,6 +10,7 @@
     "build": "node scripts/prepare-offline-assets.mjs && next build && node scripts/build-offline-worker.mjs",
     "start": "next start",
     "test": "vitest run",
+    "test:offline": "playwright test",
     "lint": "eslint . --ignore-pattern .next --ignore-pattern supabase/functions"
   },
   "dependencies": {

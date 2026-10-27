@@ -9,7 +9,7 @@ self.addEventListener("install", (event) => {
     try {
       for (const url of ASSETS) {
         const response = await fetch(url, { cache: "reload", credentials: "omit", signal: AbortSignal.timeout(60000) });
-        if (!response.ok || response.redirected) throw new Error("An application file could not be prepared.");
+        if (!response.ok || response.redirected || !url.endsWith(".html") && /text\/html/i.test(response.headers.get("content-type") || "")) throw new Error("An application file could not be prepared.");
         await cache.put(url, response);
       }
       await cache.put("/offline/ready", new Response(VERSION));

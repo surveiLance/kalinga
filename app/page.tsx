@@ -2,9 +2,13 @@
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
+import { OfflineReadiness } from "@/components/offline-readiness";
+import { downloadOfflineResource, getOfflineResource, listOfflineResources, removeOfflineResource, type OfflineResource } from "@/lib/offline-resources";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { GabayMascot } from "@/components/gabay-mascot";
 import { GabayThinking, isGabayThinking } from "@/components/gabay-thinking";
+import { createAccessEpoch, classifyAccessFailure, lockLocalWorkspace, localWorkspaceLocked, readLocalWorkspace, rememberLocalWorkspace, verifyTeacherSession, type LocalAccessRecord } from "@/lib/offline-access";
 import { LessonRevisionPanel } from "@/components/lesson-revision-panel";
 import { GabayPageGuides, PageGuideButton } from "@/components/page-guides";
 import { GuestEntry, GuestSignOut } from "@/components/guest-entry";
@@ -35,7 +39,8 @@ import type { ClassLearner, ClassMeeting, GradeLevel, LegacySavedPlan, LegacyTea
 import { acknowledgePendingWrite, attendanceChanges, canSyncScope, enqueuePendingWrite, failPendingWrite, maxSyncAttempts, pendingCandidates, readPendingWrites, reconcilePendingWrites, retryPendingWrites, startPendingWrite, type PendingChange, type PendingWrite } from "@/lib/pending-writes";
 
 type View = "home" | "classes" | "plan" | "teach" | "library" | "attendance" | "community";
-type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated";
+const OfflinePdfViewer = dynamic(() => import("@/components/offline-pdf-viewer").then((module) => module.OfflinePdfViewer), { ssr: false });
+type EntryMode = "loading" | "signed-out" | "prototype" | "authenticated" | "local-only";
 type AuthActionResult = { ok: boolean; message?: string };
 type GabayLiveContext = Partial<GabayPageContext> & { view: View };
 type AppNotification = { id: string; kind: "reply" | "mention" | "resource"; title: string; body: string; createdAt?: string; view: View; targetId?: string; read?: boolean };
@@ -360,6 +365,13 @@ export default function Home() {
   const [classDataReady, setClassDataReady] = useState(false);
   const [hydratedWorkspaceScope, setHydratedWorkspaceScope] = useState("");
   const [teacherAccountId, setTeacherAccountId] = useState("");
+  const [cloudVerifiedTeacherId, setCloudVerifiedTeacherId] = useState("");
+  const [localWorkspacePrepared, setLocalWorkspacePrepared] = useState(false);
+  const accessEpoch = useRef(createAccessEpoch());
+  const interactiveSignIn = useRef("");
+  const verifiedUnlock = useRef("");
+  const reconnectAccount = useRef<() => void>(() => {});
+  const authSignOutTask = useRef<Promise<unknown> | null>(null);
   const [guestIdentity, setGuestIdentity] = useState<GuestIdentity | null>(null);
   const [guestSetupOpen, setGuestSetupOpen] = useState(false);
   const [guestDraftName, setGuestDraftName] = useState("");
@@ -395,11 +407,12 @@ export default function Home() {
   const sessionTeacherId = useRef("");
   const wakeSync = useRef<(refresh?: boolean) => void>(() => {});
   const syncRun = useRef<Promise<void> | null>(null);
-  const workspaceScope = entryMode === "authenticated" && teacherAccountId
+  const workspaceScope = (entryMode === "authenticated" || entryMode === "local-only") && teacherAccountId
     ? `teacher-${teacherAccountId}`
     : entryMode === "prototype"
       ? "prototype"
       : "";
+  const cloudAvailable = entryMode === "authenticated" && cloudVerifiedTeacherId === teacherAccountId && online;
 
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
@@ -448,10 +461,33 @@ export default function Home() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let active = true;
-    let sessionEventSeen = false;
     const resolver = accountResolver.current;
+    const epoch = accessEpoch.current;
+
+    function lockAccount() {
+      epoch.invalidate(); resolver.cancel();
+      try { lockLocalWorkspace(window.localStorage); } catch { /* Keep the current UI locked even if storage is unavailable. */ }
+      sessionTeacherId.current = ""; resolvedAccountId.current = ""; interactiveSignIn.current = ""; verifiedUnlock.current = "";
+      setCloudVerifiedTeacherId(""); setTeacherAccountId(""); setGuestIdentity(null); setGabayOpen(false); setAccountPanel(null); setLocalWorkspacePrepared(false);
+      setEntryMode((current) => current === "prototype" ? current : "signed-out");
+    }
+
+    function restoreLocalWorkspace(expectedId?: string) {
+      if (!active || offlineDemoActive.current) return;
+      let record: LocalAccessRecord | null = null;
+      try { record = readLocalWorkspace(window.localStorage); } catch { /* Do not guess another teacher's scope. */ }
+      sessionTeacherId.current = ""; setCloudVerifiedTeacherId("");
+      if (record && (!expectedId || record.teacherId === expectedId)) {
+        resolvedAccountId.current = record.teacherId;
+        setTeacherAccountId(record.teacherId); setTeacherName(record.name); setTeacherEmail(record.email); setGuestIdentity(null); setEntryMode("local-only");
+      } else { setTeacherAccountId(""); setEntryMode((current) => current === "prototype" ? current : "signed-out"); }
+    }
 
     function applyTeacherAccount(user: User, identity?: GuestIdentity) {
+      if (identity) {
+        try { window.localStorage.removeItem(workspaceStorageKey("device", "offline-workspace")); if (interactiveSignIn.current === user.id) window.localStorage.removeItem(workspaceStorageKey("device", "offline-lock")); } catch { /* Guests never inherit regular-teacher offline eligibility. */ }
+        interactiveSignIn.current = "";
+      }
       sessionTeacherId.current = user.id;
       const displayName = typeof user.user_metadata?.display_name === "string"
         ? user.user_metadata.display_name
@@ -467,6 +503,7 @@ export default function Home() {
       resolvedAccountId.current = user.id;
       setTeacherEmail(user.email || "");
       setTeacherAccountId(user.id);
+      setCloudVerifiedTeacherId(user.id);
       setEntryMode("authenticated");
       window.setTimeout(() => wakeSync.current(true), 0);
       if (new URLSearchParams(window.location.search).get("confirmed") === "1") {
@@ -478,8 +515,36 @@ export default function Home() {
 
     function queueAccount(user: User) {
       if (!active) return;
+      if (!user.is_anonymous) {
+        resolver.cancel();
+        const eligible = readLocalWorkspace(window.localStorage);
+        if (eligible && eligible.teacherId !== user.id) window.localStorage.removeItem(workspaceStorageKey("device", "offline-workspace"));
+        if (resolvedAccountId.current && resolvedAccountId.current !== user.id) { sessionTeacherId.current = ""; setCloudVerifiedTeacherId(""); setTeacherAccountId(""); setEntryMode("loading"); }
+        const version = epoch.begin();
+        const mayUnlock = interactiveSignIn.current === user.id;
+        if (localWorkspaceLocked(window.localStorage) && !mayUnlock) return;
+        if (!navigator.onLine) { restoreLocalWorkspace(user.id); return; }
+        window.setTimeout(() => {
+          if (!active || !epoch.current(version)) return;
+          void verifyTeacherSession(supabase!).then((result) => {
+            if (!active || !epoch.current(version) || offlineDemoActive.current) return;
+            if (localWorkspaceLocked(window.localStorage) && !mayUnlock) return;
+            if (result.kind === "ready" && result.user.id === user.id && !result.user.is_anonymous) {
+              verifiedUnlock.current = mayUnlock ? user.id : "";
+              if (mayUnlock) {
+                try { window.localStorage.removeItem(workspaceStorageKey("device", "offline-lock")); } catch { setLocalWorkspacePrepared(false); }
+              }
+              interactiveSignIn.current = "";
+              applyTeacherAccount(result.user);
+            } else if (result.kind === "denied") lockAccount();
+            else restoreLocalWorkspace(user.id);
+          });
+        }, 0);
+        return;
+      }
+      epoch.invalidate();
+      if (localWorkspaceLocked(window.localStorage) && interactiveSignIn.current !== user.id) return;
       sessionTeacherId.current = user.id;
-      if (!user.is_anonymous) { resolver.cancel(); applyTeacherAccount(user); return; }
       if (offlineDemoActive.current) return;
       if (guestStarting.current) return;
       if (resolvedAccountId.current !== user.id) setEntryMode("loading");
@@ -497,32 +562,42 @@ export default function Home() {
       }, 0);
     }
     resumeAccount.current = queueAccount;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!active || sessionEventSeen) return;
-      if (data.session?.user) queueAccount(data.session.user);
-      else {
-        sessionTeacherId.current = "";
-        setTeacherAccountId("");
-        setEntryMode((current) => current === "prototype" ? current : "signed-out");
+    async function reconnect() {
+      if (!active || offlineDemoActive.current) return;
+      if (localWorkspaceLocked(window.localStorage)) { setEntryMode("signed-out"); return; }
+      const version = epoch.begin();
+      if (!navigator.onLine) { restoreLocalWorkspace(); return; }
+      const result = await verifyTeacherSession(supabase!);
+      if (!active || !epoch.current(version)) return;
+      if (result.kind === "ready") { if (result.user.is_anonymous) queueAccount(result.user); else applyTeacherAccount(result.user); }
+      else if (result.kind === "denied") lockAccount();
+      else restoreLocalWorkspace();
+    }
+    reconnectAccount.current = () => { void reconnect(); };
+    const boot = window.setTimeout(() => { void reconnect(); }, 0);
+    function accessStorageChanged(event: StorageEvent) {
+      if (event.key === null || event.key === workspaceStorageKey("device", "offline-lock") || event.key === workspaceStorageKey("device", "offline-workspace")) {
+        epoch.invalidate(); sessionTeacherId.current = ""; setCloudVerifiedTeacherId("");
+        if (localWorkspaceLocked(window.localStorage)) { setTeacherAccountId(""); setEntryMode("signed-out"); setGabayOpen(false); setAccountPanel(null); }
+        else { setTeacherAccountId(""); setEntryMode("loading"); void reconnect(); }
       }
-    });
+    }
+    window.addEventListener("storage", accessStorageChanged);
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
-      sessionEventSeen = true;
       if (_event === "PASSWORD_RECOVERY" && session?.user && !session.user.is_anonymous) setRecoveryAccountId(session.user.id);
       else setRecoveryAccountId((current) => current === session?.user.id ? current : "");
       if (session?.user) queueAccount(session.user);
-      else {
-        resolver.cancel(); resolvedAccountId.current = ""; setGuestIdentity(null);
-        sessionTeacherId.current = "";
-        setTeacherAccountId("");
-        setEntryMode((current) => current === "prototype" ? current : "signed-out");
-      }
+      else if (_event === "SIGNED_OUT") lockAccount();
     });
 
     return () => {
       active = false;
+      epoch.invalidate();
+      window.clearTimeout(boot);
+      window.removeEventListener("storage", accessStorageChanged);
+      reconnectAccount.current = () => {};
       resolver.cancel();
       listener.subscription.unsubscribe();
     };
@@ -531,7 +606,7 @@ export default function Home() {
   useEffect(() => {
     function updateConnection() {
       setOnline(navigator.onLine);
-      if (navigator.onLine) wakeSync.current(true);
+      if (navigator.onLine) reconnectAccount.current();
     }
     updateConnection();
     window.addEventListener("online", updateConnection);
@@ -577,6 +652,7 @@ export default function Home() {
       setGabayEventMessage("");
       setPendingWrites([]);
       setStorageError("");
+      setLocalWorkspacePrepared(false);
       setCloudLoaded(false);
       setSyncing(false);
 
@@ -627,7 +703,17 @@ export default function Home() {
   }, [classes, activeClassId, savedPlans, savedResourceIds, attendanceRecords, attendanceNotes, teacherName, teacherEmail, schoolName, gabayMotion, classDataReady, hydratedWorkspaceScope, workspaceScope, storageError]);
 
   useEffect(() => {
-    if (entryMode !== "authenticated" || !canSyncScope(workspaceScope, teacherAccountId) || hydratedWorkspaceScope !== workspaceScope || storageError) return;
+    if (!classDataReady || hydratedWorkspaceScope !== workspaceScope || storageError || !workspaceScope) return;
+    try {
+      if (entryMode === "authenticated" && !guestAccount && cloudVerifiedTeacherId === teacherAccountId && sessionTeacherId.current === teacherAccountId) rememberLocalWorkspace(window.localStorage, { version: 1, teacherId: teacherAccountId, name: teacherName, email: teacherEmail, verifiedAt: Date.now() }, verifiedUnlock.current === teacherAccountId);
+      const prepared = entryMode === "prototype" || readLocalWorkspace(window.localStorage)?.teacherId === teacherAccountId;
+      const timer = window.setTimeout(() => setLocalWorkspacePrepared(prepared), 0);
+      return () => window.clearTimeout(timer);
+    } catch { const timer = window.setTimeout(() => setLocalWorkspacePrepared(false), 0); return () => window.clearTimeout(timer); }
+  }, [classDataReady, hydratedWorkspaceScope, workspaceScope, storageError, entryMode, guestAccount, cloudVerifiedTeacherId, teacherAccountId, teacherName, teacherEmail]);
+
+  useEffect(() => {
+    if (entryMode !== "authenticated" || cloudVerifiedTeacherId !== teacherAccountId || !canSyncScope(workspaceScope, teacherAccountId) || hydratedWorkspaceScope !== workspaceScope || storageError) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let active = true;
@@ -682,13 +768,15 @@ export default function Home() {
           return;
         }
         const { data, error } = await supabase!.auth.getSession();
-        if (!currentSession() || error || !canSyncScope(workspaceScope, data.session?.user.id || "") || !navigator.onLine) return;
+        if (!currentSession() || !navigator.onLine) return;
+        if (error || !canSyncScope(workspaceScope, data.session?.user.id || "")) { sessionTeacherId.current = ""; setCloudVerifiedTeacherId(""); setEntryMode("local-only"); return; }
         queue = loadPendingWrites(workspaceScope);
         if (!queue.some((entry) => entry.id === item.id)) continue;
         setPendingWrites(persistPendingWrites(workspaceScope, startPendingWrite(queue, workspaceScope, item.id, Date.now())));
         controller = new AbortController();
         const timeout = window.setTimeout(() => controller?.abort(), 30_000);
         let failed = false;
+        let authenticationFailed = false;
         try {
           checkSession();
           if (item.kind === "profile") {
@@ -715,13 +803,19 @@ export default function Home() {
             }
             await saveAttendanceToCloud(supabase!, teacherAccountId, [{ id: item.classId }], updates, notes, controller.signal);
           }
-        } catch {
+        } catch (error) {
           failed = true;
+          authenticationFailed = classifyAccessFailure(error) === "auth";
         } finally {
           window.clearTimeout(timeout);
         }
         if (!currentSession()) return;
         queue = loadPendingWrites(workspaceScope);
+        if (authenticationFailed) {
+          setPendingWrites(persistPendingWrites(workspaceScope, queue.map((entry) => entry.id === item.id ? { ...entry, attempts: item.attempts, nextAttemptAt: item.nextAttemptAt, error: "Sign in to sync this change." } : entry)));
+          sessionTeacherId.current = ""; setCloudVerifiedTeacherId(""); setEntryMode("local-only");
+          return;
+        }
         if (failed) {
           setPendingWrites(persistPendingWrites(workspaceScope, failPendingWrite(queue, workspaceScope, item.id, "The cloud rejected this change or could not be reached.")));
         } else {
@@ -770,7 +864,7 @@ export default function Home() {
       window.removeEventListener("storage", storageChanged);
       wakeSync.current = () => {};
     };
-  }, [entryMode, hydratedWorkspaceScope, teacherAccountId, workspaceScope, storageError]);
+  }, [entryMode, hydratedWorkspaceScope, teacherAccountId, workspaceScope, storageError, cloudVerifiedTeacherId]);
 
   useEffect(() => {
     if (entryMode !== "authenticated" || !teacherAccountId) return;
@@ -832,7 +926,8 @@ export default function Home() {
   const unreadNotifications = notifications.filter((item) => !notificationReadIds.includes(item.id));
   const blockedWrites = pendingWrites.filter((item) => item.attempts >= maxSyncAttempts);
   const syncState = storageError ? "blocked"
-    : entryMode !== "authenticated" ? "device"
+    : entryMode === "local-only" ? "local"
+      : entryMode !== "authenticated" ? "device"
       : blockedWrites.length ? "blocked"
         : !online ? "offline"
           : syncing ? "syncing"
@@ -845,6 +940,7 @@ export default function Home() {
     syncing: "Syncing…",
     waiting: `${pendingWrites.length} waiting to sync`,
     synced: "All work synced",
+    local: `${online ? "Sign in to sync" : "Offline"} · ${pendingWrites.length} changes waiting`,
   }[syncState];
   const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
@@ -963,6 +1059,7 @@ export default function Home() {
   }
 
   async function continueAsGuest(name: string, captchaToken?: string): Promise<AuthActionResult> {
+    await authSignOutTask.current;
     offlineDemoActive.current = false;
     setGuestDraftName(name); setGuestError("");
     if (!guestAccessEnabled || !guestCaptchaSiteKey || !navigator.onLine) return { ok: false, message: "Guest sign-in needs an internet connection and configured guest access. Use the offline demo if needed." };
@@ -975,6 +1072,7 @@ export default function Home() {
       const { data, error } = await supabase.auth.getSession();
       if (error || data.session?.user.id !== result.identity.userId) return { ok: false, message: "Your session changed. Please reopen guest sign-in." };
       guestStarting.current = false;
+      interactiveSignIn.current = data.session.user.id;
       resumeAccount.current(data.session.user);
       return { ok: true };
     } finally { guestStarting.current = false; }
@@ -983,12 +1081,13 @@ export default function Home() {
   async function signOut(confirmedGuest = false) {
     if (guestIdentity && !confirmedGuest) { setAccountOpen(false); setGuestError(""); setGuestSignOutOpen(true); return; }
     if (signingOut) return;
+    if (pendingWrites.length && !window.confirm("Some changes are waiting to sync. Sign out and lock this device? Your work will be kept for this teacher account.")) return;
     setSigningOut(true);
+    try { lockLocalWorkspace(window.localStorage); } catch { setNotice("This device could not lock saved access. Free storage and try signing out again."); setSigningOut(false); return; }
+    accessEpoch.current.invalidate(); sessionTeacherId.current = ""; interactiveSignIn.current = ""; verifiedUnlock.current = "";
+    setCloudVerifiedTeacherId(""); setLocalWorkspacePrepared(false); setGabayOpen(false);
     if (entryMode === "authenticated") {
-      try {
-        const result = await getSupabaseBrowserClient()?.auth.signOut();
-        if (!result || result.error) throw new Error("Sign-out failed");
-      } catch { setSigningOut(false); setGuestError("Sign-out did not complete. Please retry."); setNotice("Sign-out did not complete. Your session is unchanged."); return; }
+      authSignOutTask.current = getSupabaseBrowserClient()?.auth.signOut({ scope: "local" }).catch(() => {}) || null;
     }
     accountResolver.current.cancel(); resolvedAccountId.current = "";
     setGuestSignOutOpen(false); setGuestSetupOpen(false); setGuestIdentity(null); setSigningOut(false);
@@ -1007,13 +1106,16 @@ export default function Home() {
   async function signInTeacher(email: string, password: string, captchaToken?: string): Promise<AuthActionResult> {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { ok: false, message: "Supabase is not configured on this device yet." };
+    await authSignOutTask.current;
     const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
     if (error) return { ok: false, message: error.message };
     if (!data.user) return { ok: false, message: "We could not open this teacher account." };
+    offlineDemoActive.current = false; interactiveSignIn.current = data.user.id; resumeAccount.current(data.user);
     return { ok: true };
   }
 
   async function createTeacherAccount(name: string, email: string, password: string, captchaToken?: string): Promise<AuthActionResult> {
+    await authSignOutTask.current;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { ok: false, message: "Supabase is not configured on this device yet." };
     const { data, error } = await supabase.auth.signUp({
@@ -1027,11 +1129,12 @@ export default function Home() {
     });
     if (error) return { ok: false, message: error.message };
     if (!data.session) return { ok: true, message: "Check your email and tap Confirm. Kalinga will bring you straight into your teacher workspace." };
+    if (data.user) { offlineDemoActive.current = false; interactiveSignIn.current = data.user.id; resumeAccount.current(data.user); }
     return { ok: true };
   }
 
   function queueChanges(changes: PendingChange<TeachingClass, SavedPlan>[], offlineNotice: string) {
-    if (entryMode !== "authenticated" || !canSyncScope(workspaceScope, teacherAccountId) || storageError || !changes.length) return;
+    if ((entryMode !== "authenticated" && entryMode !== "local-only") || !canSyncScope(workspaceScope, teacherAccountId) || storageError || !changes.length) return;
     try {
       const queue = changes.reduce((current, change) => enqueuePendingWrite(current, workspaceScope, change, crypto.randomUUID(), Date.now()), loadPendingWrites(workspaceScope));
       setPendingWrites(persistPendingWrites(workspaceScope, queue));
@@ -1090,6 +1193,7 @@ export default function Home() {
   }
 
   async function saveAccountDetails(name: string, school: string): Promise<AccountResult> {
+    if (entryMode === "local-only") return { ok: false, message: "Reconnect and sign in before changing account defaults. You can still edit saved lessons and take attendance offline." };
     const details = normalizeAccountDetails(guestIdentity?.displayName || name, school);
     if (!details.ok) return details;
     if (!classDataReady || hydratedWorkspaceScope !== workspaceScope || !workspaceScope || storageError) return { ok: false, message: "Wait for your workspace to load and resolve any device-storage warning before saving." };
@@ -1230,10 +1334,7 @@ export default function Home() {
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" data-tour="nav-community" aria-label="Ask teachers" onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
         </nav>
 
-        <div className="offline-card sidebar-status">
-          <span className="status-dot" />
-          <div><strong>Teaching kit</strong><small>2 starter PDFs ready</small></div>
-        </div>
+        <OfflineReadiness key={workspaceScope} scope={workspaceScope} persisted={localWorkspacePrepared} storageError={storageError} pendingCount={pendingWrites.length} cloudVerified={cloudAvailable} online={online} />
 
         <div className="account-anchor desktop-account">
           {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} />}
@@ -1261,7 +1362,7 @@ export default function Home() {
             <button data-tour="gabay-open" className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b>Ask Gabay</b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
             <div className="notification-anchor">
               <button data-tour="notifications" className={`notification ${unreadNotifications.length ? "has-unread" : ""}`} type="button" aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ""}`} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><BellIcon />{unreadNotifications.length > 0 && <b>{Math.min(unreadNotifications.length, 9)}</b>}</button>
-              {notificationsOpen && <NotificationPanel notifications={notifications} readIds={notificationReadIds} authenticated={entryMode === "authenticated"} onOpen={openNotification} onMarkAll={() => markNotificationsRead(unreadNotifications.map((item) => item.id))} />}
+              {notificationsOpen && <NotificationPanel notifications={notifications} readIds={notificationReadIds} authenticated={cloudAvailable} onOpen={openNotification} onMarkAll={() => markNotificationsRead(unreadNotifications.map((item) => item.id))} />}
             </div>
             <div className="account-anchor mobile-account">
               <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
@@ -1272,6 +1373,7 @@ export default function Home() {
 
         <div className="walkthrough-dock-host" data-walkthrough-host="workspace" />
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
+        {!cloudAvailable && <p className="offline-workspace-notice" role="status">{entryMode === "prototype" ? "Offline demo · saved only in this browser." : "Using your saved device workspace."} You can edit saved lessons and take attendance. Gabay AI, new uploads and teacher discussions need internet.{entryMode === "local-only" && online && <button className="text-button" type="button" onClick={() => setEntryMode("signed-out")}>Sign in to sync</button>}</p>}
         <GabayPageGuides key={workspaceScope} scope={workspaceScope} page={view} motion={gabayMotion} blocked={gabayOpen || accountOpen || notificationsOpen || !!accountPanel || guestSignOutOpen} request={guideRequest} onStart={openWalkthrough} />
         {guestSignOutOpen && <GuestSignOut busy={signingOut} error={guestError} onConfirm={() => void signOut(true)} onCancel={() => { setGuestSignOutOpen(false); setGuestError(""); }} />}
 
@@ -1292,11 +1394,11 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onResources={() => setView("library")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} teacherName={teacherName} guestMentionTag={guestIdentity?.mentionTag} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onResources={() => setView("library")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView cloudAvailable={cloudAvailable} key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView key={workspaceScope} scope={workspaceScope} onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} authenticated={cloudAvailable} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={cloudAvailable} teacherAccountId={teacherAccountId} teacherName={teacherName} guestMentionTag={guestIdentity?.mentionTag} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
         </div>
 
-        {accountPanel && <AccountDialog key={`${workspaceScope}:${accountPanel}`} kind={accountPanel} name={teacherName} school={schoolName} email={teacherEmail} guest={!!guestIdentity} authenticated={entryMode === "authenticated"} onClose={() => setAccountPanel(null)} onSave={saveAccountDetails} />}
-        <GabayGuide onStartWalkthrough={openWalkthrough} open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={entryMode === "authenticated"} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
+        {accountPanel && <AccountDialog key={`${workspaceScope}:${accountPanel}`} kind={accountPanel} name={teacherName} school={schoolName} email={teacherEmail} guest={!!guestIdentity} authenticated={cloudAvailable} onClose={() => setAccountPanel(null)} onSave={saveAccountDetails} />}
+        <GabayGuide onStartWalkthrough={openWalkthrough} open={gabayOpen} view={view} pageContext={gabayPageContext} activeClass={activeClass} motion={gabayMotion} authenticated={cloudAvailable} teacherAccountId={teacherAccountId} onClose={() => setGabayOpen(false)} onRequestSignIn={() => { setGabayOpen(false); setEntryMode("signed-out"); }} />
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button data-tour="nav-home" className={view === "home" ? "active" : ""} type="button" onClick={() => setView("home")}><span>⌂</span>Today</button><button data-tour="nav-classes" className={view === "classes" ? "active" : ""} type="button" onClick={() => setView("classes")}><span>▦</span>Classes</button><button data-tour="nav-plan" className={view === "plan" || view === "teach" ? "active" : ""} type="button" onClick={() => openPlanLessons()}><span>＋</span>Plan</button><button data-tour="nav-library" className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}><span>▱</span>Resources</button><button data-tour="nav-community" className={view === "community" ? "active" : ""} type="button" onClick={() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); }}><span>♧</span>Ask</button>
@@ -1767,13 +1869,13 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   }
 
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
-    <header><GabayMascot size="small" motion={motion} speaking={thinking} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? thinking ? "Thinking with your page context…" : contextReady ? `${gabayPageLabels[view]} context ready` : "Reading this page…" : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
+    <header><GabayMascot size="small" motion={motion} speaking={thinking} /><div><h2 id="gabay-title">Gabay</h2><small>{authenticated ? thinking ? "Thinking with your page context…" : contextReady ? `${gabayPageLabels[view]} context ready` : "Reading this page…" : pageContext.offline ? "Connect to use Gabay AI" : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
     {authenticated && <div className={`gabay-context-status ${contextReady ? "ready" : "loading"}`} role="status" aria-live="polite"><i />{contextReady ? `Ready to help with ${pageContext.pageStep || gabayPageLabels[view]}` : "Loading the current page context…"}</div>}
     {conversationMenuOpen && <div className="gabay-conversation-menu"><button className="gabay-walkthrough-start" type="button" onClick={() => { setConversationMenuOpen(false); onStartWalkthrough(); }}>Guide this page</button><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 12).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}<div className="gabay-delete-actions">{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Delete this conversation</button>}{conversations.length > 1 && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearAllConversations}>Delete all conversations</button>}</div>{conversationDeleteError && <p className="gabay-delete-error">{conversationDeleteError}</p>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
     <div className="gabay-chat-body">
-      {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>Sign in to start chatting</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{thinking && <GabayThinking motion={motion} />}</div>}
+      {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b>How can I help?</b><p>{pagePrompt[view]}</p>{!authenticated && <button type="button" onClick={onRequestSignIn}>{pageContext.offline ? "Gabay AI needs internet" : "Sign in to start chatting"}</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{thinking && <GabayThinking motion={motion} />}</div>}
     </div>
-    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady} onChange={(event) => setChatInput(event.target.value)} placeholder={!authenticated ? "Sign in to chat" : contextReady ? `Ask about ${gabayPageLabels[view]}…` : "Reading this page…"} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady} onChange={(event) => setChatInput(event.target.value)} placeholder={!authenticated ? pageContext.offline ? "Gabay AI needs internet" : "Sign in to chat" : contextReady ? `Ask about ${gabayPageLabels[view]}…` : "Reading this page…"} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
   </aside>;
 }
 
@@ -2255,7 +2357,7 @@ function useIsNarrow(query = "(max-width: 720px)") {
   return narrow;
 }
 
-function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId, initialPlan, teacherName: defaultTeacherName, schoolName: defaultSchoolName, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { classes: TeachingClass[]; persistedPlans: SavedPlan[]; onAllPlans: () => void; onDelete: (id: string) => void; activeClassId: string; initialPlan?: SavedPlan; teacherName: string; schoolName: string; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function PlanView({ cloudAvailable, classes, persistedPlans, onAllPlans, onDelete, activeClassId, initialPlan, teacherName: defaultTeacherName, schoolName: defaultSchoolName, onSave, onTeach, onBack, onSetUpClass, onGabayContext }: { cloudAvailable: boolean; classes: TeachingClass[]; persistedPlans: SavedPlan[]; onAllPlans: () => void; onDelete: (id: string) => void; activeClassId: string; initialPlan?: SavedPlan; teacherName: string; schoolName: string; onSave: (plan: SavedPlan) => void; onTeach: (plan: SavedPlan) => void; onBack: () => void; onSetUpClass: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [teacherName] = useState(initialPlan?.teacherName ?? defaultTeacherName);
   const [schoolName, setPlanSchoolName] = useState(initialPlan?.schoolName ?? defaultSchoolName);
   const [selectedClassId, setSelectedClassId] = useState(initialPlan?.classId || activeClassId || classes[0]?.id || "");
@@ -2462,10 +2564,11 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
   }
 
   function draftFailure(reason: string, what: string) {
-    return reason === "not-signed-in" ? `Sign in to let Gabay draft ${what}.` : reason === "busy" ? "Gabay is helping many teachers right now. Please try again shortly." : `Gabay could not draft ${what} right now. Your work is unchanged.`;
+    return reason === "offline" ? "Gabay AI needs internet. Your lesson is unchanged and remains editable." : reason === "not-signed-in" ? `Sign in to let Gabay draft ${what}.` : reason === "busy" ? "Gabay is helping many teachers right now. Please try again shortly." : `Gabay could not draft ${what} right now. Your work is unchanged.`;
   }
 
   async function draftCompletePlan() {
+    if (!cloudAvailable) { setFullPlanDraftError("Connect and sign in to use Gabay AI. You can still edit this lesson yourself."); return; }
     if (!selectedClass || draftingFullPlan || !requireTopic()) return;
     if (hasPlanContent) { setRevisionScope("whole"); return; }
     const captured = JSON.stringify(currentPlan);
@@ -2681,7 +2784,7 @@ function PlanView({ classes, persistedPlans, onAllPlans, onDelete, activeClassId
         </div>
       </div>
       {revisionNotice && <p className="draft-restore" role="status">{revisionNotice} {revisionUndo && <button type="button" onClick={undoSuggestions}>Undo applied changes</button>}</p>}
-      {revisionScope && currentPlan && <LessonRevisionPanel key={revisionScope} plan={currentPlan} initialScope={revisionScope} onClose={closeRevisions} onApply={applySuggestions} />}
+      {revisionScope && currentPlan && <LessonRevisionPanel available={cloudAvailable} key={revisionScope} plan={currentPlan} initialScope={revisionScope} onClose={closeRevisions} onApply={applySuggestions} />}
       {docxError && <p className="gabay-draft-error" role="alert">{docxError}</p>}
 
       {narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}
@@ -2777,6 +2880,7 @@ type LibraryResource = {
   pdfPath: string;
   source: "starter" | "teacher";
   ownerId?: string;
+  storagePath?: string;
   visibility?: "private" | "shared";
   reviewStatus?: string;
 };
@@ -2799,6 +2903,7 @@ type ResourceSubmission = {
 };
 
 const emptyResourceSubmission: ResourceSubmission = { title: "", subject: "Mathematics", grades: "", type: "Activity sheet", description: "", tags: "", visibility: "shared" };
+function onlineResourceAllowed(resource: LibraryResource, authenticated: boolean) { return typeof navigator !== "undefined" && navigator.onLine && (resource.source === "starter" || authenticated); }
 
 function resourceIcon(subject: string) {
   if (/math/i.test(subject)) return "½";
@@ -2828,7 +2933,7 @@ async function loadTeacherResources(supabase: SupabaseClient) {
     const signedUrl = await signedResourceUrl(supabase, String(row.storage_path));
     const subject = String(metadata.subject || "General");
     return {
-      id: String(row.id), ownerId: String(row.owner_id), title: String(row.title), icon: resourceIcon(subject), subject,
+      id: String(row.id), ownerId: String(row.owner_id), storagePath: String(row.storage_path), title: String(row.title), icon: resourceIcon(subject), subject,
       grades: String(metadata.grades || "Grade levels not specified"), type: String(metadata.type || "Teacher resource"),
       description: String(metadata.description || "No description was provided."), tags: Array.isArray(metadata.tags) ? metadata.tags.map(String) : [],
       author: String(metadata.author || "Kalinga teacher"), pages: Number(metadata.pages || 0), pdfPath: signedUrl,
@@ -2837,10 +2942,17 @@ async function loadTeacherResources(supabase: SupabaseClient) {
   }));
 }
 
-function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, teacherName, onSetUpClass, onRequestSignIn, onOpenCommunity, onGuide, onGabayContext }: { classes: TeachingClass[]; activeClassId: string; authenticated: boolean; teacherAccountId: string; teacherName: string; onSetUpClass: () => void; onRequestSignIn: () => void; onOpenCommunity: (resourceId: string) => void; onGuide: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function LibraryView({ scope, classes, activeClassId, authenticated, teacherAccountId, teacherName, onSetUpClass, onRequestSignIn, onOpenCommunity, onGuide, onGabayContext }: { scope: string; classes: TeachingClass[]; activeClassId: string; authenticated: boolean; teacherAccountId: string; teacherName: string; onSetUpClass: () => void; onRequestSignIn: () => void; onOpenCommunity: (resourceId: string) => void; onGuide: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [filter, setFilter] = useState<"all" | "Mathematics" | "Science">("all");
   const [libraryError, setLibraryError] = useState("");
   const [previewResource, setPreviewResource] = useState<LibraryResource>();
+  const [previewBlob, setPreviewBlob] = useState<Blob>();
+  const [downloads, setDownloads] = useState<OfflineResource[]>([]);
+  const [downloadedOnly, setDownloadedOnly] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, string>>({});
+  const downloadControllers = useRef(new Map<string, AbortController>());
+  const downloadActive = useRef(true);
+  const openSnapshotId = useRef("");
   const [teacherResources, setTeacherResources] = useState<LibraryResource[]>([]);
   const [comments, setComments] = useState<ResourceComment[]>([]);
   const [commentInput, setCommentInput] = useState("");
@@ -2851,6 +2963,50 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
   const [submissionFile, setSubmissionFile] = useState<File>();
   const [sharingRightsConfirmed, setSharingRightsConfirmed] = useState(false);
   const activeClass = classes.find((item) => item.id === activeClassId);
+
+  useEffect(() => {
+    downloadActive.current = true;
+    const controllers = downloadControllers.current;
+    const refresh = () => { void listOfflineResources(scope).then((items) => {
+      if (!downloadActive.current) return;
+      setDownloads(items);
+      if (openSnapshotId.current && !items.some((item) => item.info.id === openSnapshotId.current)) { setPreviewResource(undefined); setPreviewBlob(undefined); openSnapshotId.current = ""; }
+    }).catch(() => { if (downloadActive.current) setLibraryError("Offline PDFs could not be read. Your classroom records are unchanged."); }); };
+    const storageChanged = (event: StorageEvent) => { if (event.key === workspaceStorageKey(scope, "offline-downloads")) refresh(); };
+    window.addEventListener("kalinga:downloads", refresh); window.addEventListener("storage", storageChanged); refresh();
+    return () => { downloadActive.current = false; controllers.forEach((controller) => controller.abort()); window.removeEventListener("kalinga:downloads", refresh); window.removeEventListener("storage", storageChanged); };
+  }, [scope]);
+
+  async function openResource(resource: LibraryResource) {
+    try {
+      const local = await getOfflineResource(scope, resource.id);
+      if (!downloadActive.current) return;
+      if (local) { openSnapshotId.current = resource.id; setPreviewBlob(local.blob); setPreviewResource({ ...local.info, icon: resourceIcon(local.info.subject), pdfPath: resource.pdfPath, reviewStatus: "Downloaded snapshot" }); }
+      else if (navigator.onLine && resource.pdfPath) { openSnapshotId.current = ""; setPreviewBlob(undefined); setPreviewResource(resource); }
+      else setLibraryError("This PDF has not been downloaded. Connect and choose Download for offline first.");
+    } catch { if (navigator.onLine && resource.pdfPath) { setPreviewBlob(undefined); setPreviewResource(resource); } else setLibraryError("The offline PDF could not be read. Please check device storage."); }
+  }
+
+  async function downloadResource(resource: LibraryResource) {
+    if (!navigator.onLine || resource.source === "teacher" && !authenticated) { setLibraryError("Connect and sign in to download this PDF. Your saved files are unchanged."); return; }
+    const controller = new AbortController();
+    downloadControllers.current.get(resource.id)?.abort(); downloadControllers.current.set(resource.id, controller);
+    setDownloadProgress((current) => ({ ...current, [resource.id]: "Starting…" })); setLibraryError("");
+    try {
+      let url = resource.pdfPath;
+      const client = getSupabaseBrowserClient();
+      if (resource.source === "teacher" && client && resource.storagePath) { signedResourceUrls.delete(resource.storagePath); url = await signedResourceUrl(client, resource.storagePath); }
+      if (!url) throw new Error("The PDF link could not be renewed. Reconnect and retry.");
+      await downloadOfflineResource(scope, resource, url, { signal: controller.signal, isCurrent: () => downloadActive.current && downloadControllers.current.get(resource.id) === controller, onProgress: ({ received, total }) => { if (downloadActive.current) setDownloadProgress((current) => ({ ...current, [resource.id]: total ? `${Math.min(100, Math.round(received / total * 100))}%` : `${(received / 1048576).toFixed(1)} MB` })); } });
+      void navigator.storage?.persist?.().catch(() => false);
+    } catch (error) { if (downloadActive.current) setLibraryError(controller.signal.aborted ? "Download cancelled. Any earlier copy is unchanged." : error instanceof Error ? error.message : "The PDF could not be downloaded. Check device storage and retry."); }
+    finally { if (downloadActive.current && downloadControllers.current.get(resource.id) === controller) { downloadControllers.current.delete(resource.id); setDownloadProgress((current) => { const next = { ...current }; delete next[resource.id]; return next; }); } }
+  }
+
+  async function removeDownload(id: string) {
+    downloadControllers.current.get(id)?.abort();
+    try { await removeOfflineResource(scope, id); } catch { setLibraryError("The local copy could not be removed. Please retry."); }
+  }
 
   useEffect(() => {
     if (!authenticated || !teacherAccountId) return;
@@ -2864,6 +3020,13 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
       const commentResult = await supabase!.from("resource_comments").select("id,resource_id,teacher_id,teacher_name,body,created_at").in("resource_id", resourceIds).order("created_at");
       if (!active) return;
       setTeacherResources(uploaded);
+      const local = await listOfflineResources(scope).catch(() => []);
+      const localIds = local.filter((item) => item.info.source === "teacher").map((item) => item.info.id);
+      if (localIds.length && active) {
+        const access = await supabase!.from("resources").select("id").in("id", localIds);
+        if (!access.error && active) { const allowed = new Set((access.data || []).map((item) => item.id)); for (const id of localIds) { if (active && !allowed.has(id)) await removeOfflineResource(scope, id); } }
+      }
+      if (!active) return;
       if (commentResult.error) { setLibraryError("Teacher comments could not refresh. The PDFs are still available."); return; }
       setComments((commentResult.data || []).map((row) => ({ id: String(row.id), resourceId: String(row.resource_id), teacherId: String(row.teacher_id), teacherName: String(row.teacher_name), body: String(row.body), createdAt: String(row.created_at) })));
       setLibraryError("");
@@ -2871,10 +3034,10 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     void refresh();
     const channel = supabase.channel(`resource-room-${teacherAccountId}`).on("postgres_changes", { event: "*", schema: "public", table: "resource_comments" }, () => { void refresh(); }).on("postgres_changes", { event: "*", schema: "public", table: "resources" }, () => { void refresh(); }).subscribe();
     return () => { active = false; void supabase.removeChannel(channel); };
-  }, [authenticated, teacherAccountId]);
+  }, [authenticated, teacherAccountId, scope]);
 
-  const allResources = [...teacherResources, ...starterResources];
-  const visible = allResources.filter((resource) => filter === "all" || resource.subject === filter);
+  const allResources = [...new Map([...downloads.map((item): LibraryResource => ({ ...item.info, icon: resourceIcon(item.info.subject), pdfPath: "", reviewStatus: "Downloaded snapshot" })), ...starterResources, ...teacherResources].map((item) => [item.id, item])).values()];
+  const visible = allResources.filter((resource) => (filter === "all" || resource.subject === filter) && (!downloadedOnly || downloads.some((item) => item.info.id === resource.id)));
   const previewComments = comments.filter((comment) => comment.resourceId === previewResource?.id);
 
   useEffect(() => {
@@ -2888,6 +3051,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
 
   async function submitResource(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!navigator.onLine || !authenticated) { setLibraryError("Connect and sign in to upload a resource. Your submission is still here."); return; }
     if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
     if (!submissionFile || submissionFile.type !== "application/pdf") { setLibraryError("Choose a PDF file to submit."); return; }
     if (submissionFile.size > 20 * 1024 * 1024) { setLibraryError("The PDF must be 20 MB or smaller."); return; }
@@ -2923,6 +3087,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
   }
 
   async function shareResource(resource: LibraryResource) {
+    if (!navigator.onLine) { setLibraryError("Sharing links needs internet. Your downloaded copy is still available."); return; }
     const url = /^https?:\/\//i.test(resource.pdfPath) ? resource.pdfPath : `${window.location.origin}${resource.pdfPath}`;
     try {
       if (navigator.share) await navigator.share({ title: resource.title, text: `Kalinga teacher resource: ${resource.title}`, url });
@@ -2933,6 +3098,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
   }
 
   async function makeResourceShared(resource: LibraryResource) {
+    if (!navigator.onLine || !authenticated) { setLibraryError("Connect and sign in to share this resource."); return; }
     if (!authenticated || resource.ownerId !== teacherAccountId) return;
     if (!window.confirm("Share this PDF with all signed-in Kalinga teachers? Confirm that you made it or have permission to share it.")) return;
     const supabase = getSupabaseBrowserClient();
@@ -2946,6 +3112,7 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
 
   async function submitComment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!navigator.onLine || !authenticated) { setLibraryError("Connect and sign in to post this note. Your text is still here."); return; }
     if (!previewResource || !commentInput.trim()) return;
     if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
     const supabase = getSupabaseBrowserClient();
@@ -2972,10 +3139,10 @@ function LibraryView({ classes, activeClassId, authenticated, teacherAccountId, 
     <section className="starter-library-toolbar"><div role="tablist" aria-label="Filter resources">{[["all", "All resources"], ["Mathematics", "Mathematics"], ["Science", "Science"]].map(([value, label]) => <button role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} type="button" onClick={() => setFilter(value as typeof filter)} key={value}>{label}</button>)}</div>{activeClass ? <p><b>Matched to {activeClass.name}</b><span>{gradeList(activeClass.grades)} · {activeClass.subjects.join(", ")}</span></p> : <button type="button" onClick={onSetUpClass}>Set up a class for matching →</button>}</section>
     {libraryError && <p className="library-error" role="status">{libraryError}</p>}
     {shareMessage && <p className="resource-share-message" role="status">{shareMessage}</p>}
-    <section className="resource-grid starter-resource-grid">
-      {visible.map((resource) => { const resourceComments = comments.filter((comment) => comment.resourceId === resource.id); const isOwner = resource.ownerId === teacherAccountId; return <article className={`library-card starter-resource-card ${resource.subject.toLowerCase()}`} key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.subject}</span></div><div className="library-body"><div className="library-badges"><span className={resource.source === "starter" ? "verified" : "community-upload"}>{resource.source === "starter" ? `PDF · ${resource.pages} pages` : "TEACHER UPLOAD · NOT REVIEWED"}</span><span className={`resource-visibility ${resource.visibility || "shared"}`}>{resource.visibility === "private" ? "Only me" : "Shared"}</span><span>{resource.type}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.author}{isOwner ? " · Your resource" : ""}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="resource-social-proof"><span><b>{resourceComments.length}</b> teacher {resourceComments.length === 1 ? "note" : "notes"}</span><span>{resource.reviewStatus || "Community upload · not reviewed"}</span></div><div className="library-actions starter-resource-actions"><button className="dark-button" type="button" disabled={!resource.pdfPath} onClick={() => setPreviewResource(resource)}>View PDF</button><button className="secondary-button" type="button" onClick={() => setPreviewResource(resource)}>Discuss</button>{resource.visibility === "private" && isOwner ? <button className="secondary-button" type="button" onClick={() => makeResourceShared(resource)}>Share with teachers</button> : <button className="secondary-button" type="button" onClick={() => onOpenCommunity(resource.id)}>Ask teachers</button>}</div></div></article>; })}
+    <label className="downloaded-filter"><input type="checkbox" checked={downloadedOnly} onChange={(event) => setDownloadedOnly(event.target.checked)} /> Downloaded only <span>{downloads.length} PDFs · {(downloads.reduce((sum, item) => sum + item.size, 0) / 1048576).toFixed(1)} MB</span></label><section className="resource-grid starter-resource-grid">
+      {visible.map((resource) => { const resourceComments = comments.filter((comment) => comment.resourceId === resource.id); const isOwner = resource.ownerId === teacherAccountId; return <article className={`library-card starter-resource-card ${resource.subject.toLowerCase()}`} key={resource.id}><div className="library-thumb">{resource.icon}<span>{resource.subject}</span></div><div className="library-body"><div className="library-badges"><span className={resource.source === "starter" ? "verified" : "community-upload"}>{resource.source === "starter" ? `PDF · ${resource.pages} pages` : "TEACHER UPLOAD · NOT REVIEWED"}</span><span className={`resource-visibility ${resource.visibility || "shared"}`}>{resource.visibility === "private" ? "Only me" : "Shared"}</span><span>{resource.type}</span></div><h2>{resource.title}</h2><p>{resource.grades} · {resource.author}{isOwner ? " · Your resource" : ""}</p><p className="library-description">{resource.description}</p><div className="tags">{resource.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="resource-social-proof"><span><b>{resourceComments.length}</b> teacher {resourceComments.length === 1 ? "note" : "notes"}</span><span>{resource.reviewStatus || "Community upload · not reviewed"}</span></div><div className="resource-offline-controls">{downloads.some((item) => item.info.id === resource.id) ? <p>Downloaded on this device <small>Saved {new Date(downloads.find((item) => item.info.id === resource.id)!.downloadedAt).toLocaleDateString()} · snapshot</small></p> : <small>Not downloaded for offline use</small>}{downloadProgress[resource.id] ? <><span role="status">Downloading {downloadProgress[resource.id]}</span><button type="button" onClick={() => downloadControllers.current.get(resource.id)?.abort()}>Cancel download</button></> : <><button className="secondary-button" type="button" disabled={!onlineResourceAllowed(resource, authenticated)} onClick={() => void downloadResource(resource)}>{downloads.some((item) => item.info.id === resource.id) ? "Refresh offline copy" : "Download for offline"}</button>{downloads.some((item) => item.info.id === resource.id) && <button className="text-button" type="button" onClick={() => void removeDownload(resource.id)}>Remove download</button>}</>}</div><div className="library-actions starter-resource-actions"><button className="dark-button" type="button" disabled={!resource.pdfPath && !downloads.some((item) => item.info.id === resource.id)} onClick={() => void openResource(resource)}>View PDF</button><button className="secondary-button" type="button" onClick={() => void openResource(resource)}>Discuss</button>{resource.visibility === "private" && isOwner ? <button className="secondary-button" type="button" onClick={() => makeResourceShared(resource)}>Share with teachers</button> : <button className="secondary-button" type="button" onClick={() => onOpenCommunity(resource.id)}>Ask teachers</button>}</div></div></article>; })}
     </section>
-    {previewResource && <div className="resource-preview-backdrop"><section data-tour="resource-reader" className="resource-reader" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><header><div><p className="eyebrow">{previewResource.subject} · PDF RESOURCE</p><h2 id="resource-preview-title">{previewResource.title}</h2></div><PageGuideButton compact onStart={onGuide} /><button type="button" aria-label="Close resource" onClick={() => { setPreviewResource(undefined); setCommentInput(""); }}>×</button></header><div className="walkthrough-dock-host" data-walkthrough-host="reader" /><div className="resource-reader-layout"><div className="resource-pdf-panel"><iframe src={previewResource.pdfPath} title={`${previewResource.title} PDF`} /><a href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open PDF in a new tab ↗</a></div><aside data-tour="resource-notes" className="resource-conversation"><div data-tour="resource-share" className="resource-reader-actions"><a className="secondary-button" href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open full PDF</a><button className="secondary-button" type="button" onClick={() => shareResource(previewResource)}>Share link</button></div><p className="resource-reader-description">{previewResource.description}</p><div className="resource-comments-heading"><b>Teacher notes</b><span>{previewComments.length}</span></div><div className="resource-comment-list">{previewComments.map((comment) => <article key={comment.id}><span className="avatar">{teacherInitials(comment.teacherName.replace(/^Teacher\s+/i, ""))}</span><p><b>{comment.teacherName} <small>{communityTime(comment.createdAt)}</small></b>{comment.body}</p></article>)}{!previewComments.length && <p>No notes yet. Add what worked, what you changed, or a question for teachers using this material.</p>}</div>{authenticated ? <form className="resource-comment-form" onSubmit={submitComment}><label className="sr-only" htmlFor="resource-comment">Comment on this resource</label><textarea id="resource-comment" maxLength={1500} value={commentInput} onChange={(event) => setCommentInput(event.target.value)} placeholder="What worked? What would you change?" /><button type="submit" disabled={!commentInput.trim() || submitting}>{submitting ? "Posting…" : "Add note"}</button><small>Keep this thread about the material. Ask broader questions in Ask Teachers.</small></form> : <button className="resource-signin-comment" type="button" onClick={onRequestSignIn}>Sign in to join the material discussion</button>}</aside></div></section></div>}
+    {previewResource && <div className="resource-preview-backdrop"><section data-tour="resource-reader" className="resource-reader" role="dialog" aria-modal="true" aria-labelledby="resource-preview-title"><header><div><p className="eyebrow">{previewResource.subject} · PDF RESOURCE</p><h2 id="resource-preview-title">{previewResource.title}</h2></div><PageGuideButton compact onStart={onGuide} /><button type="button" aria-label="Close resource" onClick={() => { setPreviewResource(undefined); setPreviewBlob(undefined); openSnapshotId.current = ""; setCommentInput(""); }}>×</button></header><div className="walkthrough-dock-host" data-walkthrough-host="reader" /><div className="resource-reader-layout"><div className="resource-pdf-panel">{previewBlob ? <OfflinePdfViewer blob={previewBlob} title={previewResource.title} /> : <><iframe src={previewResource.pdfPath} title={`${previewResource.title} PDF`} /><a href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open PDF in a new tab ↗</a></>}</div><aside data-tour="resource-notes" className="resource-conversation"><div data-tour="resource-share" className="resource-reader-actions">{!previewBlob && <a className="secondary-button" href={previewResource.pdfPath} target="_blank" rel="noreferrer">Open full PDF</a>}<button className="secondary-button" type="button" disabled={!authenticated} onClick={() => shareResource(previewResource)}>Share link</button></div><p className="resource-reader-description">{previewResource.description}</p><div className="resource-comments-heading"><b>Teacher notes</b><span>{previewComments.length}</span></div><div className="resource-comment-list">{previewComments.map((comment) => <article key={comment.id}><span className="avatar">{teacherInitials(comment.teacherName.replace(/^Teacher\s+/i, ""))}</span><p><b>{comment.teacherName} <small>{communityTime(comment.createdAt)}</small></b>{comment.body}</p></article>)}{!previewComments.length && <p>No notes yet. Add what worked, what you changed, or a question for teachers using this material.</p>}</div>{authenticated ? <form className="resource-comment-form" onSubmit={submitComment}><label className="sr-only" htmlFor="resource-comment">Comment on this resource</label><textarea id="resource-comment" maxLength={1500} value={commentInput} onChange={(event) => setCommentInput(event.target.value)} placeholder="What worked? What would you change?" /><button type="submit" disabled={!commentInput.trim() || submitting}>{submitting ? "Posting…" : "Add note"}</button><small>Keep this thread about the material. Ask broader questions in Ask Teachers.</small></form> : <button className="resource-signin-comment" type="button" onClick={onRequestSignIn}>Sign in to join the material discussion</button>}</aside></div></section></div>}
   </div>;
 }
 
@@ -3219,6 +3386,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
 
   async function submitQuestion(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!navigator.onLine || !authenticated) { setCommunityError("Connect and sign in to post your question. Your draft is still here."); return; }
     if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
     const supabase = getSupabaseBrowserClient();
     if (!supabase || questionTitle.trim().length < 4 || questionBody.trim().length < 4) return;
@@ -3232,6 +3400,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
   }
 
   async function submitReply() {
+    if (!navigator.onLine || !authenticated) { setCommunityError("Connect and sign in to reply. Your text is still here."); return; }
     if (!selectedDiscussion || !reply.trim()) return;
     if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
     const supabase = getSupabaseBrowserClient();
@@ -3246,6 +3415,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
   }
 
   async function deleteCommunityPost() {
+    if (!navigator.onLine || !authenticated) { setCommunityError("Connect and sign in to change shared discussions."); return; }
     if (!deleteTarget || !teacherAccountId) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;

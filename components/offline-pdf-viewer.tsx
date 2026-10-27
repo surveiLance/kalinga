@@ -8,8 +8,16 @@ export function OfflinePdfViewer({ blob, title }: { blob: Blob; title: string })
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [url, setUrl] = useState("");
+  const [width, setWidth] = useState(600);
+  const [zoom, setZoom] = useState(1);
   const canvas = useRef<HTMLCanvasElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!panel.current) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(panel.current);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     let active = true;
     let destroy: (() => void) | undefined;
@@ -17,7 +25,7 @@ export function OfflinePdfViewer({ blob, title }: { blob: Blob; title: string })
     void (async () => {
       await Promise.resolve();
       if (!active) return;
-      setUrl(objectUrl); setPage(1); setPdf(undefined); setError("");
+      setUrl(objectUrl); setPage(1); setZoom(1); setPdf(undefined); setError("");
       const library = await import("pdfjs-dist");
       const data = new Uint8Array(await blob.arrayBuffer());
       if (!active) return;
@@ -37,11 +45,11 @@ export function OfflinePdfViewer({ blob, title }: { blob: Blob; title: string })
       const sheet = await pdf.getPage(page);
       if (!active || !canvas.current) return;
       const base = sheet.getViewport({ scale: 1 });
-      const viewport = sheet.getViewport({ scale: Math.min(2, Math.max(240, (panel.current?.clientWidth || 600) - 24) / base.width) });
+      const viewport = sheet.getViewport({ scale: Math.min(4, Math.max(240, width - 24) / base.width * zoom) });
       const scale = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8000000 / (viewport.width * viewport.height)));
       const element = canvas.current;
       element.width = Math.floor(viewport.width * scale); element.height = Math.floor(viewport.height * scale);
-      element.style.width = `${viewport.width}px`; element.style.height = `${viewport.height}px`;
+      element.style.width = `${viewport.width}px`; element.style.height = "auto";
       const task = sheet.render({ canvas: element, viewport, transform: [scale, 0, 0, scale, 0, 0] });
       cancel = () => task.cancel();
       await task.promise;
@@ -49,6 +57,6 @@ export function OfflinePdfViewer({ blob, title }: { blob: Blob; title: string })
       if (active) setText(content.items.map((item) => "str" in item ? item.str : "").join(" "));
     })().catch((cause: unknown) => { if (active && !(cause instanceof Error && cause.name === "RenderingCancelledException")) setError("This page could not be rendered. Try opening the local file."); });
     return () => { active = false; cancel?.(); };
-  }, [pdf, page]);
-  return <div className="offline-pdf-viewer" ref={panel}><div className="offline-pdf-controls"><button type="button" disabled={!pdf || page === 1} onClick={() => setPage((p) => p - 1)}>← Previous page</button><span role="status">{pdf ? `Page ${page} of ${pdf.numPages}` : "Opening downloaded PDF…"}</span><button type="button" disabled={!pdf || page >= pdf.numPages} onClick={() => setPage((p) => p + 1)}>Next page →</button></div>{error && <p role="alert">{error}</p>}<canvas ref={canvas} aria-label={`${title}, page ${page}`} />{text && <details><summary>Read page text</summary><p>{text}</p></details>}{url && <a href={url} target="_blank" rel="noreferrer">Open downloaded PDF in your browser ↗</a>}</div>;
+  }, [pdf, page, width, zoom]);
+  return <div className="offline-pdf-viewer" ref={panel}><div className="offline-pdf-controls"><button type="button" disabled={!pdf || page === 1} onClick={() => setPage((p) => p - 1)}>← Previous page</button><span role="status">{pdf ? `Page ${page} of ${pdf.numPages}` : "Opening downloaded PDF…"}</span><button type="button" disabled={!pdf || page >= pdf.numPages} onClick={() => setPage((p) => p + 1)}>Next page →</button><button type="button" disabled={!pdf || zoom >= 3} onClick={() => setZoom((value) => Math.min(3, value + .5))}>Zoom in</button><button type="button" disabled={!pdf || zoom <= 1} onClick={() => setZoom((value) => Math.max(1, value - .5))}>Zoom out</button></div>{error && <p role="alert">{error}</p>}<canvas ref={canvas} style={{ maxWidth: zoom === 1 ? "100%" : "none" }} aria-label={`${title}, page ${page}`} />{text && <details><summary>Read page text</summary><p>{text}</p></details>}{url && <a href={url} target="_blank" rel="noreferrer">Open downloaded PDF in your browser ↗</a>}</div>;
 }

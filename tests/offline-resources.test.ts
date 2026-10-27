@@ -32,6 +32,11 @@ describe("scoped offline PDF snapshots", () => {
     await expect(downloadOfflineResource(a, { ...info, title: "Replacement" }, "/file.pdf", options)).rejects.toThrow();
     expect((await getOfflineResource(a, info.id))?.info.title).toBe("Local plants");
   });
+  it("does not compare compressed transfer length with the decoded PDF body", async () => {
+    vi.stubGlobal("fetch", async () => new Response(pdf, { headers: { "Content-Type": "application/pdf", "Content-Encoding": "gzip", "Content-Length": "10" } }));
+    await downloadOfflineResource(a, info, "/file.pdf", options);
+    expect((await getOfflineResource(a, info.id))?.size).toBe(pdf.length);
+  });
   it("cannot resurrect a download removed while its response is pending", async () => {
     let respond!: (r: Response) => void;
     vi.stubGlobal("fetch", () => new Promise<Response>((resolve) => { respond = resolve; }));

@@ -2,6 +2,12 @@
 
 Kalinga is an offline-first teacher assistant prototype for multigrade classrooms. It combines class and learner management, date-specific attendance, ILAW lesson planning, shared resources, and Gabay—a page-aware Taglish teaching guide.
 
+## Prepare online, teach offline
+
+The production app prepares its application files for offline reopening. Regular teachers can reopen their saved workspace on the same personal device, use saved lessons and attendance, and explicitly download PDFs for offline reading. Gabay AI and community features still need internet. Installing the PWA is optional; normal development does not register a service worker.
+
+Read [offline preparation, sign-out and verification limits](docs/offline-school-workflow.md) before testing. Production-browser tests use synthetic Supabase fixtures, not real accounts. After building, run `npm run test:offline` with installed Chrome (or `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`). Actual Android and live-account acceptance remain separate checks.
+
 ## Local development
 
 Requirements: Node.js 22.13 or newer.

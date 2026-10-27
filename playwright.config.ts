@@ -1,0 +1,2 @@
+import { defineConfig } from "@playwright/test";
+export default defineConfig({ testDir: "tests/browser", workers: 1, timeout: 120000, expect: { timeout: 15000 }, use: { baseURL: "http://127.0.0.1:3120", serviceWorkers: "allow", launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : { channel: "chrome" } }, webServer: { command: "npm run start -- -p 3120", url: "http://127.0.0.1:3120", reuseExistingServer: false, timeout: 30000 } });
