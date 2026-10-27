@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito, PT_Sans } from "next/font/google";
 import "./globals.css";
+import { OfflineAvailability } from "@/components/offline-availability";
 
 const nunito = Nunito({
   weight: "variable",
@@ -26,5 +27,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${nunito.variable} ${ptSans.variable}`}><body>{children}</body></html>;
+  return <html lang="en" className={`${nunito.variable} ${ptSans.variable}`}><body><OfflineAvailability />{children}</body></html>;
 }

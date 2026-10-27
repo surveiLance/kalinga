@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/prepare-offline-assets.mjs && next build && node scripts/build-offline-worker.mjs",
     "start": "next start",
     "test": "vitest run",
     "lint": "eslint . --ignore-pattern .next --ignore-pattern supabase/functions"
@@ -16,12 +16,14 @@
     "@supabase/supabase-js": "^2.112.4",
     "docx": "^9.7.1",
     "next": "16.2.6",
+    "pdfjs-dist": "6.4.299",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
     "@next/eslint-plugin-next": "16.2.6",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -32,6 +34,7 @@
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
+    "fake-indexeddb": "6.2.6",
     "globals": "16.4.0",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",

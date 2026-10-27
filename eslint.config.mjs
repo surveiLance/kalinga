@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "public/offline/**",
+    "public/kalinga-sw.js",
   ]),
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

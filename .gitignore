@@ -44,3 +44,7 @@ yarn-error.log*
 
 # Claude Code local run config
 /.claude/
+/public/offline/
+/public/kalinga-sw.js
+/test-results/
+/playwright-report/
