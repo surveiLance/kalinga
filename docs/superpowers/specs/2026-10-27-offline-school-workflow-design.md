@@ -1,6 +1,6 @@
 # Prepare online, teach offline
 
-Status: proposed design, awaiting Lance's approval. No application implementation is included in this document.
+Status: approved by Lance on 27 October 2026 ("it loosk right"). No application implementation is included in this document.
 
 ## Intent and agreed direction
 
@@ -14,7 +14,7 @@ Lance selected reliable offline preparation as the next milestone and confirmed 
 - A downloadable PDF/Word-only teaching pack is simpler, but does not meet the requirement to reopen Kalinga, edit records or take attendance offline. Existing exports remain available, not the primary solution.
 - A separate native app adds another application and release process. It is outside this milestone; nothing currently requires that expansion.
 
-The PWA approach is proposed for final approval here. New dependencies, if needed for reliable PDF viewing, should be narrow and documented; do not switch the application's build system or add a state library.
+The existing-app PWA approach is approved. New dependencies, if needed for reliable PDF viewing, should be narrow and documented; do not switch the application's build system or add a state library.
 
 ## Goals and explicit limits
 
