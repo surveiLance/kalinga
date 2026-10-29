@@ -1405,7 +1405,7 @@ export default function Home() {
                 </div>
               </article>
             </section>}
-          </div> : view === "classes" ? <ClassesView onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onResources={() => setView("library")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView cloudAvailable={cloudAvailable} key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView key={workspaceScope} scope={workspaceScope} onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} authenticated={cloudAvailable} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={cloudAvailable} teacherAccountId={teacherAccountId} teacherName={teacherName} guestMentionTag={guestIdentity?.mentionTag} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onOpenLibrary={() => setView("library")} onGabayContext={setGabayLiveContext} />}
+          </div> : view === "classes" ? <ClassesView onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} savedPlans={savedPlans} attendanceRecords={attendanceRecords} onSelectClass={setActiveClassId} onSave={saveClass} onDelete={deleteClass} onLoadSample={loadSampleClass} onPlan={beginPlan} onTeach={openTeachingPlan} onAttendance={() => setView("attendance")} onResources={() => setView("library")} onGabayContext={setGabayLiveContext} /> : view === "plan" ? (planListOpen ? <PlanIndex plans={savedPlans} classes={classes} onOpen={(planId) => beginPlan(planId)} onNew={() => beginPlan()} onBack={() => setView("home")} onDelete={deletePlan} /> : <PlanView cloudAvailable={cloudAvailable} key={editingPlanId || `new-${activeClass?.id || "none"}`} classes={classes} persistedPlans={savedPlans} onAllPlans={showAllPlans} onDelete={deletePlan} activeClassId={activeClass?.id || ""} initialPlan={savedPlans.find((item) => item.id === editingPlanId)} teacherName={teacherName} schoolName={schoolName} onSave={savePlan} onTeach={(plan) => { setEditingPlanId(plan.id); setActiveClassId(plan.classId); setView("teach"); }} onBack={() => setView("home")} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} />) : view === "teach" ? teachingPlan ? <TeachingView plan={teachingPlan} teachingClass={classes.find((item) => item.id === teachingPlan.classId)} onBack={() => setView("home")} onEdit={() => beginPlan(teachingPlan.id)} onAttendance={() => setView("attendance")} onGabayContext={setGabayLiveContext} /> : <section className="class-zero-state compact-zero"><span className="zero-icon">▶</span><div><p className="eyebrow">TEACHING GUIDE</p><h2>Open a saved lesson first</h2><p>The classroom guide is created from a saved lesson plan.</p></div><div className="zero-actions"><button className="primary-button" type="button" onClick={() => setView("home")}>Back to Today</button></div></section> : view === "library" ? <LibraryView key={workspaceScope} scope={workspaceScope} onGuide={openWalkthrough} classes={classes} activeClassId={activeClass?.id || ""} authenticated={cloudAvailable} teacherAccountId={teacherAccountId} teacherName={teacherName} onSetUpClass={() => setView("classes")} onRequestSignIn={() => setEntryMode("signed-out")} onOpenCommunity={(resourceId) => { setCommunityTargetId(""); setCommunityResourceId(resourceId); setView("community"); }} onGabayContext={setGabayLiveContext} /> : view === "attendance" ? <AttendanceView classes={classes} activeClassId={activeClass?.id || ""} attendanceRecords={attendanceRecords} attendanceNotes={attendanceNotes} onSave={saveAttendance} onSetUpClass={() => setView("classes")} onGabayContext={setGabayLiveContext} /> : <CommunityView key={`community-${communityTargetId}-${communityResourceId}`} authenticated={cloudAvailable} teacherAccountId={teacherAccountId} teacherName={teacherName} guestMentionTag={guestIdentity?.mentionTag} openDiscussionId={communityTargetId} initialResourceId={communityResourceId} onRequestSignIn={() => setEntryMode("signed-out")} onGabayContext={setGabayLiveContext} />}
         </div>
 
         {accountPanel && <AccountDialog key={`${workspaceScope}:${accountPanel}`} kind={accountPanel} name={teacherName} school={schoolName} email={teacherEmail} guest={!!guestIdentity} authenticated={cloudAvailable} onClose={() => setAccountPanel(null)} onSave={saveAccountDetails} />}
@@ -2756,18 +2756,20 @@ function PlanView({ cloudAvailable, classes, persistedPlans, onAllPlans, onDelet
   return (
     <div data-tour="plan-page" className={`view-page plan-page plan-workspace-surface${printingPlan ? " ilaw-print-mode" : ""}`}>
       <div className="lesson-document-navigation"><button type="button" onClick={() => leaveLesson(dirty, window.confirm, onAllPlans)}>← All lesson plans</button>{persistedPlan && <button type="button" className="lesson-delete-button" onClick={() => { if (deleteLesson(planId, persistedPlan.title, window.confirm, onDelete)) onAllPlans(); }}>Delete lesson</button>}</div>
-      <PageIntro eyebrow="MULTIGRADE LESSON PLAN" title={lessonTitle.trim() || "New lesson plan"} description="Prepare your lesson, review Gabay’s suggestions, and edit directly on the document." action={<button className="secondary-button" type="button" onClick={() => leaveLesson(dirty, window.confirm, onBack)}>← Today</button>} />
+      <PageIntro eyebrow="MULTIGRADE LESSON PLAN" title={lessonTitle.trim() || "New lesson plan"} description={hasPlanContent ? "Edit your ILAW document, or ask Gabay to suggest improvements." : "Choose a topic, generate a draft, then review and edit it here."} action={<button className="secondary-button" type="button" onClick={() => leaveLesson(dirty, window.confirm, onBack)}>← Today</button>} />
 
       <section data-tour={setupOpen ? "plan-setup-open" : "plan-setup"} className={`plan-setup${setupOpen ? " open" : ""}`}>
         {setupOpen ? <>
+          <header className="plan-start-heading"><div><p className="eyebrow">{hasPlanContent ? "LESSON DETAILS" : "START HERE"}</p><h2>{hasPlanContent ? "Your lesson setup" : "What will you teach?"}</h2><p>Your class details are filled in. Add a specific lesson topic to begin.</p></div>{!hasPlanContent && <span className="plan-start-format">ILAW lesson plan</span>}</header>
+          <div className="plan-start-layout"><div className="plan-start-fields">
           <div className="plan-setup-grid">
             <label>Class<select value={selectedClassId} onChange={(event) => chooseClass(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
             <label>Subject<input list="plan-subjects" value={subject} onChange={(event) => { setSubject(event.target.value); touch(); }} placeholder="e.g. Filipino" /><datalist id="plan-subjects">{[...new Set([...(selectedClass?.subjects || []), ...commonSubjects])].map((item) => <option value={item} key={item} />)}</datalist></label>
-            <label className={topicPrompt ? "needs-topic" : ""}>Lesson topic <small>Needed for Gabay</small><input ref={topicRef} value={lessonTitle} onChange={(event) => { setLessonTitle(event.target.value); if (event.target.value.trim()) setTopicPrompt(""); touch(); }} placeholder={`e.g. ${setupHints.topic}`} /></label>
+            <label className={`plan-topic-field${topicPrompt ? " needs-topic" : ""}`}>Lesson topic <input ref={topicRef} value={lessonTitle} onChange={(event) => { setLessonTitle(event.target.value); if (event.target.value.trim()) setTopicPrompt(""); touch(); }} placeholder="What will your learners study?" /><small>For example: {setupHints.topic}</small></label>
             <label>Teaching date<input type="date" value={teachingDate} onChange={(event) => { setTeachingDate(event.target.value); touch(); }} /></label>
           </div>
           {topicPrompt && <p className="topic-prompt" role="alert">{topicPrompt}</p>}
-          <label className="plan-setup-notes">Anything Gabay should know <small>Optional · do not include learner names or sensitive details</small><textarea rows={2} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder={`e.g. ${setupHints.notes}`} /></label>
+          <details className="plan-context-details"><summary>Add classroom needs or available materials <span>Optional</span></summary><label className="plan-setup-notes">Anything Gabay should know <small>Do not include learner names or sensitive details</small><textarea rows={3} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder={`e.g. ${setupHints.notes}`} /></label></details>
           <details className="plan-setup-more">
             <summary><span>{quarter} · {startTime} · {targetMinutes} min · {language} · {multigradeModel}</span><b>Change</b></summary>
             <div className="plan-setup-grid">
@@ -2779,35 +2781,38 @@ function PlanView({ cloudAvailable, classes, persistedPlans, onAllPlans, onDelet
               <div className="field-group wide"><span className="field-label">Grades in this lesson</span><GradeLevelPicker value={grades} onChange={updateGrades} /></div>
             </div>
           </details>
-          <footer>
-            {!hasPlanContent && <button data-tour="plan-draft" className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? (fullPlanDraftStatus || "Gabay is drafting the whole plan…") : topicReady ? "Draft the whole plan with Gabay" : "Add a topic to draft with Gabay"}</button>}
-            <button data-tour="plan-manual" className="secondary-button" type="button" onClick={() => setSetupOpen(false)}>I’ll write it myself</button>
-          </footer>
+          </div><aside className="plan-generate-panel"><div className="plan-generate-heading"><GabayMascot size="small" motion={!draftingFullPlan} /><h3>{hasPlanContent ? "Keep making it yours" : "Draft with Gabay"}</h3></div>
+            {!hasPlanContent ? <button data-tour="plan-draft" className="primary-button plan-generate-button" type="button" disabled={draftingFullPlan || !subject.trim() || !grades.length} onClick={draftCompletePlan}>{draftingFullPlan ? "Generating lesson plan…" : "Generate lesson plan"}</button> : <button className="feature-button" type="button" disabled={draftingFullPlan} onClick={() => setRevisionScope("whole")}>Improve lesson with Gabay</button>}
+            <p>{hasPlanContent ? "Edit the document yourself, or review suggestions from Gabay before applying them." : "Gabay fills the ILAW sections for your grade levels. You can edit every part of the lesson afterwards."}</p>
+            <small>{hasPlanContent ? "Your current work stays until you apply changes." : "Uses AI · needs internet. Review the draft for accuracy before teaching or submitting it."}</small>
+            <div className="plan-manual-choice"><span>{hasPlanContent ? "Ready to edit?" : "Prefer to start with a blank plan?"}</span><button data-tour="plan-manual" className="secondary-button" type="button" disabled={draftingFullPlan} onClick={() => setSetupOpen(false)}>{hasPlanContent ? "Back to the document" : "Write it myself"}</button></div>
+          </aside></div>
         </> : <button data-tour="plan-change" type="button" className="plan-setup-summary" onClick={() => setSetupOpen(true)}><span><b>{selectedClass?.name}</b> · {subject || "No subject"} · {printedDate || "No date"} · {quarter} · {startTime} · {targetMinutes} min · {language}</span><b>Change setup</b></button>}
         {draftingFullPlan && fullPlanDraftStatus && <p className="gabay-draft-status" role="status">{fullPlanDraftStatus}</p>}
         {fullPlanDraftError && <p className="gabay-draft-error" role="alert">{fullPlanDraftError}</p>}
       </section>
 
-      <div className="plan-toolbar">
+      {(hasPlanContent || !setupOpen) && <div className="plan-document-intro"><div><p className="eyebrow">YOUR EDITABLE ILAW PLAN</p><h2>Review and make it yours</h2><p>Click any text in the document to edit it. Save your lesson when you are ready.</p></div></div>}
+      {(hasPlanContent || !setupOpen) && <div className="plan-toolbar">
         <div>
           <span className="pill orange">{saved ? "SAVED" : "UNSAVED"}</span>
           {plannedMinutes !== targetMinutes && <span className="plan-time-warning">Blocks add up to {plannedMinutes} min; the lesson is {targetMinutes} min.</span>}
         </div>
         <div>
-          {(hasPlanContent || !setupOpen) && <button data-tour={hasPlanContent ? "plan-improve" : "plan-draft"} className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={() => hasPlanContent ? setRevisionScope("whole") : draftCompletePlan()}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Drafting…" : hasPlanContent ? "Improve lesson with Gabay" : "Draft the whole plan with Gabay"}</button>}
+          {(hasPlanContent || !setupOpen) && <button data-tour={hasPlanContent ? "plan-improve" : "plan-draft"} className="gabay-draft-button toolbar-gabay" type="button" disabled={draftingFullPlan} onClick={() => hasPlanContent ? setRevisionScope("whole") : draftCompletePlan()}><GabayMascot size="small" motion={!draftingFullPlan} />{draftingFullPlan ? "Generating…" : hasPlanContent ? "Improve lesson with Gabay" : "Generate lesson plan"}</button>}
           <button data-tour="plan-pdf" className="secondary-button" type="button" onClick={exportCurrentPlan}>Print / PDF</button>
           <button data-tour="plan-word" className="secondary-button" type="button" disabled={downloadingDocx} onClick={downloadCurrentPlanDocx}>{downloadingDocx ? "Preparing…" : "Download Word"}</button>
           <button data-tour="plan-teach" className="feature-button" type="button" onClick={() => saveCurrentPlan(true)}><span className="feature-icon" aria-hidden="true">▷</span> Teach this lesson</button>
           <button data-tour={saved ? "plan-saved" : "plan-save"} className="primary-button" type="button" onClick={() => saveCurrentPlan()}>{saved ? "✓ Saved" : "Save lesson"}</button>
         </div>
-      </div>
+      </div>}
       {revisionNotice && <p className="draft-restore" role="status">{revisionNotice} {revisionUndo && <button type="button" onClick={undoSuggestions}>Undo applied changes</button>}</p>}
       {revisionScope && currentPlan && <LessonRevisionPanel available={cloudAvailable} key={revisionScope} plan={currentPlan} initialScope={revisionScope} onClose={closeRevisions} onApply={applySuggestions} />}
       {docxError && <p className="gabay-draft-error" role="alert">{docxError}</p>}
 
-      {narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}
+      {(hasPlanContent || !setupOpen) && narrow && grades.length > 1 && <nav className="grade-switcher" aria-label="Grade shown">{grades.map((grade) => <button type="button" className={shownGrades.includes(grade) ? "active" : ""} aria-pressed={shownGrades.includes(grade)} onClick={() => setMobileGrade(grade)} key={grade}>{gradeLabel(grade)}</button>)}<small>Showing one grade at a time on this screen. The export includes all grades.</small></nav>}
 
-      {selectedClass && <article style={ilawDocumentStyle} data-tour="plan-document" className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
+      {selectedClass && (hasPlanContent || !setupOpen) && <article style={ilawDocumentStyle} data-tour="plan-document" className={`ilaw-export-document ilaw-export-inline ilaw-editor${narrow ? " narrow" : ""}`} ref={documentRef}>
         <header className="ilaw-print-title"><p>{planTitleLine(grades)}</p><input className="ilaw-title-input" aria-label="Lesson title" value={lessonTitle} placeholder="Untitled lesson" onChange={(event) => { setLessonTitle(event.target.value); touch(); }} /></header>
         <table className="ilaw-print-meta"><tbody>
           <tr><th>School</th><td><input className="cell-input" aria-label="School" value={schoolName} placeholder="School name" onChange={(event) => { setPlanSchoolName(event.target.value); touch(); }} /></td><th>Grade Levels</th><td>{gradeList(grades)}</td></tr>
@@ -2963,6 +2968,91 @@ async function loadTeacherResources(supabase: SupabaseClient) {
   }));
 }
 
+function ResourceUploadDialog({ open, authenticated, teacherAccountId, teacherName, attachTo, onClose, onUploaded }: { open: boolean; authenticated: boolean; teacherAccountId: string; teacherName: string; attachTo?: "question" | "reply"; onClose: () => void; onUploaded: (resource: LibraryResource) => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const titleId = useId();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [submission, setSubmission] = useState<ResourceSubmission>(emptyResourceSubmission);
+  const [submissionFile, setSubmissionFile] = useState<File>();
+  const [sharingRightsConfirmed, setSharingRightsConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const visibility = attachTo ? "shared" : submission.visibility;
+  useAppUpdateGuard(open ? "Finish or close your PDF upload before updating." : "");
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !dialog) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; dialog.showModal();
+    return () => { dialog.close(); document.body.style.overflow = previousOverflow; };
+  }, [open]);
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
+  function changeStep(next: 1 | 2) { setStep(next); setError(""); dialogRef.current?.querySelector(".resource-upload-body")?.scrollTo(0, 0); }
+  async function submitResource(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+    if (step === 1) { changeStep(2); return; }
+    if (!navigator.onLine || !authenticated || !teacherAccountId) { setError("Connect and sign in to upload a resource. Your submission is still here."); return; }
+    if (!submissionFile || submissionFile.type !== "application/pdf") { changeStep(1); setError("Choose a PDF file to submit."); return; }
+    if (submissionFile.size > 20 * 1024 * 1024) { changeStep(1); setError("The PDF must be 20 MB or smaller."); return; }
+    if (visibility === "shared" && !sharingRightsConfirmed) { setError("Confirm that you have permission to share this material."); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) { setError("Uploading is unavailable right now. Your submission is still here."); return; }
+    setSubmitting(true); setError("");
+    try {
+      const safeName = submissionFile.name.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "") || "teacher-resource.pdf";
+      const storagePath = `${teacherAccountId}/${crypto.randomUUID()}-${safeName}`;
+      const upload = await supabase.storage.from("teacher-resources").upload(storagePath, submissionFile, { contentType: "application/pdf", upsert: false });
+      if (upload.error) { setError(guestOperationMessage(upload.error, "The PDF could not be uploaded. Check your connection, access, or upload limit, then retry.")); return; }
+      const metadata = {
+        subject: submission.subject.trim() || "General", grades: submission.grades.trim() || "Grade levels not specified",
+        type: submission.type.trim() || "Teacher resource", description: submission.description.trim(),
+        tags: submission.tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 8), author: teacherLabel(teacherName),
+        reviewStatus: "Community upload · not reviewed", originalFileName: submissionFile.name, mimeType: submissionFile.type,
+      };
+      const result = await supabase.from("resources").insert({ owner_id: teacherAccountId, title: submission.title.trim(), storage_path: storagePath, visibility, metadata }).select("id,owner_id,title,storage_path,visibility,metadata,created_at").single();
+      if (result.error || !result.data) {
+        const removed = await supabase.storage.from("teacher-resources").remove([storagePath]);
+        setError(removed.error ? "The resource details could not be saved. An unfinished file may remain in your storage; please contact support if this continues." : "The resource details could not be saved. The unfinished upload was removed; please try again."); return;
+      }
+      const uploadedSignedUrl = await signedResourceUrl(supabase, storagePath).catch(() => "");
+      const uploadedResource: LibraryResource = {
+        id: String(result.data.id), ownerId: teacherAccountId, storagePath, title: submission.title.trim(), icon: resourceIcon(metadata.subject), subject: metadata.subject,
+        grades: metadata.grades, type: metadata.type, description: metadata.description, tags: metadata.tags,
+        author: metadata.author, pages: 0, pdfPath: uploadedSignedUrl, source: "teacher", visibility, reviewStatus: metadata.reviewStatus,
+      };
+      setSubmission(emptyResourceSubmission); setSubmissionFile(undefined); setSharingRightsConfirmed(false); setStep(1); formRef.current?.reset();
+      onUploaded(uploadedResource); onClose();
+    } catch { setError("The upload could not finish. Your form is still here. Check Resources before retrying if your connection dropped after publishing."); }
+    finally { setSubmitting(false); }
+  }
+  return <dialog className="resource-upload-dialog" ref={dialogRef} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); if (!submitting) onClose(); }}>
+    <form ref={formRef} className="resource-submission resource-upload-form" onSubmit={submitResource}>
+      <header><div><p className="eyebrow">{attachTo ? `ATTACH TO YOUR ${attachTo.toUpperCase()}` : "TEACHER RESOURCE LIBRARY"}</p><h2 id={titleId}>Upload a PDF</h2><p>{attachTo ? `Your ${attachTo} stays here while you upload. The PDF will be selected for you when it is ready.` : "Add your material, then choose who can open it."}</p></div><button type="button" aria-label="Close PDF upload" disabled={submitting} onClick={onClose}>×</button></header>
+      <ol className="resource-upload-steps" aria-label="Upload progress"><li aria-current={step === 1 ? "step" : undefined}><span>{step === 2 ? "✓" : "1"}</span> PDF and details</li><li aria-current={step === 2 ? "step" : undefined}><span>2</span> Review and share</li></ol>
+      <div className="resource-upload-body">
+        <fieldset hidden={step !== 1} disabled={submitting}>
+          <label className="resource-file-choice">PDF file <small>PDF only · up to 20 MB</small><input required type="file" accept=".pdf,application/pdf" onChange={(event) => { const file = event.target.files?.[0]; setSubmissionFile(file); if (file && !submission.title.trim()) setSubmission((current) => ({ ...current, title: file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " ").slice(0, 200) })); }} /></label>
+          <label>Resource title<input required minLength={4} maxLength={200} value={submission.title} onChange={(event) => setSubmission((current) => ({ ...current, title: event.target.value }))} placeholder="e.g. Reading practice cards" /></label>
+          <div className="resource-submission-grid"><label>Subject<select value={submission.subject} onChange={(event) => setSubmission((current) => ({ ...current, subject: event.target.value }))}>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}<option>General</option></select></label><label>Grade levels<input required value={submission.grades} onChange={(event) => setSubmission((current) => ({ ...current, grades: event.target.value }))} placeholder="e.g. Grades 3–5" /></label></div>
+          <label>How to use this resource<textarea required minLength={20} maxLength={1200} value={submission.description} onChange={(event) => setSubmission((current) => ({ ...current, description: event.target.value }))} placeholder="Describe the activity and what teachers need to prepare." /><small>At least 20 characters. Keep learner names and private records out.</small></label>
+          <details className="resource-extra-details"><summary>Material type and tags <span>Optional</span></summary><div className="resource-submission-grid"><label>Material type<select value={submission.type} onChange={(event) => setSubmission((current) => ({ ...current, type: event.target.value }))}>{["Activity sheet", "Teacher guide", "Lesson exemplar", "Assessment", "Reading material", "Presentation", "Other"].map((type) => <option key={type}>{type}</option>)}</select></label><label>Tags <small>Separate with commas</small><input value={submission.tags} onChange={(event) => setSubmission((current) => ({ ...current, tags: event.target.value }))} placeholder="Low-cost, multigrade" /></label></div></details>
+        </fieldset>
+        <fieldset hidden={step !== 2} disabled={submitting}>
+          <div className="resource-upload-review"><span>YOUR PDF</span><h3>{submission.title}</h3><p>{submissionFile?.name} · {((submissionFile?.size || 0) / 1048576).toFixed(1)} MB</p><p>{submission.subject} · {submission.grades}</p></div>
+          {attachTo ? <div className="resource-sharing-note"><b>Shared with the teacher room</b><p>Connected Kalinga users, including public guests, can open this PDF. It will also appear in Find resources.</p></div> : <label>Who can open this PDF?<select value={submission.visibility} onChange={(event) => setSubmission((current) => ({ ...current, visibility: event.target.value as ResourceSubmission["visibility"] }))}><option value="shared">Connected Kalinga users (including guests)</option><option value="private">Only me</option></select></label>}
+          <div className="submission-transparency"><p><b>Uploaded by {teacherLabel(teacherName)}</b><span>{visibility === "shared" ? "Shared with connected users, including guests." : "Private to your account."} Community upload · not reviewed or approved by Kalinga.</span></p><p><b>Only this PDF is uploaded</b><span>Your classes, learner records, attendance and lesson plans are not added automatically. Check the file itself for private information.</span></p></div>
+          {visibility === "shared" && <label className="rights-check" htmlFor={`${titleId}-rights`}><input id={`${titleId}-rights`} type="checkbox" checked={sharingRightsConfirmed} onChange={(event) => setSharingRightsConfirmed(event.target.checked)} /><span>I made this resource or have permission to share it.<small>I understand that connected users, including public guests, can open it.</small></span></label>}
+        </fieldset>
+        {error && <p ref={errorRef} tabIndex={-1} className="library-error" role="alert">{error}</p>}
+      </div>
+      <footer><button className="secondary-button" type="button" disabled={submitting} onClick={onClose}>Cancel</button>{step === 2 && <button className="secondary-button" type="button" disabled={submitting} onClick={() => changeStep(1)}>Back</button>}<button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Uploading PDF…" : step === 1 ? "Continue to sharing →" : attachTo ? "Publish and attach PDF" : visibility === "shared" ? "Publish resource" : "Upload privately"}</button></footer>
+    </form>
+  </dialog>;
+}
+
 function LibraryView({ scope, classes, activeClassId, authenticated, teacherAccountId, teacherName, onSetUpClass, onRequestSignIn, onOpenCommunity, onGuide, onGabayContext }: { scope: string; classes: TeachingClass[]; activeClassId: string; authenticated: boolean; teacherAccountId: string; teacherName: string; onSetUpClass: () => void; onRequestSignIn: () => void; onOpenCommunity: (resourceId: string) => void; onGuide: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
   const [filter, setFilter] = useState<"all" | "Mathematics" | "Science">("all");
   const [libraryError, setLibraryError] = useState("");
@@ -2975,14 +3065,12 @@ function LibraryView({ scope, classes, activeClassId, authenticated, teacherAcco
   const downloadActive = useRef(true);
   const openSnapshotId = useRef("");
   const [teacherResources, setTeacherResources] = useState<LibraryResource[]>([]);
+  const resourceRefreshVersion = useRef(0);
   const [comments, setComments] = useState<ResourceComment[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [submissionOpen, setSubmissionOpen] = useState(false);
-  const [submission, setSubmission] = useState<ResourceSubmission>(emptyResourceSubmission);
-  const [submissionFile, setSubmissionFile] = useState<File>();
-  const [sharingRightsConfirmed, setSharingRightsConfirmed] = useState(false);
   useAppUpdateGuard(submitting || Object.keys(downloadProgress).length ? "Wait for the resource upload or download to finish before updating." : submissionOpen || commentInput.trim() ? "Finish or close the resource form and send or clear your comment before updating." : "");
   const activeClass = classes.find((item) => item.id === activeClassId);
 
@@ -3036,12 +3124,13 @@ function LibraryView({ scope, classes, activeClassId, authenticated, teacherAcco
     if (!supabase) return;
     let active = true;
     async function refresh() {
+      const version = resourceRefreshVersion.current;
       let uploaded: LibraryResource[] = [];
       try { uploaded = await loadTeacherResources(supabase!); } catch { if (active) setLibraryError("Teacher uploads could not refresh. The starter PDFs are still available."); }
       const resourceIds = [...starterResources, ...uploaded].map((item) => item.id);
       const commentResult = await supabase!.from("resource_comments").select("id,resource_id,teacher_id,teacher_name,body,created_at").in("resource_id", resourceIds).order("created_at");
       if (!active) return;
-      setTeacherResources(uploaded);
+      if (version === resourceRefreshVersion.current) setTeacherResources(uploaded);
       const local = await listOfflineResources(scope).catch(() => []);
       const localIds = local.filter((item) => item.info.source === "teacher").map((item) => item.info.id);
       if (localIds.length && active) {
@@ -3070,43 +3159,6 @@ function LibraryView({ scope, classes, activeClassId, authenticated, teacherAcco
       availableActions: ["Help prepare a transparent resource submission", "Help adapt the Mathematics activity", "Help adapt the Science investigation", "Summarize the open PDF", "Draft a useful teacher comment"],
     });
   }, [activeClass, filter, onGabayContext, previewComments.length, previewResource, teacherResources.length, visible.length]);
-
-  async function submitResource(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!navigator.onLine || !authenticated) { setLibraryError("Connect and sign in to upload a resource. Your submission is still here."); return; }
-    if (!authenticated || !teacherAccountId) { onRequestSignIn(); return; }
-    if (!submissionFile || submissionFile.type !== "application/pdf") { setLibraryError("Choose a PDF file to submit."); return; }
-    if (submissionFile.size > 20 * 1024 * 1024) { setLibraryError("The PDF must be 20 MB or smaller."); return; }
-    if (submission.visibility === "shared" && !sharingRightsConfirmed) { setLibraryError("Confirm that you have permission to share this material."); return; }
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setSubmitting(true); setLibraryError("");
-    const safeName = submissionFile.name.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "") || "teacher-resource.pdf";
-    const storagePath = `${teacherAccountId}/${crypto.randomUUID()}-${safeName}`;
-    const upload = await supabase.storage.from("teacher-resources").upload(storagePath, submissionFile, { contentType: "application/pdf", upsert: false });
-    if (upload.error) { setSubmitting(false); setLibraryError(guestOperationMessage(upload.error, "The PDF could not be uploaded. Check your connection, access, or upload limit, then retry.")); return; }
-    const metadata = {
-      subject: submission.subject.trim() || "General", grades: submission.grades.trim() || "Grade levels not specified",
-      type: submission.type.trim() || "Teacher resource", description: submission.description.trim(),
-      tags: submission.tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 8), author: teacherLabel(teacherName),
-      reviewStatus: "Community upload · not reviewed", originalFileName: submissionFile.name, mimeType: submissionFile.type,
-    };
-    const result = await supabase.from("resources").insert({ owner_id: teacherAccountId, title: submission.title.trim(), storage_path: storagePath, visibility: submission.visibility, metadata }).select("id,owner_id,title,storage_path,visibility,metadata,created_at").single();
-    if (result.error || !result.data) {
-      await supabase.storage.from("teacher-resources").remove([storagePath]);
-      setSubmitting(false); setLibraryError("The resource details could not be saved. The unfinished upload was removed; please try again."); return;
-    }
-    const uploadedSignedUrl = await signedResourceUrl(supabase, storagePath);
-    const uploadedResource: LibraryResource = {
-      id: String(result.data.id), ownerId: teacherAccountId, title: submission.title.trim(), icon: resourceIcon(metadata.subject), subject: metadata.subject,
-      grades: metadata.grades, type: metadata.type, description: metadata.description || "No description was provided.", tags: metadata.tags,
-      author: metadata.author, pages: 0, pdfPath: uploadedSignedUrl, source: "teacher", visibility: submission.visibility, reviewStatus: metadata.reviewStatus,
-    };
-    setTeacherResources((current) => [uploadedResource, ...current.filter((item) => item.id !== uploadedResource.id)]);
-    setSubmission(emptyResourceSubmission); setSubmissionFile(undefined); setSharingRightsConfirmed(false); setSubmissionOpen(false); setSubmitting(false);
-    setShareMessage(submission.visibility === "shared" ? "Resource published for signed-in teachers" : "Private resource uploaded");
-    window.setTimeout(() => setShareMessage(""), 2400);
-  }
 
   async function shareResource(resource: LibraryResource) {
     if (!navigator.onLine) { setLibraryError("Sharing links needs internet. Your downloaded copy is still available."); return; }
@@ -3149,15 +3201,7 @@ function LibraryView({ scope, classes, activeClassId, authenticated, teacherAcco
 
   return <div data-tour="library-page" className="view-page resource-library-page resource-workspace-surface">
     <PageIntro eyebrow="TEACHER RESOURCE LIBRARY" title="Open it. Teach it. Improve it together." description="Use the two Kalinga starters or submit a PDF of your own with clear classroom details." action={<button data-tour="resource-upload" className="primary-button" type="button" onClick={() => authenticated ? setSubmissionOpen((open) => !open) : onRequestSignIn()}>＋ Upload a resource</button>} />
-    {submissionOpen && <form className="resource-submission" onSubmit={submitResource}>
-      <header><div><p className="eyebrow">RESOURCE SUBMISSION</p><h2>Tell teachers exactly what they are opening</h2><p>Your name, classroom fit, and sharing status stay visible. Uploading does not mean Kalinga has reviewed or approved the material.</p></div><button type="button" aria-label="Close resource submission" onClick={() => setSubmissionOpen(false)}>×</button></header>
-      <div className="resource-submission-sections">
-        <fieldset><legend><span>1</span> PDF and title</legend><label>PDF file <small>Required · PDF only · up to 20 MB</small><input required type="file" accept=".pdf,application/pdf" onChange={(event) => setSubmissionFile(event.target.files?.[0])} /></label><label>Resource title<input required minLength={4} maxLength={200} value={submission.title} onChange={(event) => setSubmission((current) => ({ ...current, title: event.target.value }))} placeholder="A clear, specific title" /></label></fieldset>
-        <fieldset><legend><span>2</span> Classroom fit</legend><div className="resource-submission-grid"><label>Subject<select value={submission.subject} onChange={(event) => setSubmission((current) => ({ ...current, subject: event.target.value }))}>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}<option>General</option></select></label><label>Grade levels<input required value={submission.grades} onChange={(event) => setSubmission((current) => ({ ...current, grades: event.target.value }))} placeholder="e.g. Grades 3–5" /></label><label>Material type<select value={submission.type} onChange={(event) => setSubmission((current) => ({ ...current, type: event.target.value }))}><option>Activity sheet</option><option>Teacher guide</option><option>Lesson exemplar</option><option>Assessment</option><option>Reading material</option><option>Presentation</option><option>Other</option></select></label><label>Tags <small>Comma-separated</small><input value={submission.tags} onChange={(event) => setSubmission((current) => ({ ...current, tags: event.target.value }))} placeholder="Low-cost, multigrade, offline" /></label><label className="wide">What is this and how should it be used?<textarea required minLength={20} maxLength={1200} value={submission.description} onChange={(event) => setSubmission((current) => ({ ...current, description: event.target.value }))} placeholder="Briefly explain the activity, materials needed, and anything another teacher should check first." /></label></div></fieldset>
-        <fieldset><legend><span>3</span> Sharing and transparency</legend><label>Who can open this PDF?<select value={submission.visibility} onChange={(event) => setSubmission((current) => ({ ...current, visibility: event.target.value as ResourceSubmission["visibility"] }))}><option value="shared">Connected Kalinga users (including guests)</option><option value="private">Only me</option></select></label><div className="submission-transparency"><p><b>Shown on the resource card</b><span>Uploaded by {teacherLabel(teacherName)} · {submission.visibility === "shared" ? "Shared with connected users, including guests" : "Private to your account"} · Community upload, not reviewed</span></p><p><b>Not shared automatically</b><span>Your classes, learners, attendance, and lesson-plan records are never added to the PDF submission.</span></p></div>{submission.visibility === "shared" && <div className="rights-check"><input id="resource-sharing-rights" type="checkbox" aria-labelledby="resource-sharing-rights-label" checked={sharingRightsConfirmed} onChange={(event) => setSharingRightsConfirmed(event.target.checked)} /><span id="resource-sharing-rights-label"><b>I made this resource or have permission to share it.</b><small>I understand connected users, including public guests, can open it and discuss it.</small></span></div>}</fieldset>
-      </div>
-      <footer><button className="secondary-button" type="button" onClick={() => setSubmissionOpen(false)}>Cancel</button><button className="primary-button" type="submit" disabled={submitting || !submissionFile || !submission.title.trim() || !submission.description.trim() || (submission.visibility === "shared" && !sharingRightsConfirmed)}>{submitting ? "Uploading…" : submission.visibility === "shared" ? "Publish resource" : "Upload privately"}</button></footer>
-    </form>}
+    <ResourceUploadDialog open={submissionOpen} authenticated={authenticated} teacherAccountId={teacherAccountId} teacherName={teacherName} onClose={() => setSubmissionOpen(false)} onUploaded={(resource) => { resourceRefreshVersion.current += 1; setTeacherResources((current) => [resource, ...current.filter((item) => item.id !== resource.id)]); setShareMessage(resource.visibility === "shared" ? "Resource published for connected Kalinga users" : "Private resource uploaded"); }} />
     <section className="starter-library-toolbar"><div role="tablist" aria-label="Filter resources">{[["all", "All resources"], ["Mathematics", "Mathematics"], ["Science", "Science"]].map(([value, label]) => <button role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} type="button" onClick={() => setFilter(value as typeof filter)} key={value}>{label}</button>)}</div>{activeClass ? <p><b>Matched to {activeClass.name}</b><span>{gradeList(activeClass.grades)} · {activeClass.subjects.join(", ")}</span></p> : <button type="button" onClick={onSetUpClass}>Set up a class for matching →</button>}</section>
     {libraryError && <p className="library-error" role="status">{libraryError}</p>}
     {shareMessage && <p className="resource-share-message" role="status">{shareMessage}</p>}
@@ -3304,6 +3348,7 @@ function renderCommunityMessage(body: string) {
 function SharedMaterialCard({ resourceId, resources }: { resourceId: string; resources: LibraryResource[] }) {
   const resource = resources.find((item) => item.id === resourceId);
   if (!resource) return null;
+  if (!resource.pdfPath) return <div className="community-material-card"><span>{resource.icon}</span><p><b>{resource.title}</b><small>The PDF was uploaded, but its link is unavailable. Reopen this discussion when connected to try again.</small></p></div>;
   return <a className="community-material-card" href={resource.pdfPath} target="_blank" rel="noreferrer"><span>{resource.icon}</span><p><b>{resource.title}</b><small>{resource.subject} · PDF · {resource.author}{resource.source === "teacher" ? " · Community upload, not reviewed" : ""}</small></p><strong>Open ↗</strong></a>;
 }
 
@@ -3317,7 +3362,9 @@ function communityTime(value: string) {
   return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 }
 
-function CommunityView({ authenticated, teacherAccountId, teacherName, guestMentionTag, openDiscussionId, initialResourceId, onRequestSignIn, onOpenLibrary, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; guestMentionTag?: string; openDiscussionId: string; initialResourceId: string; onRequestSignIn: () => void; onOpenLibrary: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+function CommunityView({ authenticated, teacherAccountId, teacherName, guestMentionTag, openDiscussionId, initialResourceId, onRequestSignIn, onGabayContext }: { authenticated: boolean; teacherAccountId: string; teacherName: string; guestMentionTag?: string; openDiscussionId: string; initialResourceId: string; onRequestSignIn: () => void; onGabayContext: (context: GabayLiveContext) => void }) {
+  const [uploadTarget, setUploadTarget] = useState<"question" | "reply">();
+  const [uploadNotice, setUploadNotice] = useState("");
   const [tab, setTab] = useState<"all" | "mine">("all");
   const [discussions, setDiscussions] = useState<TeacherDiscussion[]>([]);
   const [canonicalTags, setCanonicalTags] = useState<Record<string, string>>({});
@@ -3338,6 +3385,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
   const [deleteTarget, setDeleteTarget] = useState<{ kind: "question" | "reply"; id: string }>();
   useAppUpdateGuard(submitting ? "Wait for your teacher post to finish before updating." : composerOpen || questionTitle.trim() || questionBody.trim() || reply.trim() || replyResourceId ? "Finish or clear your teacher question or reply before updating." : "");
   const [teacherResources, setTeacherResources] = useState<LibraryResource[]>([]);
+  const resourceRefreshVersion = useRef(0);
 
   useEffect(() => {
     if (!authenticated || !teacherAccountId) return;
@@ -3345,6 +3393,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
     if (!supabase) return;
     let active = true;
     async function refresh() {
+      const version = resourceRefreshVersion.current;
       const [discussionResult, replyResult, uploadedResources] = await Promise.all([
         supabase!.from("teacher_discussions").select("id,author_id,author_name,school_name,title,body,subject,grade_levels,created_at").order("created_at", { ascending: false }).limit(80),
         supabase!.from("teacher_replies").select("id,discussion_id,author_id,author_name,body,created_at").order("created_at").limit(500),
@@ -3354,7 +3403,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
       if (discussionResult.error || replyResult.error) { setCommunityError("The teacher room could not refresh. Please check your connection."); setLoading(false); return; }
       const nextDiscussions = (discussionResult.data || []).map(discussionFromRow);
       const nextReplies = (replyResult.data || []).map(replyFromRow);
-      setDiscussions(nextDiscussions); setReplies(nextReplies); setTeacherResources(uploadedResources.filter((resource) => resource.visibility === "shared")); setSelectedDiscussionId((current) => nextDiscussions.some((item) => item.id === current) ? current : nextDiscussions[0]?.id || ""); setCommunityError(""); setLoading(false);
+      setDiscussions(nextDiscussions); setReplies(nextReplies); if (version === resourceRefreshVersion.current) setTeacherResources(uploadedResources.filter((resource) => resource.visibility === "shared")); setSelectedDiscussionId((current) => nextDiscussions.some((item) => item.id === current) ? current : nextDiscussions[0]?.id || ""); setCommunityError(""); setLoading(false);
     }
     void refresh();
     // A new post appends the one row it carries. Only edits and deletes, which
@@ -3421,7 +3470,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
     if (error || !data) { setCommunityError(guestOperationMessage(error, "Your question could not be posted. Please check your connection and try again.")); return; }
     const message = decodeCommunityMessage(String(data.body));
     const item: TeacherDiscussion = { id: String(data.id), authorId: String(data.author_id), authorName: String(data.author_name), schoolName: data.school_name ? String(data.school_name) : "", title: String(data.title), body: message.body, resourceId: message.resourceId, subject: data.subject ? String(data.subject) : "General", gradeLevels: Array.isArray(data.grade_levels) ? data.grade_levels.map(String) : [], createdAt: String(data.created_at) };
-    setDiscussions((current) => [item, ...current.filter((discussion) => discussion.id !== item.id)]); setSelectedDiscussionId(item.id); setQuestionTitle(""); setQuestionBody(""); setQuestionGrades(""); setQuestionResourceId(""); setComposerOpen(false); setTab("all"); setCommunityError("");
+    setDiscussions((current) => [item, ...current.filter((discussion) => discussion.id !== item.id)]); setSelectedDiscussionId(item.id); setQuestionTitle(""); setQuestionBody(""); setQuestionGrades(""); setQuestionResourceId(""); setComposerOpen(false); setTab("all"); setCommunityError(""); setUploadNotice("");
   }
 
   async function submitReply() {
@@ -3436,7 +3485,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
     if (error || !data) { setCommunityError(guestOperationMessage(error, "Your reply could not be sent. Please try again.")); return; }
     const message = decodeCommunityMessage(String(data.body));
     const item: TeacherReply = { id: String(data.id), discussionId: String(data.discussion_id), authorId: String(data.author_id), authorName: String(data.author_name), body: message.body, resourceId: message.resourceId, createdAt: String(data.created_at) };
-    setReplies((current) => [...current.filter((entry) => entry.id !== item.id), item]); setReply(""); setReplyResourceId(""); setCommunityError("");
+    setReplies((current) => [...current.filter((entry) => entry.id !== item.id), item]); setReply(""); setReplyResourceId(""); setCommunityError(""); setUploadNotice("");
   }
 
   async function deleteCommunityPost() {
@@ -3462,7 +3511,9 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
   if (!authenticated) return <div data-tour="community-page" className="view-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers who understand the classroom" description="Sign in to read questions and exchange practical ideas with other Kalinga teachers." /><section data-tour="community-signin" className="community-signin"><span>♧</span><h2>Your teacher room is account-based</h2><p>Posts and replies are shared with signed-in teachers. Classes, learner records, lesson plans, and private resources remain yours.</p><button className="primary-button" type="button" onClick={onRequestSignIn}>Sign in to join</button></section></div>;
 
   return <div data-tour="community-page" className="view-page community-page community-workspace-surface"><PageIntro eyebrow="TEACHER ROOM" title="Ask teachers. Share what worked." description="Questions, practical replies, and classroom materials live together here." action={<button data-tour="community-ask" className="primary-button" type="button" onClick={() => setComposerOpen((open) => !open)}>＋ Ask a question</button>} />
-    <aside className="community-explainer"><span>@</span><p><b>Your tag is {guestMentionTag || canonicalTags[teacherAccountId] || teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><button type="button" onClick={onOpenLibrary}>Upload or manage resources →</button></aside>
+    <ResourceUploadDialog open={Boolean(uploadTarget)} authenticated={authenticated} teacherAccountId={teacherAccountId} teacherName={teacherName} attachTo={uploadTarget} onClose={() => setUploadTarget(undefined)} onUploaded={(resource) => { resourceRefreshVersion.current += 1; setTeacherResources((current) => [resource, ...current.filter((item) => item.id !== resource.id)]); if (uploadTarget === "question") setQuestionResourceId(resource.id); else setReplyResourceId(resource.id); setUploadNotice("PDF uploaded and selected. Send your question or reply when you are ready."); }} />
+    {uploadNotice && <p className="resource-share-message" role="status">{uploadNotice}</p>}
+    <aside className="community-explainer"><span>@</span><p><b>Your tag is {guestMentionTag || canonicalTags[teacherAccountId] || teacherMention(teacherName, teacherAccountId)}</b><small>Use a teacher’s tag in a question or reply and Kalinga will notify that exact account. Attach one of your shared PDFs when the material helps explain the idea.</small></p><small className="community-attachment-hint">Upload and attach PDFs below, without leaving your message.</small></aside>
     {composerOpen && <form className="community-composer" onSubmit={submitQuestion}>
       <header><div><p className="eyebrow">NEW QUESTION</p><h2>Give teachers enough context to help</h2></div><button type="button" aria-label="Close question form" onClick={() => setComposerOpen(false)}>×</button></header>
       <div>
@@ -3470,7 +3521,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
         <label>Subject<select value={questionSubject} onChange={(event) => setQuestionSubject(event.target.value)}><option>General</option>{commonSubjects.map((subject) => <option key={subject}>{subject}</option>)}</select></label>
         <label>Grade levels<input value={questionGrades} onChange={(event) => setQuestionGrades(event.target.value)} placeholder="e.g. Grade 2, Grade 3" /></label>
         <label className="wide">Classroom context<textarea required minLength={4} maxLength={3000} value={questionBody} onChange={(event) => setQuestionBody(event.target.value)} placeholder="What have you tried? Add a teacher tag if you want their attention." /></label>
-        <div className="community-compose-tools wide"><label>Attach your resource <small>Shared PDFs only</small><select value={questionResourceId} onChange={(event) => setQuestionResourceId(event.target.value)}><option value="">No attachment</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.subject} · {resource.title}</option>)}</select></label><div><small>Tag a teacher</small>{teacherTags.length ? teacherTags.map((tag) => <button type="button" onClick={() => setQuestionBody((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>) : <span>Teacher tags appear after another account posts.</span>}</div></div>
+        <div className="community-compose-tools wide"><label>Attach a shared PDF <small>Optional</small><select value={questionResourceId} onChange={(event) => setQuestionResourceId(event.target.value)}><option value="">No attachment</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.subject} · {resource.title}</option>)}</select></label><button className="attachment-upload-button" type="button" onClick={() => setUploadTarget("question")}>Upload a PDF</button><div><small>Tag a teacher</small>{teacherTags.length ? teacherTags.map((tag) => <button type="button" onClick={() => setQuestionBody((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>) : <span>Teacher tags appear after another account posts.</span>}</div></div>
       </div>
       <footer><small>Shared with connected Kalinga users, including public guests. Display names are not verified teacher identities. Keep learner names and private records out.</small><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Posting…" : "Post question"}</button></footer>
     </form>}
@@ -3483,7 +3534,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
         <h2>{selectedDiscussion.title}</h2><p className="discussion-body">{renderCommunityMessage(selectedDiscussion.body)}</p><SharedMaterialCard resourceId={selectedDiscussion.resourceId} resources={attachableResources} />
         <div className="discussion-replies-heading"><b>{selectedReplies.length} {selectedReplies.length === 1 ? "reply" : "replies"}</b><small>Replying automatically notifies the teacher who asked.</small></div>
         <div className="reply-list">{selectedReplies.map((item) => <div className="reply-item" key={item.id}><span className="avatar">{teacherInitials(item.authorName.replace(/^Teacher\s+/i, ""))}</span><div><p><b>{item.authorName} <small>{communityTime(item.createdAt)}</small></b>{renderCommunityMessage(item.body)}</p><SharedMaterialCard resourceId={item.resourceId} resources={attachableResources} /></div>{item.authorId === teacherAccountId && <button className="reply-delete-button" type="button" onClick={() => setDeleteTarget({ kind: "reply", id: item.id })}>Delete</button>}</div>)}{!selectedReplies.length && <p className="no-replies">No replies yet. Share one useful idea to get the conversation started.</p>}</div>
-        <div className="reply-composer"><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion or tag a teacher…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div><div className="reply-tools"><select aria-label="Attach one of your shared resources" value={replyResourceId} onChange={(event) => setReplyResourceId(event.target.value)}><option value="">＋ Attach your resource</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.title}</option>)}</select><button type="button" onClick={onOpenLibrary}>＋ Upload PDF</button>{teacherTags.map((tag) => <button type="button" onClick={() => setReply((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>)}</div></div>
+        <div className="reply-composer"><div className="reply-box"><textarea value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} placeholder="Share a practical suggestion or tag a teacher…" /><button type="button" disabled={!reply.trim() || submitting} onClick={submitReply}>{submitting ? "Sending…" : "Reply"}</button></div><div className="reply-tools"><select aria-label="Attach a shared PDF to your reply" value={replyResourceId} onChange={(event) => setReplyResourceId(event.target.value)}><option value="">Choose a shared PDF (optional)</option>{attachableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.ownerId === teacherAccountId ? "My PDF" : resource.source === "starter" ? "Kalinga starter" : "Teacher PDF"} · {resource.title}</option>)}</select><button className="attachment-upload-button" type="button" onClick={() => setUploadTarget("reply")}>Upload a PDF</button>{teacherTags.map((tag) => <button type="button" onClick={() => setReply((body) => `${body}${body.endsWith(" ") || !body ? "" : " "}${tag} `)} key={tag}>{tag}</button>)}</div></div>
       </> : <div className="discussion-empty"><span>♧</span><b>Choose a question</b><p>Open a teacher discussion to read its replies.</p></div>}</article>
     </section>}
   </div>;
