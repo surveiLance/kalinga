@@ -17,14 +17,15 @@ function workerMessage<T>(worker: ServiceWorker, message: Record<string, unknown
     worker.postMessage(message, [channel.port2]);
   });
 }
-function status(worker: ServiceWorker) { return workerMessage<{ version: string; prepared: boolean; assets: string[] }>(worker, { type: "OFFLINE_STATUS" }); }
+export function offlineUpdateReady(update: { prepared: boolean; canApplyUpdate?: boolean }) { return update.prepared && update.canApplyUpdate === true; }
+function status(worker: ServiceWorker) { return workerMessage<{ version: string; prepared: boolean; assets: string[]; canApplyUpdate?: boolean }>(worker, { type: "OFFLINE_STATUS" }); }
 async function checkRegistration(registration: ServiceWorkerRegistration) {
   if (availability.updating || !navigator.serviceWorker.controller) return;
   try {
     const result = await status(navigator.serviceWorker.controller);
     const pageAssets = Array.from(document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>('script[src],link[rel="stylesheet"]')).map((item) => new URL(item instanceof HTMLScriptElement ? item.src : item.href).pathname).filter((path) => path.startsWith("/_next/static/"));
     const prepared = result.prepared && offlinePageMatchesAssets(pageAssets, result.assets);
-    const updateReady = registration.waiting ? (await status(registration.waiting)).prepared : false;
+    const updateReady = registration.waiting ? offlineUpdateReady(await status(registration.waiting)) : false;
     publish({ state: updateReady || !prepared ? "update" : "ready", prepared, updateReady, message: updateReady ? "Update downloaded. Open App updates to refresh this window safely." : registration.installing ? "Downloading application files. You can keep working." : prepared ? "Application files available offline" : "Application files need preparation. Check for updates while connected." });
   } catch { publish({ ...availability, message: "Offline files could not be checked. Reconnect and retry preparation." }); }
 }
@@ -65,6 +66,7 @@ export async function applyApplicationUpdate(): Promise<string> {
   const worker = registration?.waiting;
   if (!worker) return "No downloaded update is waiting. Choose Check for updates first.";
   const ready = await status(worker);
+  if (!ready.canApplyUpdate) return "An older update is waiting. Choose Check for updates to download the current version.";
   if (!ready.prepared) return "The update is still downloading. Keep this window open and retry shortly.";
   const changed = updateGuards.check(); if (changed) return changed;
   publish({ ...availability, updating: true, message: "Applying update. This window will refresh…" });

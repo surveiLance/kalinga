@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildOfflineWorker } from "../scripts/build-offline-worker.mjs";
-import { offlinePageMatchesAssets } from "@/lib/offline-availability";
+import { offlinePageMatchesAssets, offlineUpdateReady } from "@/lib/offline-availability";
 
 describe("offline build inventory", () => {
   it("includes cold lazy imports and fonts but excludes maps and resource snapshots", async () => {
@@ -26,5 +26,10 @@ describe("offline build inventory", () => {
     expect(offlinePageMatchesAssets(["/_next/static/new.js"], ["/_next/static/old.js"])).toBe(false);
     expect(offlinePageMatchesAssets(["/_next/static/main.js"], ["/_next/static/main.js", "/_next/static/word.js"])).toBe(true);
     expect(offlinePageMatchesAssets([], ["/_next/static/main.js"])).toBe(false);
+  });
+  it("offers in-app activation only for complete updates supporting the new update protocol", () => {
+    expect(offlineUpdateReady({ prepared: true })).toBe(false);
+    expect(offlineUpdateReady({ prepared: false, canApplyUpdate: true })).toBe(false);
+    expect(offlineUpdateReady({ prepared: true, canApplyUpdate: true })).toBe(true);
   });
 });

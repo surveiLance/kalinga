@@ -70,6 +70,11 @@ describe("offline service worker boundaries", () => {
     app.handlers.message({ data: { type: "APPLY_UPDATE", version: "test" }, source: { id: "current", url: "https://kalinga.test/" }, ports: [{ postMessage(value: any) { reply = value; } }], waitUntil(p: Promise<void>) { task = p; } }); await task;
     expect(reply?.ok).toBe(true); expect(app.skipped()).toBe(true);
   });
+  it("advertises explicit-update support so new pages can distinguish older waiting workers", async () => {
+    const app = await worker(); let task!: Promise<void>; let reply: any;
+    app.handlers.message({ data: { type: "OFFLINE_STATUS" }, source: { id: "current", url: "https://kalinga.test/" }, ports: [{ postMessage(value: any) { reply = value; } }], waitUntil(p: Promise<void>) { task = p; } }); await task;
+    expect(reply.canApplyUpdate).toBe(true);
+  });
   it("keeps the previous version active if another window exists or preparation is incomplete", async () => {
     for (const ids of [["current", "other"], ["current"]]) {
       const app = await worker(false, true, false, 200, ids); let task!: Promise<void>; let reply: any;

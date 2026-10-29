@@ -58,7 +58,7 @@ self.addEventListener("message", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     const prepared = !!(await cache.match("/offline/ready")) && (await Promise.all(ASSETS.map((url) => cache.match(url)))).every(Boolean);
-    if (event.data.type === "OFFLINE_STATUS") { event.ports[0].postMessage({ version: VERSION, prepared, assets: ASSETS }); return; }
+    if (event.data.type === "OFFLINE_STATUS") { event.ports[0].postMessage({ version: VERSION, prepared, assets: ASSETS, canApplyUpdate: true }); return; }
     if (!prepared || event.data.version !== VERSION) { event.ports[0].postMessage({ ok: false, message: "The update is not fully downloaded. Check for updates and retry." }); return; }
     const windows = (await self.clients.matchAll({ type: "window", includeUncontrolled: true })).filter((client) => new URL(client.url).origin === self.location.origin);
     if (windows.length !== 1 || windows[0].id !== event.source.id) { event.ports[0].postMessage({ ok: false, message: "Save work in the other Kalinga tabs or app windows and close them, then update here. This window can stay open." }); return; }
