@@ -54,10 +54,15 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data?.type !== "OFFLINE_STATUS" || !event.ports[0] || !event.source?.url || new URL(event.source.url).origin !== self.location.origin) return;
+  if (!["OFFLINE_STATUS", "APPLY_UPDATE"].includes(event.data?.type) || !event.ports[0] || !event.source?.url || new URL(event.source.url).origin !== self.location.origin) return;
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     const prepared = !!(await cache.match("/offline/ready")) && (await Promise.all(ASSETS.map((url) => cache.match(url)))).every(Boolean);
-    event.ports[0].postMessage({ version: VERSION, prepared, assets: ASSETS });
+    if (event.data.type === "OFFLINE_STATUS") { event.ports[0].postMessage({ version: VERSION, prepared, assets: ASSETS }); return; }
+    if (!prepared || event.data.version !== VERSION) { event.ports[0].postMessage({ ok: false, message: "The update is not fully downloaded. Check for updates and retry." }); return; }
+    const windows = (await self.clients.matchAll({ type: "window", includeUncontrolled: true })).filter((client) => new URL(client.url).origin === self.location.origin);
+    if (windows.length !== 1 || windows[0].id !== event.source.id) { event.ports[0].postMessage({ ok: false, message: "Save work in the other Kalinga tabs or app windows and close them, then update here. This window can stay open." }); return; }
+    event.ports[0].postMessage({ ok: true, version: VERSION });
+    await self.skipWaiting();
   })());
 });

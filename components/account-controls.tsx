@@ -5,6 +5,7 @@ import { finishPasswordRecovery, normalizeAccountDetails, requestPasswordReset, 
 import { guestCaptchaSiteKey } from "@/lib/guest-access";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { GuestCaptcha } from "@/components/guest-captcha";
+import { useAppUpdateGuard } from "@/components/app-updates";
 
 export type AccountPanel = "settings" | "help" | "reset";
 function ResetRequest({ email: initialEmail }: { email: string }) {
@@ -13,6 +14,7 @@ function ResetRequest({ email: initialEmail }: { email: string }) {
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AccountResult>();
+  useAppUpdateGuard(busy ? "Wait for the password-reset request to finish before updating." : "");
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;
     setBusy(true); setResult(undefined);
@@ -28,6 +30,7 @@ export function AccountDialog({ kind, name, school, email, guest, authenticated,
   const [draftSchool, setDraftSchool] = useState(school);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AccountResult>();
+  useAppUpdateGuard(busy ? "Wait for your account details to finish saving before updating." : panel === "settings" && (draftName.trim() !== name.trim() || draftSchool.trim() !== school.trim()) && !result?.ok ? "Save your account details before updating." : "");
   useEffect(() => { const current = dialog.current; current?.showModal(); return () => current?.close(); }, []);
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;

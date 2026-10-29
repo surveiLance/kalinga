@@ -42,6 +42,18 @@ test("failed updates keep the old offline build and complete updates wait for un
   await expect.poll(() => page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())!.waiting)).toBe(true);
   await expect(page.getByLabel("Lesson notes")).toHaveValue("An unsaved lesson must not be reloaded");
   expect((await workerStatus(page)).version).toBe("A");
+  const other = await context.newPage(); await other.goto(origin);
+  await other.getByLabel("Lesson notes").fill("Another teacher draft must stay untouched");
+  const blocked = await page.evaluate(async () => {
+    const channel = new MessageChannel();
+    const reply = new Promise<{ ok: boolean }>((resolve) => { channel.port1.onmessage = (event) => { channel.port1.close(); resolve(event.data); }; });
+    (await navigator.serviceWorker.getRegistration())!.waiting!.postMessage({ type: "APPLY_UPDATE", version: "C" }, [channel.port2]);
+    return reply;
+  });
+  expect(blocked.ok).toBe(false);
+  await expect(other.getByLabel("Lesson notes")).toHaveValue("Another teacher draft must stay untouched");
+  await expect(page.getByLabel("Lesson notes")).toHaveValue("An unsaved lesson must not be reloaded");
+  await other.close();
   await page.close();
   await context.setOffline(true);
   const reopen = await context.newPage(); await reopen.goto(origin);

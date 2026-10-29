@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Route } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 const teacherId = "11111111-1111-4111-8111-111111111111";
 const classId = "22222222-2222-4222-8222-222222222222";
 const learnerId = "33333333-3333-4333-8333-333333333333";
@@ -210,4 +211,55 @@ test("cancelling during PDF link renewal releases the controls and ignores a lat
   await expect(page.getByText("Download cancelled. Any earlier copy is unchanged.", { exact: true })).toBeVisible();
   expect(transfers).toBe(0);
   await expect(card.getByText("Downloaded on this device")).toHaveCount(0);
+});
+
+test("a downloaded update protects an unsaved lesson then refreshes the same window after saving", async ({ context, page }) => {
+  const state = await fixtures(context);
+  const template = await readFile("scripts/offline-worker.js", "utf8");
+  const generated = await readFile("public/kalinga-sw.js", "utf8");
+  const assets = JSON.parse(generated.match(/^const ASSETS = (.+);$/m)![1]);
+  let version = "update-A";
+  const server = createServer(async (request, response) => {
+    if (request.url === "/kalinga-sw.js") {
+      response.writeHead(200, { "Content-Type": "application/javascript", "Cache-Control": "no-store" });
+      response.end(template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)));
+    } else {
+      try { const upstream = await fetch(`http://127.0.0.1:3120${request.url}`); response.writeHead(upstream.status, { "Content-Type": upstream.headers.get("content-type") || "application/octet-stream", "Cache-Control": "no-store" }); response.end(Buffer.from(await upstream.arrayBuffer())); }
+      catch { response.writeHead(503); response.end("Fixture unavailable"); }
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(3132, "127.0.0.1", resolve));
+  try {
+    await page.goto("http://127.0.0.1:3132/");
+    await page.getByLabel("Email address").fill("ana@example.test"); await page.locator('input[autocomplete="current-password"]').fill("fixture-password");
+    await page.getByRole("button", { name: "Sign in to Kalinga", exact: true }).click();
+    await page.getByRole("button", { name: "Keep sidebar open", exact: true }).click();
+    await expect(page.getByText("Ready for offline teaching", { exact: true })).toBeVisible({ timeout: 90000 });
+    await page.getByRole("button", { name: "Plan lessons", exact: true }).click();
+    await page.getByRole("button", { name: /Plants around us/ }).first().click();
+    state.offline = true;
+    await page.getByLabel("Shared sub-theme", { exact: true }).fill("Keep this lesson through the update");
+    version = "update-B";
+    const openUpdates = async () => {
+      if (!await page.getByRole("menu", { name: "Account options", exact: true }).isVisible()) await page.getByRole("button", { name: "Account options for Teacher Ana", exact: true }).click();
+      await page.getByRole("menuitem", { name: "App updates", exact: true }).click();
+      return page.getByRole("dialog", { name: "App updates", exact: true });
+    };
+    let dialog = await openUpdates();
+    await dialog.getByRole("button", { name: "Check for updates", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: "Update now", exact: true })).toBeEnabled({ timeout: 90000 });
+    await dialog.getByRole("button", { name: "Update now", exact: true }).click();
+    await expect(dialog.getByText("Save your lesson before updating.", { exact: true })).toBeVisible();
+    await page.screenshot({ path: "/private/tmp/kalinga-update-checks/update-panel.png" });
+    await expect(page.getByLabel("Shared sub-theme", { exact: true })).toHaveValue("Keep this lesson through the update");
+    await dialog.getByRole("button", { name: "Close app updates", exact: true }).click();
+    await page.getByRole("button", { name: "Save lesson", exact: true }).click();
+    dialog = await openUpdates();
+    const loaded = page.waitForEvent("load");
+    await dialog.getByRole("button", { name: "Update now", exact: true }).click();
+    await loaded;
+    await expect(page.getByRole("button", { name: "Classes & learners", exact: true })).toBeVisible();
+    expect(await page.evaluate((id) => JSON.parse(localStorage.getItem(`kalinga:teacher-${id}:plans`) || "[]")[0]?.sharedTheme, teacherId)).toBe("Keep this lesson through the update");
+    expect(await page.evaluate((id) => JSON.parse(localStorage.getItem(`kalinga:teacher-${id}:pending-writes`) || "[]").some((item: { kind: string }) => item.kind === "plan"), teacherId)).toBe(true);
+  } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); }
 });

@@ -109,3 +109,16 @@ test("Mac Chrome guidance explains Guest profiles and supports choosing Dia or O
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Install Kalinga", exact: true })).toBeFocused();
 });
+
+test("installation moves out of the sidebar and app updates are available in the account menu", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Offline demo", exact: false }).click();
+  await page.getByRole("button", { name: "Keep sidebar open", exact: true }).click();
+  await expect(page.locator(".sidebar-device-tools").getByRole("button", { name: "Install Kalinga", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Account options for Teacher Ana", exact: true }).click();
+  await page.getByRole("menuitem", { name: "App updates", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "App updates", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Check for updates", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Update now", exact: true })).toBeDisabled();
+});

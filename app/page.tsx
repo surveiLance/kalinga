@@ -5,6 +5,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { OfflineReadiness } from "@/components/offline-readiness";
 import { InstallAppButton } from "@/components/app-install";
+import { AppUpdateButton, useAppUpdateGuard } from "@/components/app-updates";
 import { openAppInstall } from "@/lib/pwa-install";
 import { downloadOfflineResource, getOfflineResource, listOfflineResources, removeOfflineResource, waitForOfflineResourceLink, type OfflineResource } from "@/lib/offline-resources";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
@@ -415,6 +416,7 @@ export default function Home() {
       ? "prototype"
       : "";
   const cloudAvailable = entryMode === "authenticated" && cloudVerifiedTeacherId === teacherAccountId && online;
+  useAppUpdateGuard(storageError || (!workspaceScope || !classDataReady || hydratedWorkspaceScope !== workspaceScope ? "Wait for your workspace to finish opening before updating." : ""));
 
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
@@ -1342,7 +1344,7 @@ export default function Home() {
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" data-tour="nav-community" aria-label="Ask teachers" onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
         </nav>
 
-        <div className="sidebar-device-tools"><InstallAppButton /><OfflineReadiness key={workspaceScope} scope={workspaceScope} persisted={localWorkspacePrepared} storageError={storageError} pendingCount={pendingWrites.length} cloudVerified={cloudAvailable} online={online} /></div>
+        <OfflineReadiness key={workspaceScope} scope={workspaceScope} persisted={localWorkspacePrepared} storageError={storageError} pendingCount={pendingWrites.length} cloudVerified={cloudAvailable} online={online} />
 
         <div className="account-anchor desktop-account">
           {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} />}
@@ -1363,6 +1365,7 @@ export default function Home() {
           </button>
           <button className="mobile-brand" type="button" aria-label="Kalinga home" onClick={() => setView("home")}><Image src="/kalinga-logo.png" width={2172} height={724} alt="Kalinga" priority /></button>
           <div className="top-actions">
+            <AppUpdateButton />
             {blockedWrites.length && !storageError
               ? <button data-tour="sync-status" className={`connection ${syncState}`} type="button" onClick={retrySync} aria-label={`${syncLabel}. Retry sync now.`}><i /> {syncLabel} · Retry</button>
               : <span data-tour="sync-status" className={`connection ${syncState}`} role="status"><i /> {syncLabel}</span>}
@@ -1541,6 +1544,7 @@ function AccountMenu({ name, email, guest, onSignOut, onSettings, onHelp, offlin
         <button type="button" role="menuitem" onClick={onSettings}><span>◎</span> Account settings</button>
         <button type="button" role="menuitem" onClick={onHelp}><span>?</span> Help &amp; support</button>
         <InstallAppButton menuItem onOpen={openAppInstall} />
+        <AppUpdateButton menuItem />
       </div>
       {offlineStatus && <div className="account-offline-status">{offlineStatus}</div>}
       <button className="signout-button" type="button" role="menuitem" onClick={onSignOut}><span>↪</span> Sign out</button>
@@ -1645,6 +1649,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   const [hydratedChatAccountId, setHydratedChatAccountId] = useState("");
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
+  useAppUpdateGuard(isReplying ? "Wait for Gabay to finish before updating." : chatInput.trim() ? "Send or clear your unfinished Gabay message before updating." : "");
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [conversationDeleteError, setConversationDeleteError] = useState("");
   const [readyContextSignature, setReadyContextSignature] = useState("");
@@ -1904,6 +1909,7 @@ function ClassesView({ classes, activeClassId, savedPlans, attendanceRecords, on
   const [learners, setLearners] = useState<ClassLearner[]>([]);
   const [classStep, setClassStep] = useState<1 | 2 | 3>(1);
   const [workspaceTab, setWorkspaceTab] = useState<"overview" | "learners" | "schedule" | "lessons">("overview");
+  useAppUpdateGuard(formOpen || editSection ? "Save or close your class setup before updating." : "");
   const selectedClass = classes.find((item) => item.id === activeClassId) || classes[0];
   const selectedPlans = savedPlans.filter((plan) => plan.classId === selectedClass?.id);
   const currentPlan = selectedPlans[0];
@@ -2425,6 +2431,7 @@ function PlanView({ cloudAvailable, classes, persistedPlans, onAllPlans, onDelet
   const [fullPlanDraftError, setFullPlanDraftError] = useState("");
   const [fullPlanDraftStatus, setFullPlanDraftStatus] = useState("");
   const [printingPlan, setPrintingPlan] = useState(false);
+  useAppUpdateGuard(dirty ? "Save your lesson before updating." : draftingFullPlan || downloadingDocx || printingPlan || revisionScope ? "Finish the lesson draft, review, or export before updating." : "");
   const documentRef = useRef<HTMLElement>(null);
   const incompletePlanSections = useMemo(() => [
     !subject.trim() && "lesson subject",
@@ -2976,6 +2983,7 @@ function LibraryView({ scope, classes, activeClassId, authenticated, teacherAcco
   const [submission, setSubmission] = useState<ResourceSubmission>(emptyResourceSubmission);
   const [submissionFile, setSubmissionFile] = useState<File>();
   const [sharingRightsConfirmed, setSharingRightsConfirmed] = useState(false);
+  useAppUpdateGuard(submitting || Object.keys(downloadProgress).length ? "Wait for the resource upload or download to finish before updating." : submissionOpen || commentInput.trim() ? "Finish or close the resource form and send or clear your comment before updating." : "");
   const activeClass = classes.find((item) => item.id === activeClassId);
 
   useEffect(() => {
@@ -3193,6 +3201,8 @@ function AttendanceView({ classes, activeClassId, attendanceRecords, attendanceN
   const [notes, setNotes] = useState<Record<string, string>>(() => selectedClass ? attendanceNotesForClass(selectedClass, attendanceNotes, selectedDate) : {});
   const [saved, setSaved] = useState(false);
 
+  useAppUpdateGuard(!saved && selectedClass && (JSON.stringify(statuses) !== JSON.stringify(attendanceForClass(selectedClass, attendanceRecords, selectedDate)) || JSON.stringify(notes) !== JSON.stringify(attendanceNotesForClass(selectedClass, attendanceNotes, selectedDate))) ? "Save attendance before updating." : "");
+
   function chooseClass(classId: string) {
     const nextClass = classes.find((item) => item.id === classId);
     setSelectedClassId(classId);
@@ -3326,6 +3336,7 @@ function CommunityView({ authenticated, teacherAccountId, teacherName, guestMent
   const [replyResourceId, setReplyResourceId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ kind: "question" | "reply"; id: string }>();
+  useAppUpdateGuard(submitting ? "Wait for your teacher post to finish before updating." : composerOpen || questionTitle.trim() || questionBody.trim() || reply.trim() || replyResourceId ? "Finish or clear your teacher question or reply before updating." : "");
   const [teacherResources, setTeacherResources] = useState<LibraryResource[]>([]);
 
   useEffect(() => {
