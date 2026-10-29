@@ -1,9 +1,11 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { OfflineReadiness } from "@/components/offline-readiness";
+import { InstallAppButton } from "@/components/app-install";
+import { openAppInstall } from "@/lib/pwa-install";
 import { downloadOfflineResource, getOfflineResource, listOfflineResources, removeOfflineResource, waitForOfflineResourceLink, type OfflineResource } from "@/lib/offline-resources";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { GabayMascot } from "@/components/gabay-mascot";
@@ -1340,7 +1342,7 @@ export default function Home() {
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" data-tour="nav-community" aria-label="Ask teachers" onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span>Ask teachers</span></button>
         </nav>
 
-        <OfflineReadiness key={workspaceScope} scope={workspaceScope} persisted={localWorkspacePrepared} storageError={storageError} pendingCount={pendingWrites.length} cloudVerified={cloudAvailable} online={online} />
+        <div className="sidebar-device-tools"><InstallAppButton /><OfflineReadiness key={workspaceScope} scope={workspaceScope} persisted={localWorkspacePrepared} storageError={storageError} pendingCount={pendingWrites.length} cloudVerified={cloudAvailable} online={online} /></div>
 
         <div className="account-anchor desktop-account">
           {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} />}
@@ -1372,7 +1374,7 @@ export default function Home() {
             </div>
             <div className="account-anchor mobile-account">
               <button className="mobile-account-button" type="button" aria-label="Account options" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>{teacherInitials(teacherName)}</button>
-              {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} />}
+              {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} offlineStatus={<OfflineReadiness scope={workspaceScope} persisted={localWorkspacePrepared} storageError={storageError} pendingCount={pendingWrites.length} cloudVerified={cloudAvailable} online={online} />} />}
             </div>
           </div>
         </header>
@@ -1474,6 +1476,7 @@ function LoginScreen({ name, email, onNameChange, onEmailChange, onSignIn, onCre
         <div className="login-divider"><span>or</span></div>
         {guestAccessEnabled && <button className="prototype-button guest-start-button" type="button" onClick={() => setFormMode("guest")}>Continue as guest <span>→</span></button>}
         <button className="prototype-button" type="button" onClick={onContinue}>Offline demo <span>→</span></button>
+        <InstallAppButton className="install-app-button login-install-button" />
         <p className="demo-note"><span>i</span><b>Offline demo</b> Stays on this device. It does not connect to Gabay AI or other teachers.</p>
         </>}
         {resetOpen && <AccountDialog kind="reset" name={name} school="" email={email} guest={false} authenticated={false} onClose={() => setResetOpen(false)} onSave={async () => ({ ok: false })} />}
@@ -1530,14 +1533,16 @@ function KalingaFooterArtwork() {
   );
 }
 
-function AccountMenu({ name, email, guest, onSignOut, onSettings, onHelp }: { name: string; email: string; guest: boolean; onSignOut: () => void; onSettings: () => void; onHelp: () => void }) {
+function AccountMenu({ name, email, guest, onSignOut, onSettings, onHelp, offlineStatus }: { name: string; email: string; guest: boolean; onSignOut: () => void; onSettings: () => void; onHelp: () => void; offlineStatus?: ReactNode }) {
   return (
     <div className="account-menu" role="menu" aria-label="Account options">
       <div className="account-menu-heading"><span className="avatar">{teacherInitials(name)}</span><span><strong>{teacherLabel(name)}</strong><small>{guest ? "Guest · remembered in this browser" : email}</small></span></div>
       <div className="account-menu-options">
         <button type="button" role="menuitem" onClick={onSettings}><span>◎</span> Account settings</button>
         <button type="button" role="menuitem" onClick={onHelp}><span>?</span> Help &amp; support</button>
+        <InstallAppButton menuItem onOpen={openAppInstall} />
       </div>
+      {offlineStatus && <div className="account-offline-status">{offlineStatus}</div>}
       <button className="signout-button" type="button" role="menuitem" onClick={onSignOut}><span>↪</span> Sign out</button>
     </div>
   );

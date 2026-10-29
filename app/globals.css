@@ -2127,3 +2127,44 @@ html { scroll-behavior: smooth; }
 .offline-pdf-controls button { padding: 10px 12px; border: 1px solid #cbd8d4; border-radius: 8px; background: white; color: #176c66; }
 .offline-pdf-controls button:disabled { opacity: .45; }
 .offline-pdf-viewer details { padding: 12px; background: white; line-height: 1.6; }
+.sidebar-device-tools { margin-top: auto; display: grid; gap: 9px; }
+.sidebar-device-tools .sidebar-status { margin-top: 0; }
+.install-app-button { min-height: 44px; padding: 10px 14px; border: 1px solid #a8ccc4; border-radius: 10px; color: #176c66; background: #f0f8f5; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
+.install-app-button:hover { background: #e0f0ea; border-color: #187873; }
+.login-install-button { width: 100%; margin-top: 10px; }
+.account-menu .install-app-button { display: block; padding: 12px 10px; color: #176c66; }
+.account-offline-status { margin: 9px 0; }
+.install-dialog { width: min(560px, calc(100vw - 28px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #bed7d0; border-radius: 18px; color: var(--ink); background: #fffdf8; box-shadow: 0 24px 80px rgba(21, 43, 39, .25); overflow: auto; }
+.install-dialog::backdrop { background: rgba(22, 38, 39, .46); }
+.install-dialog > header { display: flex; align-items: center; gap: 13px; padding: 24px; border-bottom: 1px solid #d9e5df; background: #edf6f1; }
+.install-dialog > header > div { min-width: 0; flex: 1; }
+.install-dialog > header .eyebrow { margin: 0 0 5px; font-size: 10px; color: #176c66; }
+.install-dialog h2 { margin: 0; font-size: 26px; line-height: 1.2; }
+.install-close { width: 44px; height: 44px; flex-shrink: 0; border: 1px solid #bfd8cf; border-radius: 10px; color: #176c66; background: #fffdf8; font-size: 26px; cursor: pointer; }
+.install-dialog-body { padding: 24px; font-size: 15px; line-height: 1.6; }
+.install-dialog-body p { margin: 0 0 16px; }
+.install-intro { color: #56676a; }
+.install-native { padding: 18px; margin-bottom: 20px; border-radius: 12px; background: #f5eee2; }
+.install-native .primary-button { min-height: 48px; width: 100%; justify-content: center; font-size: 16px; }
+.install-device { font-weight: 750; color: #176c66; }
+.install-steps { margin: 0 0 24px; padding-left: 25px; list-style: decimal; }
+.install-steps li { padding-left: 6px; margin-bottom: 12px; }
+.install-steps li::marker { color: #bd4c28; font-weight: 800; }
+.install-offline { padding: 18px; border: 1px solid #c4ded3; border-radius: 12px; background: #eef7f1; }
+.install-dialog h3 { margin: 0 0 10px; font-size: 18px; }
+.install-offline small { display: block; color: #5c6e69; font-size: 13px; line-height: 1.55; }
+.install-offline .install-preparation { font-size: 13px; font-weight: 700; color: #68634f; }
+.install-offline .install-preparation.prepared { color: #176c66; }
+.install-offline .text-button { min-height: 44px; padding: 8px 0; font-size: 14px; }
+.install-result, .install-success { padding: 14px; border-radius: 10px; background: #f8ebdc; }
+.install-success { margin-bottom: 20px; background: #e5f3ec; }
+.install-success p { margin: 0; }
+.install-dialog > footer { display: flex; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid #e1e7df; }
+.install-dialog > footer button { min-height: 44px; min-width: 100px; font-size: 15px; }
+@media (max-width: 480px) {
+  .install-dialog > header { padding: 18px; gap: 10px; }
+  .install-dialog > header img { width: 42px; height: 42px; }
+  .install-dialog h2 { font-size: 23px; }
+  .install-dialog-body { padding: 18px; }
+}
+@media print { .install-dialog { display: none !important; } }
