@@ -19,6 +19,8 @@ test("installation is offered at sign-in and acceptance is separate from offline
   await dialog.getByRole("button", { name: "Install app", exact: true }).click();
   await expect(dialog.getByText("Finish installing in your browser.", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Kalinga is installed", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText(/Sign in and wait for “Ready for offline teaching”/)).not.toBeVisible();
+  await dialog.getByText("After installing: prepare for offline teaching", { exact: true }).click();
   await expect(dialog.getByText(/Sign in and wait for “Ready for offline teaching”/)).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
   await expect(dialog.getByText("Kalinga is installed", { exact: true })).toBeVisible();
@@ -82,4 +84,28 @@ test("an already-open installed app does not advertise installing again", async 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Welcome back, Teacher", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Install Kalinga", exact: true })).toHaveCount(0);
+});
+
+test("Mac Chrome guidance explains Guest profiles and supports choosing Dia or Opera", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { get: () => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36" });
+    Object.defineProperty(navigator, "platform", { get: () => "MacIntel" });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Install Kalinga", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Install Kalinga" });
+  await expect(dialog.getByText("Chrome on Mac", { exact: true })).toBeVisible({ timeout: 3000 });
+  await expect(dialog.getByText(/Guest/).first()).toBeVisible();
+  await expect(dialog.getByText(/Cast, save, and share/)).toBeVisible();
+  for (const browser of ["dia", "opera"]) {
+    await dialog.getByLabel("Your browser").selectOption(browser);
+    await expect(dialog.getByText(/Add to Dock/).first()).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Install app", exact: true })).toHaveCount(0);
+    await expect(dialog.getByText(/current browser/).first()).toBeVisible();
+  }
+  await expect(dialog.getByRole("button", { name: "Use Kalinga in this browser", exact: true })).toBeInViewport({ timeout: 1000 });
+  await page.screenshot({ path: "/private/tmp/kalinga-install-checks/install-mac-browser-guide.png" });
+  await dialog.getByRole("button", { name: "Use Kalinga in this browser", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Install Kalinga", exact: true })).toBeFocused();
 });

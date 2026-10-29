@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createInstallController, installInstructions } from "@/lib/pwa-install";
+import { createInstallController, installInstructions, installationLink } from "@/lib/pwa-install";
 
 function invitation(outcome: "accepted" | "dismissed" = "accepted") {
   const event = new Event("beforeinstallprompt", { cancelable: true });
@@ -51,5 +51,23 @@ describe("Kalinga installation", () => {
     expect(installInstructions("Android Chrome/140", "Linux", 1).steps.join(" ")).toContain("Install app");
     expect(installInstructions("Macintosh Version/20 Safari/600", "MacIntel", 0).steps.join(" ")).toContain("Add to Dock");
     expect(installInstructions("Windows Firefox/140", "Win32", 0).steps.join(" ")).toContain("Chrome or Edge");
+  });
+  it("gives Chrome its real install command and explains a Guest window without claiming to detect one", () => {
+    const guide = installInstructions("Macintosh Chrome/140 Safari/537.36", "MacIntel", 0);
+    expect(guide.device).toBe("Chrome on Mac");
+    expect(guide.steps.join(" ")).toContain("Install page as app");
+    expect(guide.steps.join(" ")).toContain("Guest");
+    expect(guide.steps.join(" ")).not.toContain("Open Kalinga in Chrome or Edge");
+  });
+  it.each(["dia", "opera"] as const)("allows a manual %s choice when a browser identifies itself as Chrome", (browser) => {
+    const guide = installInstructions("Macintosh Chrome/140 Safari/537.36", "MacIntel", 0, browser);
+    expect(guide.browser).toBe(browser);
+    expect(guide.steps.join(" ")).toContain("Safari");
+    expect(guide.steps.join(" ")).toContain("Add to Dock");
+    expect(guide.note).toContain("current browser");
+  });
+  it("copies only the public application URL, never an email callback or private route", () => {
+    expect(installationLink("https://kalinga.test/?confirmed=1#access_token=private&refresh_token=secret")).toBe("https://kalinga.test/");
+    expect(installationLink("https://kalinga.test/private/path?token=private")).toBe("https://kalinga.test/");
   });
 });
