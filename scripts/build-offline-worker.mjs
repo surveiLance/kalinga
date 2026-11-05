@@ -17,7 +17,7 @@ export async function buildOfflineWorker(root = process.cwd()) {
   const inventory = [...staticFiles.map((p) => ["/_next/static/" + relative(join(root, ".next/static"), p), p]), ...publicFiles.map((p) => ["/" + relative(join(root, "public"), p), p])].sort(([a], [b]) => a.localeCompare(b));
   const hash = createHash("sha256");
   const hashes = {};
-  for (const [url, path] of inventory) { const content = await readFile(path); hash.update(url).update(content); hashes[url] = createHash("sha256").update(content).digest("hex"); }
+  for (const [url, path] of inventory) { const content = await readFile(path); hash.update(url).update(content); hashes[url] = [createHash("sha256").update(content).digest("hex"), content.length]; }
   const template = await readFile(new URL("./offline-worker.js", import.meta.url), "utf8");
   hash.update(template);
   const version = hash.digest("hex").slice(0, 20);

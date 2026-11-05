@@ -22,7 +22,7 @@ test.beforeAll(async () => {
     if (request.url === "/kalinga-sw.js") {
       response.setHeader("Content-Type", "application/javascript");
       const assets = ["/offline/shell.html", version === "B" ? "/missing.js" : `/build-${version}.js`];
-      const hashes = Object.fromEntries(assets.map((url) => [url, createHash("sha256").update(url.endsWith(".html") ? shell() : "window.fixture = true;").digest("hex")]));
+      const hashes = Object.fromEntries(assets.map((url) => { const content = url.endsWith(".html") ? shell() : "window.fixture = true;"; return [url, [createHash("sha256").update(content).digest("hex"), Buffer.byteLength(content)]]; }));
       response.end(template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)).replaceAll("__KALINGA_HASHES__", JSON.stringify(hashes)));
     } else if (request.url === "/missing.js" || request.url === "/build-D.js" && interruptedDownloads++ === 0) { response.writeHead(503); response.end("interrupted"); }
     else if (request.url?.endsWith(".js")) { response.setHeader("Content-Type", "application/javascript"); response.end("window.fixture = true;"); }

@@ -13,9 +13,15 @@ async function download(cache, url) {
     if (response) {
       if (response.ok && !response.redirected && (url.endsWith(".html") || !/text\/html/i.test(response.headers.get("content-type") || ""))) {
         try {
-          const digest = await crypto.subtle.digest("SHA-256", await response.clone().arrayBuffer());
-          if (Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("") !== HASHES[url]) throw new Error("The application file belongs to a different build. Check for updates.");
-          await cache.put(url, response); return;
+          const [expected, size] = HASHES[url];
+          const content = await response.clone().arrayBuffer();
+          const trimmed = /^\/_next\/static\/chunks\/turbopack-[\w-]+\.js$/.test(url) && content.byteLength > size;
+          const bytes = trimmed ? content.slice(0, size) : content;
+          const digest = await crypto.subtle.digest("SHA-256", bytes);
+          if (Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("") !== expected) throw new Error("The application file belongs to a different build. Check for updates.");
+          if (trimmed) { const headers = new Headers(response.headers); for (const name of ["Content-Encoding", "Content-Length", "ETag"]) headers.delete(name); await cache.put(url, new Response(bytes, { headers })); }
+          else await cache.put(url, response);
+          return;
         }
         catch (error) { if (attempt === 2) throw error; }
       } else if (attempt === 2 || response.status < 500 && ![408, 429].includes(response.status)) throw new Error("An application file could not be prepared.");

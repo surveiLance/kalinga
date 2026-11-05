@@ -4,17 +4,17 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { createHash } from "node:crypto";
 
-async function worker(fail = false, active = true, htmlInsteadOfScript = false, status = 200, clientIds = ["current"], fetchAsset?: (url: string) => Promise<Response>) {
+async function worker(fail = false, active = true, htmlInsteadOfScript = false, status = 200, clientIds = ["current"], fetchAsset?: (url: string) => Promise<Response>, scriptPath = "/_next/static/main.js") {
   const handlers: Record<string, (event: any) => void> = {};
   const records = new Map<string, Response>();
   const cache = { match: async (key: string) => records.get(key)?.clone(), put: async (key: string, value: Response) => { const saved = value.clone(); await value.arrayBuffer(); records.set(key, saved); }, keys: async () => [...records.keys()].map((url) => ({ url })) };
   let skipped = false;
   const self = { location: { origin: "https://kalinga.test" }, registration: { active }, clients: { claim: async () => {}, matchAll: async () => clientIds.map((id) => ({ id, url: "https://kalinga.test/" })) }, skipWaiting: () => { skipped = true; }, addEventListener: (type: string, fn: (event: any) => void) => { handlers[type] = fn; } };
-  const assets = ["/offline/shell.html", "/_next/static/main.js"];
-  const hashes = Object.fromEntries(assets.map((url) => [url, createHash("sha256").update(url.endsWith(".html") && !fetchAsset ? "clean document" : "asset").digest("hex")]));
+  const assets = ["/offline/shell.html", scriptPath];
+  const hashes = Object.fromEntries(assets.map((url) => { const content = url.endsWith(".html") && !fetchAsset ? "clean document" : "asset"; return [url, [createHash("sha256").update(content).digest("hex"), Buffer.byteLength(content)]]; }));
   const source = (await readFile(new URL("../scripts/offline-worker.js", import.meta.url), "utf8")).replaceAll("__KALINGA_VERSION__", JSON.stringify("test")).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)).replaceAll("__KALINGA_HASHES__", JSON.stringify(hashes));
   const crypto = { subtle: { digest: async (_algorithm: string, content: ArrayBuffer) => new Uint8Array(createHash("sha256").update(Buffer.from(content)).digest()).buffer } };
-  runInNewContext(source, { self, URL, Response, Request, AbortController, AbortSignal, setTimeout, clearTimeout, crypto, caches: { open: async () => cache, keys: async () => ["kalinga-app-test"], delete: async () => { records.clear(); } }, fetch: async (request: string | { url: string }) => { if (fail) throw new Error("offline"); const url = typeof request === "string" ? request : request.url; if (fetchAsset) return fetchAsset(url); return new Response(url === "/offline/shell.html" ? "clean document" : "asset", { status, headers: { "Content-Type": htmlInsteadOfScript || url.endsWith(".html") ? "text/html" : "application/javascript" } }); } });
+  runInNewContext(source, { self, URL, Headers, Response, Request, AbortController, AbortSignal, setTimeout, clearTimeout, crypto, caches: { open: async () => cache, keys: async () => ["kalinga-app-test"], delete: async () => { records.clear(); } }, fetch: async (request: string | { url: string }) => { if (fail) throw new Error("offline"); const url = typeof request === "string" ? request : request.url; if (fetchAsset) return fetchAsset(url); return new Response(url === "/offline/shell.html" ? "clean document" : "asset", { status, headers: { "Content-Type": htmlInsteadOfScript || url.endsWith(".html") ? "text/html" : "application/javascript" } }); } });
   return { handlers, records, skipped: () => skipped };
 }
 
@@ -152,5 +152,14 @@ describe("offline service worker boundaries", () => {
     expect(reply?.ok).toBe(false);
     expect(app.records.has("/offline/shell.html")).toBe(false);
     expect(app.records.has("/_next/static/main.js")).toBe(true);
+  });
+  it("caches the verified runtime without a hosting toolbar appended after the build", async () => {
+    const path = "/_next/static/chunks/turbopack-runtime.js";
+    const app = await worker(false, false, false, 200, ["current"], async (url) => new Response(url === path ? "asset\n;console.log('hosting toolbar');" : "asset", { headers: { "Content-Type": url.endsWith(".html") ? "text/html" : "application/javascript" } }), path);
+    let task!: Promise<void>;
+    app.handlers.install({ waitUntil(p: Promise<void>) { task = p; } });
+    await task;
+    expect(await app.records.get(path)!.text()).toBe("asset");
+    expect(app.records.has("/offline/ready")).toBe(true);
   });
 });
