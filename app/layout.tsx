@@ -4,6 +4,7 @@ import "./globals.css";
 import { OfflineAvailability } from "@/components/offline-availability";
 import { AppInstall } from "@/components/app-install";
 import { AppUpdates } from "@/components/app-updates";
+import { AppLaunch } from "@/components/app-launch";
 
 const nunito = Nunito({
   weight: "variable",
@@ -31,5 +32,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${nunito.variable} ${ptSans.variable}`}><body><OfflineAvailability /><AppInstall /><AppUpdates />{children}</body></html>;
+  return <html lang="en" className={`${nunito.variable} ${ptSans.variable}`}><body><OfflineAvailability /><AppInstall /><AppUpdates /><AppLaunch />{children}</body></html>;
 }

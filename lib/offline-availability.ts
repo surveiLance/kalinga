@@ -9,25 +9,32 @@ function publish(value: OfflineAvailabilityState) { availability = value; window
 export function offlinePageMatchesAssets(pageAssets: string[], cachedAssets: string[]) {
   return pageAssets.length > 0 && pageAssets.every((url) => cachedAssets.includes(url));
 }
-function workerMessage<T>(worker: ServiceWorker, message: Record<string, unknown>) {
+function workerMessage<T>(worker: ServiceWorker, message: Record<string, unknown>, timeout = 8000) {
   return new Promise<T>((resolve, reject) => {
     const channel = new MessageChannel();
-    const timer = window.setTimeout(() => { channel.port1.close(); reject(new Error("Preparation check timed out")); }, 8000);
+    const timer = window.setTimeout(() => { channel.port1.close(); reject(new Error("Preparation check timed out")); }, timeout);
     channel.port1.onmessage = (event) => { window.clearTimeout(timer); channel.port1.close(); resolve(event.data); };
     worker.postMessage(message, [channel.port2]);
   });
 }
 export function offlineUpdateReady(update: { prepared: boolean; canApplyUpdate?: boolean }) { return update.prepared && update.canApplyUpdate === true; }
-function status(worker: ServiceWorker) { return workerMessage<{ version: string; prepared: boolean; assets: string[]; canApplyUpdate?: boolean }>(worker, { type: "OFFLINE_STATUS" }); }
+function status(worker: ServiceWorker) { return workerMessage<{ version: string; prepared: boolean; assets: string[]; canApplyUpdate?: boolean; canPrepareOffline?: boolean }>(worker, { type: "OFFLINE_STATUS" }); }
 async function checkRegistration(registration: ServiceWorkerRegistration) {
   if (availability.updating || !navigator.serviceWorker.controller) return;
   try {
-    const result = await status(navigator.serviceWorker.controller);
+    const controller = navigator.serviceWorker.controller;
+    let result = await status(controller);
     const pageAssets = Array.from(document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>('script[src],link[rel="stylesheet"]')).map((item) => new URL(item instanceof HTMLScriptElement ? item.src : item.href).pathname).filter((path) => path.startsWith("/_next/static/"));
-    const prepared = result.prepared && offlinePageMatchesAssets(pageAssets, result.assets);
     const updateReady = registration.waiting ? offlineUpdateReady(await status(registration.waiting)) : false;
+    if (!result.prepared && !updateReady && result.canPrepareOffline && navigator.onLine && offlinePageMatchesAssets(pageAssets, result.assets)) {
+      publish({ ...availability, state: "preparing", prepared: false, message: "Restoring offline application files. Keep Kalinga open and connected." });
+      const repair = await workerMessage<{ ok: boolean; message?: string }>(controller, { type: "PREPARE_OFFLINE", version: result.version }, 180000);
+      if (!repair.ok) { publish({ ...availability, state: "error", prepared: false, message: repair.message || "Offline preparation failed. Reconnect and retry." }); return; }
+      result = await status(controller);
+    }
+    const prepared = result.prepared && offlinePageMatchesAssets(pageAssets, result.assets);
     publish({ state: updateReady || !prepared ? "update" : "ready", prepared, updateReady, message: updateReady ? "Update downloaded. Open App updates to refresh this window safely." : registration.installing ? "Downloading application files. You can keep working." : prepared ? "Application files available offline" : "Application files need preparation. Check for updates while connected." });
-  } catch { publish({ ...availability, message: "Offline files could not be checked. Reconnect and retry preparation." }); }
+  } catch { publish({ ...availability, state: availability.prepared ? availability.state : "error", message: "Offline files could not be checked. Reconnect and retry preparation." }); }
 }
 function observeRegistration(registration: ServiceWorkerRegistration) {
   const watch = () => {
@@ -41,13 +48,23 @@ export async function prepareOfflineApplication() {
   if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) { publish({ state: "unsupported", prepared: false, message: "Offline preparation needs the published app and a supported browser" }); return; }
   if (checking || availability.updating) return checking;
   checking = (async () => {
-  publish({ ...availability, state: "preparing", message: "Preparing application files…" });
+  publish({ ...availability, state: "preparing", message: "Preparing offline access. Keep Kalinga open and connected until preparation finishes." });
+  let registration: ServiceWorkerRegistration | undefined;
   try {
-    const registration = await Promise.race([navigator.serviceWorker.register("/kalinga-sw.js", { updateViaCache: "none" }), new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Preparation took too long")), 15000))]);
+    registration = await navigator.serviceWorker.getRegistration();
+    if (registration) { observeRegistration(registration); await checkRegistration(registration); }
+    if (!navigator.onLine) {
+      if (!availability.prepared) publish({ ...availability, state: "error", message: "Connect to the internet once in this app window to finish preparing offline access." });
+      return;
+    }
+    registration = await Promise.race([navigator.serviceWorker.register("/kalinga-sw.js", { updateViaCache: "none" }), new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Preparation took too long")), 15000))]);
     observeRegistration(registration);
     await checkRegistration(registration);
     window.setTimeout(() => { if (availability.state === "preparing") publish({ ...availability, state: "error", message: "Preparation is not complete. Reconnect and retry." }); }, 90000);
-  } catch { publish({ ...availability, state: "error", message: "Offline preparation failed. Reconnect and retry." }); }
+  } catch {
+    if (registration && navigator.serviceWorker.controller) await checkRegistration(registration);
+    else publish({ ...availability, state: "error", message: "Offline preparation failed. Reconnect and retry." });
+  }
   })();
   try { await checking; } finally { checking = undefined; }
 }

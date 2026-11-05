@@ -16,12 +16,13 @@ export async function buildOfflineWorker(root = process.cwd()) {
   const publicFiles = (await files(join(root, "public"))).filter((p) => /^(offline\/|favicon\.svg$|kalinga-logo\.png$|gabay-[^/]+\.png$)/.test(relative(join(root, "public"), p)) && !p.endsWith(".map"));
   const inventory = [...staticFiles.map((p) => ["/_next/static/" + relative(join(root, ".next/static"), p), p]), ...publicFiles.map((p) => ["/" + relative(join(root, "public"), p), p])].sort(([a], [b]) => a.localeCompare(b));
   const hash = createHash("sha256");
-  for (const [url, path] of inventory) hash.update(url).update(await readFile(path));
+  const hashes = {};
+  for (const [url, path] of inventory) { const content = await readFile(path); hash.update(url).update(content); hashes[url] = createHash("sha256").update(content).digest("hex"); }
   const template = await readFile(new URL("./offline-worker.js", import.meta.url), "utf8");
   hash.update(template);
   const version = hash.digest("hex").slice(0, 20);
   const assets = inventory.map(([url]) => url);
-  await writeFile(join(root, "public/kalinga-sw.js"), template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)));
+  await writeFile(join(root, "public/kalinga-sw.js"), template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)).replaceAll("__KALINGA_HASHES__", JSON.stringify(hashes)));
   return { version, assets };
 }
 

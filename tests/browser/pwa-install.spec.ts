@@ -19,8 +19,6 @@ test("installation is offered at sign-in and acceptance is separate from offline
   await dialog.getByRole("button", { name: "Install app", exact: true }).click();
   await expect(dialog.getByText("Finish installing in your browser.", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Kalinga is installed", { exact: true })).toHaveCount(0);
-  await expect(dialog.getByText(/Sign in and wait for “Ready for offline teaching”/)).not.toBeVisible();
-  await dialog.getByText("After installing: prepare for offline teaching", { exact: true }).click();
   await expect(dialog.getByText(/Sign in and wait for “Ready for offline teaching”/)).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
   await expect(dialog.getByText("Kalinga is installed", { exact: true })).toBeVisible();
@@ -67,6 +65,7 @@ test("the browser can read the manifest and fetch Android and Apple installation
   const data = JSON.parse(manifest.data!);
   expect(data.display).toBe("standalone");
   expect(data.start_url).toBe("/");
+  expect(data.launch_handler?.client_mode).toBe("focus-existing");
   expect(data.icons).toEqual(expect.arrayContaining([expect.objectContaining({ purpose: "maskable", sizes: "512x512" })]));
   for (const icon of data.icons) {
     const response = await request.get(icon.src);
@@ -84,6 +83,27 @@ test("an already-open installed app does not advertise installing again", async 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Welcome back, Teacher", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Install Kalinga", exact: true })).toHaveCount(0);
+});
+
+test("checking preparation repairs missing cached files before an offline cold launch", async ({ context, page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Offline demo", exact: false }).click();
+  await page.getByRole("button", { name: "Keep sidebar open", exact: true }).click();
+  await expect(page.getByText("Ready for offline teaching", { exact: true })).toBeVisible({ timeout: 90000 });
+  const missing = await page.evaluate(async () => {
+    const name = (await caches.keys()).find((key) => key.startsWith("kalinga-app-"))!;
+    const cache = await caches.open(name);
+    const file = (await cache.keys()).find((request) => /\/_next\/static\/.*\.js$/.test(new URL(request.url).pathname))!.url;
+    await cache.delete(file); await cache.delete("/offline/ready");
+    return { name, file };
+  });
+  await page.locator(".offline-readiness summary").click();
+  await page.getByRole("button", { name: "Check preparation", exact: true }).click();
+  await expect.poll(() => page.evaluate(async ({ name, file }) => !!await (await caches.open(name)).match(file), missing)).toBe(true);
+  await expect(page.getByText("Ready for offline teaching", { exact: true })).toBeVisible();
+  await page.close(); await context.setOffline(true);
+  const reopen = await context.newPage(); await reopen.goto("/");
+  await expect(reopen.getByRole("heading", { name: "Welcome back, Teacher", exact: true })).toBeVisible();
 });
 
 test("Mac Chrome guidance explains Guest profiles and supports choosing Dia or Opera", async ({ page }) => {

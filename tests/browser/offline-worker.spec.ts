@@ -1,9 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 let server: Server;
 let version = "A";
+let interruptedDownloads = 0;
 const origin = "http://127.0.0.1:3131";
+function shell() { return `<html><head><title>Build ${version}</title></head><body><h1>Build ${version}</h1><textarea aria-label="Lesson notes"></textarea></body></html>`; }
 async function workerStatus(page: Page) {
   return page.evaluate(async () => {
     const channel = new MessageChannel();
@@ -18,14 +21,28 @@ test.beforeAll(async () => {
     response.setHeader("Cache-Control", "no-store");
     if (request.url === "/kalinga-sw.js") {
       response.setHeader("Content-Type", "application/javascript");
-      response.end(template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(["/offline/shell.html", version === "B" ? "/missing.js" : `/build-${version}.js`])));
-    } else if (request.url === "/missing.js") { response.writeHead(503); response.end("interrupted"); }
+      const assets = ["/offline/shell.html", version === "B" ? "/missing.js" : `/build-${version}.js`];
+      const hashes = Object.fromEntries(assets.map((url) => [url, createHash("sha256").update(url.endsWith(".html") ? shell() : "window.fixture = true;").digest("hex")]));
+      response.end(template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)).replaceAll("__KALINGA_HASHES__", JSON.stringify(hashes)));
+    } else if (request.url === "/missing.js" || request.url === "/build-D.js" && interruptedDownloads++ === 0) { response.writeHead(503); response.end("interrupted"); }
     else if (request.url?.endsWith(".js")) { response.setHeader("Content-Type", "application/javascript"); response.end("window.fixture = true;"); }
-    else { response.setHeader("Content-Type", "text/html"); response.end(`<html><head><title>Build ${version}</title></head><body><h1>Build ${version}</h1><textarea aria-label="Lesson notes"></textarea></body></html>`); }
+    else { response.setHeader("Content-Type", "text/html"); response.end(shell()); }
   });
   await new Promise<void>((resolve) => server.listen(3131, "127.0.0.1", resolve));
 });
+test("a first installation survives an interrupted download and opens in a new offline window", async ({ context, page }) => {
+  version = "D"; interruptedDownloads = 0;
+  await page.goto(origin);
+  await page.evaluate(async () => { await navigator.serviceWorker.register("/kalinga-sw.js"); await navigator.serviceWorker.ready; });
+  await expect.poll(async () => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  expect(await workerStatus(page)).toEqual(expect.objectContaining({ version: "D", prepared: true }));
+  expect(interruptedDownloads).toBe(2);
+  await page.close(); await context.setOffline(true);
+  const reopen = await context.newPage(); await reopen.goto(origin);
+  await expect(reopen.getByRole("heading", { name: "Build D" })).toBeVisible();
+});
 test.afterAll(async () => { await new Promise<void>((resolve) => server.close(() => resolve())); });
+test.beforeEach(() => { version = "A"; interruptedDownloads = 0; });
 test("failed updates keep the old offline build and complete updates wait for unsaved clients", async ({ context, page }) => {
   await page.goto(origin);
   await page.evaluate(async () => { await navigator.serviceWorker.register("/kalinga-sw.js"); await navigator.serviceWorker.ready; });

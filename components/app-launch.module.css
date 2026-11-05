@@ -1,0 +1,1 @@
+.resume { position: fixed; z-index: 80; top: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); min-height: 44px; box-shadow: var(--shadow-md); }

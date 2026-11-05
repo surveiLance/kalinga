@@ -218,11 +218,12 @@ test("a downloaded update protects an unsaved lesson then refreshes the same win
   const template = await readFile("scripts/offline-worker.js", "utf8");
   const generated = await readFile("public/kalinga-sw.js", "utf8");
   const assets = JSON.parse(generated.match(/^const ASSETS = (.+);$/m)![1]);
+  const hashes = JSON.parse(generated.match(/^const HASHES = (.+);$/m)![1]);
   let version = "update-A";
   const server = createServer(async (request, response) => {
     if (request.url === "/kalinga-sw.js") {
       response.writeHead(200, { "Content-Type": "application/javascript", "Cache-Control": "no-store" });
-      response.end(template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)));
+      response.end(template.replaceAll("__KALINGA_VERSION__", JSON.stringify(version)).replaceAll("__KALINGA_ASSETS__", JSON.stringify(assets)).replaceAll("__KALINGA_HASHES__", JSON.stringify(hashes)));
     } else {
       try { const upstream = await fetch(`http://127.0.0.1:3120${request.url}`); response.writeHead(upstream.status, { "Content-Type": upstream.headers.get("content-type") || "application/octet-stream", "Cache-Control": "no-store" }); response.end(Buffer.from(await upstream.arrayBuffer())); }
       catch { response.writeHead(503); response.end("Fixture unavailable"); }
