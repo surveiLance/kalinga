@@ -1,4 +1,5 @@
 "use client";
+import { T } from "@/components/language-switch";
 import { useEffect, useRef, useState } from "react";
 import { applyApplicationUpdate, checkApplicationUpdate, readOfflineAvailability } from "@/lib/offline-availability";
 import { updateGuards } from "@/lib/app-update";
@@ -12,7 +13,7 @@ function useAvailability() {
 export function AppUpdateButton({ menuItem = false }: { menuItem?: boolean }) {
   const app = useAvailability();
   if (!menuItem && !app.updateReady) return null;
-  return <button className={menuItem ? "app-update-menu-button" : "app-update-notice"} type="button" role={menuItem ? "menuitem" : undefined} aria-haspopup="dialog" onClick={() => window.dispatchEvent(new Event("kalinga:update-open"))}>{menuItem ? "App updates" : "Update available"}</button>;
+  return <button className={menuItem ? "app-update-menu-button" : "app-update-notice"} type="button" role={menuItem ? "menuitem" : undefined} aria-haspopup="dialog" onClick={() => window.dispatchEvent(new Event("kalinga:update-open"))}><T>{menuItem ? "App updates" : "Update available"}</T></button>;
 }
 export function AppUpdates() {
   const dialog = useRef<HTMLDialogElement>(null);

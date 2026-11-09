@@ -1,6 +1,7 @@
 "use client";
 import { PromptHelper } from "@/components/prompt-helper";
 import promptStyles from "@/components/prompt-helper.module.css";
+import { formatInterfaceDate } from "@/lib/interface-language";
 import { T, useInterfaceLanguage, LanguageSwitch, GabayLanguageLabel, useInterfaceLanguageScope } from "@/components/language-switch";
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -949,13 +950,13 @@ export default function Home() {
             : pendingWrites.length ? "waiting"
               : cloudLoaded ? "synced" : "device";
   const syncLabel = {
-    blocked: `${blockedWrites.length || "Some"} ${blockedWrites.length === 1 ? "change needs" : "changes need"} attention`,
-    device: "Saved on this device",
-    offline: `Offline · ${pendingWrites.length} waiting`,
-    syncing: "Syncing…",
-    waiting: `${pendingWrites.length} waiting to sync`,
-    synced: "All work synced",
-    local: `${online ? "Sign in to sync" : "Offline"} · ${pendingWrites.length} changes waiting`,
+    blocked: t(blockedWrites.length === 1 ? "1 change needs attention" : blockedWrites.length ? "{count} changes need attention" : "Some changes need attention", { count: blockedWrites.length }),
+    device: t("Saved on this device"),
+    offline: t("Offline · {count} waiting", { count: pendingWrites.length }),
+    syncing: t("Syncing…"),
+    waiting: t("{count} waiting to sync", { count: pendingWrites.length }),
+    synced: t("All work synced"),
+    local: t("{status} · {count} changes waiting", { status: t(online ? "Sign in to sync" : "Offline"), count: pendingWrites.length }),
   }[syncState];
   const today = dateInputValue();
   const activePlans = savedPlans.filter((item) => item.classId === activeClass?.id);
@@ -1004,7 +1005,7 @@ export default function Home() {
       `${attendanceSavedCount} scheduled classes have attendance saved today`,
       nextTeachingBlock ? `Next class: ${nextTeachingBlock.className} at ${nextTeachingBlock.meeting.startTime}` : "No later scheduled class remains today",
     ] : [],
-    availableActions: pageActions[view].map(t),
+    availableActions: pageActions[view].map((label) => t(label)),
     offline: typeof navigator !== "undefined" && !navigator.onLine,
     ...livePageContext,
   };
@@ -1354,7 +1355,7 @@ export default function Home() {
 
         <nav className="nav-list">
           <button className={`nav-item ${view === "home" ? "active" : ""}`} type="button" data-tour="nav-home" aria-label={t("Today")} onClick={() => navigateFromSidebar(() => setView("home"))}><span className="nav-icon" aria-hidden="true">⌂</span><span><T>Today</T></span></button>
-          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" data-tour="nav-classes" aria-label="Classes &amp; learners" onClick={() => navigateFromSidebar(() => setView("classes"))}><span className="nav-icon" aria-hidden="true">▦</span><span>Classes &amp; learners</span></button>
+          <button className={`nav-item ${view === "classes" ? "active" : ""}`} type="button" data-tour="nav-classes" aria-label={t("Classes & learners")} onClick={() => navigateFromSidebar(() => setView("classes"))}><span className="nav-icon" aria-hidden="true">▦</span><span><T>Classes &amp; learners</T></span></button>
           <button className={`nav-item ${view === "plan" ? "active" : ""}`} type="button" data-tour="nav-plan" aria-label={t("Plan lessons")} onClick={() => navigateFromSidebar(openPlanLessons)}><span className="nav-icon" aria-hidden="true">✎</span><span><T>Plan lessons</T></span></button>
           <button className={`nav-item ${view === "library" ? "active" : ""}`} type="button" data-tour="nav-library" aria-label={t("Find resources")} onClick={() => navigateFromSidebar(() => setView("library"))}><span className="nav-icon" aria-hidden="true">▱</span><span><T>Find resources</T></span></button>
           <button className={`nav-item ${view === "community" ? "active" : ""}`} type="button" data-tour="nav-community" aria-label={t("Ask teachers")} onClick={() => navigateFromSidebar(() => { setCommunityTargetId(""); setCommunityResourceId(""); setView("community"); })}><span className="nav-icon" aria-hidden="true">♧</span><span><T>Ask teachers</T></span></button>
@@ -1366,7 +1367,7 @@ export default function Home() {
           {accountOpen && <AccountMenu name={teacherName} email={teacherEmail} guest={!!guestIdentity} onSignOut={() => void signOut()} onSettings={() => openAccountPanel("settings")} onHelp={() => openAccountPanel("help")} />}
           <button className="profile" type="button" aria-label={`Account options for ${teacherLabel(teacherName)}`} aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}>
             <span className="avatar">{teacherInitials(teacherName)}</span>
-            <span><strong>{teacherLabel(teacherName)}</strong><small>{schoolName.trim() || "Add your school in a lesson plan"}</small></span>
+            <span><strong>{teacherLabel(teacherName)}</strong><small>{schoolName.trim() || t("Add your school in a lesson plan")}</small></span>
             <span aria-hidden="true">···</span>
           </button>
         </div>
@@ -1384,10 +1385,10 @@ export default function Home() {
             <AppUpdateButton />
             <LanguageSwitch />
             {blockedWrites.length && !storageError
-              ? <button data-tour="sync-status" className={`connection ${syncState}`} type="button" onClick={retrySync} aria-label={`${syncLabel}. Retry sync now.`}><i /> {syncLabel} · Retry</button>
+              ? <button data-tour="sync-status" className={`connection ${syncState}`} type="button" onClick={retrySync} aria-label={`${syncLabel}. Retry sync now.`}><i /> {syncLabel} · {t("Retry")}</button>
               : <span data-tour="sync-status" className={`connection ${syncState}`} role="status"><i /> {syncLabel}</span>}
             <PageGuideButton onStart={openWalkthrough} />
-            <button data-tour="gabay-open" className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={`Ask Gabay about ${gabayPageLabels[view]}`} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b><T>Ask Gabay</T></b><small>{gabayPageLabels[view]} · AI assistant</small></span></button>
+            <button data-tour="gabay-open" className={`gabay-topbar-assistant ${gabayEventMessage ? "has-update" : ""}`} type="button" aria-label={t("Ask Gabay about {page}", { page: t(gabayPageLabels[view]) })} aria-haspopup="dialog" aria-expanded={gabayOpen} onClick={() => { setGabayEventMessage(""); setGabayOpen((open) => !open); }}><GabayMascot size="small" motion={gabayMotion} /><span><b><T>Ask Gabay</T></b><small>{t(gabayPageLabels[view])} · {t("AI assistant")}</small></span></button>
             <div className="notification-anchor">
               <button data-tour="notifications" className={`notification ${unreadNotifications.length ? "has-unread" : ""}`} type="button" aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ""}`} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><BellIcon />{unreadNotifications.length > 0 && <b>{Math.min(unreadNotifications.length, 9)}</b>}</button>
               {notificationsOpen && <NotificationPanel notifications={notifications} readIds={notificationReadIds} authenticated={cloudAvailable} onOpen={openNotification} onMarkAll={() => markNotificationsRead(unreadNotifications.map((item) => item.id))} />}
@@ -1414,11 +1415,11 @@ export default function Home() {
             {activeClass && <section className="home-essentials-grid home-quick-actions">
               <TodayScheduleSummary blocks={todayTeachingBlocks} onOpenClass={(classId) => { setActiveClassId(classId); setView("classes"); }} />
               <article className="home-action-card">
-                <div className="home-action-heading"><div><p className="eyebrow">WORKING WITH</p><h2>{activeClass.name}</h2><p>{gradeList(activeClass.grades)} · {activeClass.learners.length} learners</p></div>{classes.length > 1 && <select aria-label="Choose active class" value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>}</div>
+                <div className="home-action-heading"><div><p className="eyebrow"><T>Working with</T></p><h2>{activeClass.name}</h2><p>{activeClass.grades.map((grade) => t(gradeLabel(grade).replace(/Grade (.+)/, "Grade {grade}"), { grade })).join(", ")} · {t("{count} learners", { count: activeClass.learners.length })}</p></div>{classes.length > 1 && <select aria-label="Choose active class" value={activeClass.id} onChange={(event) => setActiveClassId(event.target.value)}>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>}</div>
                 <div data-tour="home-actions" className="home-essential-actions">
-                  <button type="button" onClick={() => latestPlan ? openTeachingPlan(latestPlan.id) : beginPlan()}><p><b>{latestPlan ? "Open teaching guide" : t("Plan a lesson")}</b><small>{latestPlan ? `${latestPlan.title} · ${corePlanTasksReady(latestPlan)}/3 core tasks ready.` : "Start with the essentials, then edit one task at a time."}</small></p><b>→</b></button>
-                  <button data-tour="attendance-open" type="button" onClick={() => setView("attendance")}><p><b><T>Take attendance</T></b><small>{activeAttendance.length ? `${activeAttendance.length} records saved. Open to review them.` : `Mark the status of ${activeClass.learners.length} learners.`}</small></p><b>→</b></button>
-                  <button type="button" onClick={() => setView("library")}><p><b><T>Find a resource</T></b><small>Browse materials matched to these grade levels.</small></p><b>→</b></button>
+                  <button type="button" onClick={() => latestPlan ? openTeachingPlan(latestPlan.id) : beginPlan()}><p><b>{latestPlan ? t("Open teaching guide") : t("Plan a lesson")}</b><small>{latestPlan ? `${latestPlan.title} · ${t("{count}/3 core tasks ready.", { count: corePlanTasksReady(latestPlan) })}` : t("Start with the essentials, then edit one task at a time.")}</small></p><b>→</b></button>
+                  <button data-tour="attendance-open" type="button" onClick={() => setView("attendance")}><p><b><T>Take attendance</T></b><small>{activeAttendance.length ? t("{count} records saved. Open to review them.", { count: activeAttendance.length }) : t("Mark the status of {count} learners.", { count: activeClass.learners.length })}</small></p><b>→</b></button>
+                  <button type="button" onClick={() => setView("library")}><p><b><T>Find a resource</T></b><small><T>Browse materials matched to these grade levels.</T></small></p><b>→</b></button>
                 </div>
               </article>
             </section>}
@@ -1628,7 +1629,7 @@ function FormattedGabayMessage({ text }: { text: string }) {
 }
 
 function GabayTodayBriefing({ teacherName, activeClass, blocks, nextBlock, missingPlanCount, attendanceSavedCount, latestUpdate, motion, onOpen, onSetUp, onLoadSample }: { teacherName: string; activeClass?: TeachingClass; blocks: TodayTeachingBlock[]; nextBlock?: TodayTeachingBlock; missingPlanCount: number; attendanceSavedCount: number; latestUpdate: string; motion: boolean; onOpen: () => void; onSetUp: () => void; onLoadSample: () => void }) {
-  const { t } = useInterfaceLanguage();
+  const { language, t } = useInterfaceLanguage();
   const headline = !activeClass
     ? t("Let’s set up your first class.")
     : !blocks.length
@@ -1640,24 +1641,25 @@ function GabayTodayBriefing({ teacherName, activeClass, blocks, nextBlock, missi
   return <section className={`gabay-today-briefing ${activeClass ? "" : "is-empty"}`} aria-label={`Gabay’s briefing for ${teacherLabel(teacherName)}`}>
     <button className="gabay-briefing-mascot" type="button" aria-label="Open Gabay" onClick={onOpen}><GabayMascot size="large" motion={motion} speaking /></button>
     <div className="gabay-briefing-copy">
-      <p>{displayDate(dateInputValue()).toUpperCase()} · GABAY</p>
+      <p>{formatInterfaceDate(language, new Date()).toUpperCase()} · GABAY</p>
       <h1><T>Hi,</T> {teacherLabel(teacherName)}. {headline}</h1>
       <span><T>{activeClass ? "Here’s what matters right now." : "Add it once, then I’ll carry its details into planning and attendance."}</T></span>
       {activeClass && <div className="gabay-briefing-updates">
-        <span><b>{blocks.length}</b> {blocks.length === 1 ? "class" : "classes"} today</span>
-        <span><b>{attendanceSavedCount}</b> attendance saved</span>
-        <span className={missingPlanCount ? "needs-attention" : "is-ready"}><b>{missingPlanCount}</b> {missingPlanCount === 1 ? "plan needed" : "plans needed"}</span>
+        <span>{t(blocks.length === 1 ? "1 class today" : "{count} classes today", { count: blocks.length })}</span>
+        <span>{t("{count} attendance saved", { count: attendanceSavedCount })}</span>
+        <span className={missingPlanCount ? "needs-attention" : "is-ready"}>{t(missingPlanCount === 1 ? "1 plan needed" : "{count} plans needed", { count: missingPlanCount })}</span>
       </div>}
-      {latestUpdate && <small className="gabay-briefing-latest"><b>Latest:</b> {latestUpdate}</small>}
+      {latestUpdate && <small className="gabay-briefing-latest"><b><T>Latest:</T></b> {latestUpdate}</small>}
     </div>
-    <div className="gabay-briefing-actions">{activeClass ? <button className="gabay-briefing-action" type="button" onClick={onOpen}><T>Ask Gabay</T> <span>→</span></button> : <><button data-tour="class-first" className="primary-button" type="button" onClick={onSetUp}><T>＋ Set up my first class</T></button><button className="gabay-sample-link" type="button" onClick={onLoadSample}>Preview sample data</button></>}</div>
+    <div className="gabay-briefing-actions">{activeClass ? <button className="gabay-briefing-action" type="button" onClick={onOpen}><T>Ask Gabay</T> <span>→</span></button> : <><button data-tour="class-first" className="primary-button" type="button" onClick={onSetUp}><T>＋ Set up my first class</T></button><button className="gabay-sample-link" type="button" onClick={onLoadSample}><T>Preview sample data</T></button></>}</div>
   </section>;
 }
 
 function TodayScheduleSummary({ blocks, onOpenClass }: { blocks: TodayTeachingBlock[]; onOpenClass: (classId: string) => void }) {
+  const { t } = useInterfaceLanguage();
   return <section className="today-schedule-summary">
-    <header><div><p className="eyebrow">TODAY’S SCHEDULE</p><h2>{blocks.length ? `${blocks.length} ${blocks.length === 1 ? "class" : "classes"}` : "No classes today"}</h2></div><span>{weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]}</span></header>
-    {blocks.length ? <div className="today-schedule-list">{blocks.map((block) => { const endTime = formatTime(toMinutes(block.meeting.startTime) + block.meeting.durationMinutes); return <article key={`${block.classId}-${block.meeting.id}`}><div className="today-schedule-time"><b>{block.meeting.startTime}</b><span>to {endTime}</span></div><div className="today-schedule-details"><b>{block.className}</b><span>{gradeList(block.grades)}</span><small>{block.meeting.durationMinutes} min · {block.meeting.label || "Class block"}</small></div><button type="button" onClick={() => onOpenClass(block.classId)}>Open <span>→</span></button></article>; })}</div> : <p className="today-schedule-empty">Nothing scheduled. You can use the time to prepare a lesson or browse resources.</p>}
+    <header><div><p className="eyebrow"><T>Today’s schedule</T></p><h2>{t(blocks.length ? blocks.length === 1 ? "1 class" : "{count} classes" : "No classes today", { count: blocks.length })}</h2></div><span>{t(weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1])}</span></header>
+    {blocks.length ? <div className="today-schedule-list">{blocks.map((block) => { const endTime = formatTime(toMinutes(block.meeting.startTime) + block.meeting.durationMinutes); return <article key={`${block.classId}-${block.meeting.id}`}><div className="today-schedule-time"><b>{block.meeting.startTime}</b><span>{t("to")} {endTime}</span></div><div className="today-schedule-details"><b>{block.className}</b><span>{block.grades.map((grade) => t(gradeLabel(grade).replace(/Grade (.+)/, "Grade {grade}"), { grade })).join(", ")}</span><small>{block.meeting.durationMinutes} min · {t(block.meeting.label || "Class block")}</small></div><button type="button" onClick={() => onOpenClass(block.classId)}><T>Open</T> <span>→</span></button></article>; })}</div> : <p className="today-schedule-empty"><T>Nothing scheduled. You can use the time to prepare a lesson or browse resources.</T></p>}
   </section>;
 }
 
@@ -1767,7 +1769,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   if (!open) return null;
 
   const pagePrompt: Record<View, string> = {
-    home: activeClass ? `Need a hand with today or ${activeClass.name}?` : "Need a hand setting up your first class?",
+    home: activeClass ? t("Need a hand with today or {className}?", { className: activeClass.name }) : t("Need a hand setting up your first class?"),
     classes: "Ask about this class, learners, or schedule.",
     plan: "Ask about the ILAW section you are working on.",
     teach: "Ask about this teaching block or what each grade should do next.",
@@ -1821,8 +1823,8 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     const gabayReply = result.connected
       ? result.reply.slice(0, 3990)
       : result.reason === "busy"
-        ? "Ang dami nating natanong sa maikling panahon. Let us pause for a moment, then ask again. Your classroom data is still safe."
-        : "I could not reach Groq right now. Please try again shortly. Your classroom data is still safe.";
+        ? t("Gabay is busy. Please wait a moment and try again. Your classroom data is safe.")
+        : t("Gabay could not connect right now. Please try again shortly. Your classroom data is safe.");
     const gabayMessage: GabayChatMessage = {
       id: crypto.randomUUID(),
       conversationId,
@@ -1882,7 +1884,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     if (!supabase || !teacherAccountId) return;
     const messageResult = await supabase.from("gabay_messages").delete().eq("teacher_id", teacherAccountId).in("conversation_id", conversationIds);
     const conversationResult = await supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId).in("id", conversationIds);
-    if (messageResult.error || conversationResult.error) setConversationDeleteError("Removed here, but cloud cleanup is waiting for a connection.");
+    if (messageResult.error || conversationResult.error) setConversationDeleteError(t("Removed here, but cloud cleanup is waiting for a connection."));
   }
 
   async function clearCurrentConversation() {
@@ -1901,18 +1903,18 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     if (!supabase || !teacherAccountId) return;
     const messageResult = await supabase.from("gabay_messages").delete().eq("teacher_id", teacherAccountId);
     const conversationResult = await supabase.from("gabay_conversations").delete().eq("teacher_id", teacherAccountId);
-    if (messageResult.error || conversationResult.error) setConversationDeleteError("Removed here, but cloud cleanup is waiting for a connection.");
+    if (messageResult.error || conversationResult.error) setConversationDeleteError(t("Removed here, but cloud cleanup is waiting for a connection."));
   }
 
   return <aside className="gabay-chat-popover" role="dialog" aria-modal="false" aria-labelledby="gabay-title">
-    <header><GabayMascot size="small" motion={motion} speaking={thinking} /><div><h2 id="gabay-title">Gabay</h2><GabayLanguageLabel /><small>{authenticated ? thinking ? "Thinking with your page context…" : contextReady ? `${gabayPageLabels[view]} context ready` : "Reading this page…" : pageContext.offline ? "Connect to use Gabay AI" : "Sign in for AI"}</small></div><div className="gabay-chat-header-actions"><button type="button" aria-label="Conversation options" aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label="Close Gabay" onClick={closeGuide}>×</button></div></header>
-    {authenticated && <div className={`gabay-context-status ${contextReady ? "ready" : "loading"}`} role="status" aria-live="polite"><i />{contextReady ? `Ready to help with ${pageContext.pageStep || gabayPageLabels[view]}` : "Loading the current page context…"}</div>}
-    {conversationMenuOpen && <div className="gabay-conversation-menu"><button className="gabay-walkthrough-start" type="button" onClick={() => { setConversationMenuOpen(false); onStartWalkthrough(); }}><T>Guide this page</T></button><div><b>Conversations</b><button type="button" disabled={isReplying} onClick={startNewConversation}>＋ New chat</button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 12).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{conversation.messages.length} messages</small></button>)}</div> : <p>No saved conversations yet.</p>}<div className="gabay-delete-actions">{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}>Delete this conversation</button>}{conversations.length > 1 && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearAllConversations}>Delete all conversations</button>}</div>{conversationDeleteError && <p className="gabay-delete-error">{conversationDeleteError}</p>}<small>Private to this teacher account. Avoid learner names or sensitive details.</small></div>}
+    <header><GabayMascot size="small" motion={motion} speaking={thinking} /><div><h2 id="gabay-title">Gabay</h2><GabayLanguageLabel /></div><div className="gabay-chat-header-actions"><button type="button" aria-label={t("Conversation options")} aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button className="gabay-close" type="button" aria-label={t("Close Gabay")} onClick={closeGuide}>×</button></div></header>
+    <div className={`gabay-context-status ${contextReady ? "ready" : "loading"}`} role="status" aria-live="polite"><i />{t(!authenticated ? pageContext.offline ? "Connect to use Gabay AI" : "Sign in for AI" : thinking ? "Thinking with your page context…" : contextReady ? "Ready to help with {page}" : "Loading the current page context…", { page: t(gabayPageLabels[view]) })}</div>
+    {conversationMenuOpen && <div className="gabay-conversation-menu"><button className="gabay-walkthrough-start" type="button" onClick={() => { setConversationMenuOpen(false); onStartWalkthrough(); }}><T>Guide this page</T></button><div><b><T>Conversations</T></b><button type="button" disabled={isReplying} onClick={startNewConversation}><T>＋ New chat</T></button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 12).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{t("{count} messages", { count: conversation.messages.length })}</small></button>)}</div> : <p><T>No saved conversations yet.</T></p>}<div className="gabay-delete-actions">{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}><T>Delete this conversation</T></button>}{conversations.length > 1 && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearAllConversations}><T>Delete all conversations</T></button>}</div>{conversationDeleteError && <p className="gabay-delete-error">{conversationDeleteError}</p>}<small><T>Private to this teacher account. Avoid learner names or sensitive details.</T></small></div>}
     <div className="gabay-chat-body">
-      {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b><T>How can I help?</T></b><p><T>{pagePrompt[view]}</T></p>{!authenticated && <button type="button" disabled={pageContext.offline} onClick={onRequestSignIn}>{pageContext.offline ? t("Gabay AI needs internet") : t("Sign in to start chatting")}</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{thinking && <GabayThinking motion={motion} />}</div>}
+      {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b><T>Opening your chats…</T></b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b><T>How can I help?</T></b><p><T>{pagePrompt[view]}</T></p>{!authenticated && <button type="button" disabled={pageContext.offline} onClick={onRequestSignIn}>{pageContext.offline ? t("Gabay AI needs internet") : t("Sign in to start chatting")}</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>{t("Now helping with {page}", { page: t(gabayPageLabels[message.view]) })}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{thinking && <GabayThinking motion={motion} />}</div>}
     </div>
     <PromptHelper key={`${teacherAccountId}:${view}:${pageContext.classId || ""}`} mode="chat" context={[pageContext.className, pageContext.gradeLevels.map(gradeLabel).join(", "), pageContext.subject].filter(Boolean).join(" · ")} existingText={chatInput} onUse={setChatInput} disabled={isReplying} />
-    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><textarea rows={2} className={promptStyles.chatInput} id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady} onChange={(event) => setChatInput(event.target.value)} placeholder={!authenticated ? pageContext.offline ? "Gabay AI needs internet" : "Sign in to chat" : contextReady ? `Ask about ${gabayPageLabels[view]}…` : "Reading this page…"} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>{t("Ask Gabay a question")}</label><textarea rows={2} className={promptStyles.chatInput} id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady} onChange={(event) => setChatInput(event.target.value)} placeholder={t(!authenticated ? pageContext.offline ? "Gabay AI needs internet" : "Sign in to chat" : contextReady ? "Ask about {page}…" : "Reading this page…", { page: t(gabayPageLabels[view]) })} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady || !chatInput.trim() || isReplying} aria-label={t("Send question to Gabay")}>↑</button>{connectionIssue && <small><T>Gabay could not connect. Please try again.</T></small>}</form>
   </aside>;
 }
 

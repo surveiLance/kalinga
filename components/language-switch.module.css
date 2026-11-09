@@ -17,3 +17,6 @@
   :global(.topbar):has(.switch) :global(.gabay-topbar-assistant) { grid-area: 2 / 3 / 3 / 6; }
   :global(.class-editor-tools) { flex-wrap: wrap; justify-content: flex-end; }
 }
+@media (min-width: 721px) {
+  :global(.top-actions) > .switch .panel { left: 0; right: auto; }
+}
