@@ -1,3 +1,4 @@
+import { readInterfaceLanguage } from "@/lib/interface-language";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { validateRevisionRequest, validateRevisionProposal, type RevisionRequest, type RevisionProposal } from "@/lib/lesson-revisions";
 
@@ -15,6 +16,7 @@ export type GabayPageContext = {
   lessonTopic?: string;
   lessonDuration?: string;
   language?: string;
+  responseLanguage?: "en" | "fil" | "hil";
   incompleteSections?: string[];
   currentSummary?: string[];
   availableActions?: string[];
@@ -79,7 +81,7 @@ export async function requestGabayRevision(request: RevisionRequest, pageContext
     const capability = await supabase.functions.invoke("gabay-chat", { body: { message: "Check revision support", task: { type: "revision-capabilities" } }, signal });
     if (signal?.aborted) return { connected: false, reason: "cancelled" };
     if (capability.error || capability.data?.revisionVersion !== 1) return { connected: false, reason: "unsupported" };
-    const result = await supabase.functions.invoke("gabay-chat", { body: { message: "Suggest lesson revisions", task: { type: "revise-plan" }, revision: checked, pageContext: { ...pageContext, classId: checked.source.context.classId } }, signal });
+    const result = await supabase.functions.invoke("gabay-chat", { body: { message: "Suggest lesson revisions", task: { type: "revise-plan" }, revision: checked, pageContext: { ...pageContext, responseLanguage: readInterfaceLanguage().language, classId: checked.source.context.classId } }, signal });
     if (signal?.aborted) return { connected: false, reason: "cancelled" };
     if (result.error) return { connected: false, reason: (result.error as { context?: { status?: number } }).context?.status === 429 ? "busy" : "unavailable" };
     return { connected: true, proposal: validateRevisionProposal(result.data?.proposal, checked) };
@@ -100,7 +102,7 @@ export async function askConnectedGabay(message: string, pageContext: GabayPageC
     const { data, error } = await supabase.functions.invoke("gabay-chat", {
       body: {
         message,
-        pageContext,
+        pageContext: { ...pageContext, responseLanguage: readInterfaceLanguage().language },
         history: history.slice(-12),
       },
     });
@@ -132,7 +134,7 @@ export async function requestGabayDraft(type: GabayDraft["type"], pageContext: G
     const { data, error } = await supabase.functions.invoke("gabay-chat", {
       body: {
         message: `Create an editable ${type} draft for ${grade}.`,
-        pageContext,
+        pageContext: { ...pageContext, responseLanguage: readInterfaceLanguage().language },
         task: { type, grade },
       },
     });

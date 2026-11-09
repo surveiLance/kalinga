@@ -1,4 +1,5 @@
 "use client";
+import { T } from "@/components/language-switch";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GabayWalkthrough, WalkthroughOffer } from "@/components/gabay-walkthrough";
@@ -6,7 +7,7 @@ import { completePageGuide, isCurrentPageGuide, isNewPageGuideRequest, markPageG
 import { workspaceStorageKey } from "@/lib/workspace-keys";
 
 export function PageGuideButton({ onStart, compact = false }: { onStart: () => void; compact?: boolean }) {
-  return <button className={`page-guide-trigger${compact ? " page-guide-inline" : ""}`} type="button" onClick={onStart}>Guide this page</button>;
+  return <button className={`page-guide-trigger${compact ? " page-guide-inline" : ""}`} type="button" onClick={onStart}><T>Guide this page</T></button>;
 }
 
 export function GabayPageGuides({ scope, page, motion, blocked, request, onStart }: { scope: string; page: PageGuidePage; motion: boolean; blocked: boolean; request: PageGuideRequest | null; onStart: () => void }) {

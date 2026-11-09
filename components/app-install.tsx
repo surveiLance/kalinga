@@ -1,4 +1,5 @@
 "use client";
+import { T } from "@/components/language-switch";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { installationLink, installInstructions, openAppInstall, readInstallState, requestAppInstall, serverInstallState, startAppInstall, subscribeInstall, type InstallBrowser, type InstallResult } from "@/lib/pwa-install";
@@ -40,6 +41,6 @@ export function AppInstall() {
       {result === "failed" && <p className="install-result" role="status">The installation window could not open. Use the browser steps above instead.</p>}</>}
       <details className="install-offline" open={!offline.prepared || state.installed || result === "accepted"}><summary>After installing: prepare for offline teaching</summary><div><p>After installing, open Kalinga from its new icon. Sign in and wait for “Ready for offline teaching” in the sidebar or your account menu. Save your lessons and download each PDF you need.</p><p className={`install-preparation ${offline.prepared ? "prepared" : ""}`} role="status">{offline.prepared ? "Application files are saved on this browser." : offline.message}</p>{!offline.prepared && <button className="text-button" type="button" onClick={() => { void prepareOfflineApplication(); }}>Check application preparation</button>}<small>Installation and offline preparation are separate. Gabay AI, teacher discussions, and new uploads still need internet.</small></div></details>
     </div>
-    <footer>{!state.installed && !state.canPrompt && <button className="text-button" type="button" onClick={() => dialog.current?.close()}>Use Kalinga in this browser</button>}<button className="secondary-button" type="button" onClick={() => dialog.current?.close()}>Done</button></footer>
+    <footer>{!state.installed && !state.canPrompt && <button className="text-button" type="button" onClick={() => dialog.current?.close()}>Use Kalinga in this browser</button>}<button className="secondary-button" type="button" onClick={() => dialog.current?.close()}><T>Done</T></button></footer>
   </dialog>;
 }

@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { redactGabayPII } from "../_shared/gabay-privacy.ts";
 import { validateRevisionRequest, validateRevisionProposal, redactRevisionRequest } from "../_shared/lesson-revisions.ts";
 import { revisionTaskKind, generateRevision } from "../_shared/gabay-revision.ts";
+import { safeResponseLanguage, gabayResponseLanguage, gabayLessonLanguage } from "../_shared/gabay-language.ts";
 import { runGuestGabayTask } from "../_shared/guest-access.ts";
 
 type PageContext = {
@@ -18,6 +19,7 @@ type PageContext = {
   lessonTopic?: string;
   lessonDuration?: string;
   language?: string;
+  responseLanguage?: "en" | "fil" | "hil";
   incompleteSections?: string[];
   currentSummary?: string[];
   availableActions?: string[];
@@ -95,6 +97,7 @@ function safeContext(value: unknown): PageContext {
     lessonTopic: cleanText(input.lessonTopic, 200),
     lessonDuration: cleanText(input.lessonDuration, 120),
     language: cleanText(input.language, 60),
+    responseLanguage: safeResponseLanguage(input.responseLanguage),
     incompleteSections: cleanList(input.incompleteSections, 16, 100),
     currentSummary: cleanList(input.currentSummary, 16, 240),
     availableActions: cleanList(input.availableActions, 12, 120),
@@ -272,7 +275,7 @@ Deno.serve(async (request) => {
 
   const systemInstruction = `You are Gabay, Kalinga's friendly, witty teacher assistant for Filipino teachers. You accompany the teacher across the app and understand the current page from the supplied Kalinga context.
 Use the teacher's supplied preferred name naturally once in a while, but not in every reply.
-Use casual Taglish: mostly clear English with familiar Filipino words and connectors. Avoid deep, formal, or overly fluent Tagalog unless the teacher asks for Filipino.
+${draftTask ? gabayLessonLanguage(pageContext.language) : gabayResponseLanguage(pageContext.responseLanguage)}
 Keep every answer brief: usually 1-3 sentences, or at most 3 compact bullets. Do not repeat the page description unless it directly answers the question. Ask no more than one short follow-up question.
 You may add one light teacher-life joke or playful aside when it feels natural, but never force humor and never joke about learner welfare, attendance concerns, privacy, or emergencies.
 The teacher remains in control. Give practical help grounded only in the supplied page and classroom context. When the teacher asks where to go or what to do, point to the most relevant action on their current page first.
@@ -295,6 +298,7 @@ Class schedule: ${(pageContext.scheduleSummary ?? []).join(" | ") || "not suppli
 Subject: ${pageContext.subject || "not supplied"}
 Lesson topic: ${pageContext.lessonTopic || "not supplied"}
 Lesson duration: ${pageContext.lessonDuration || "not supplied"}
+Preferred response language: ${pageContext.responseLanguage || "en"}
 Language of instruction for this plan: ${pageContext.language || "not supplied"}
 Incomplete sections: ${(pageContext.incompleteSections ?? []).join(", ") || "none reported"}
 What the app currently reports: ${(pageContext.currentSummary ?? []).join(" | ") || "nothing supplied"}
@@ -306,7 +310,7 @@ App reports offline: ${pageContext.offline ? "yes" : "no"}`;
     : draftTask?.type === "assessment"
       ? `Create a practical, editable assessment set for ${draftTask.grade}, specific to the stated lesson topic — no generic worksheets or percentage cut-offs. Return only a JSON object with exactly these string keys: formativeAssessment, exitTask, successCriteria. Each item must align with the supplied competency or objective, remain grade-appropriate, and be realistic in the stated lesson duration.`
       : draftTask?.type === "full-plan"
-        ? `Create one complete but concise editable ILAW lesson-plan draft for every supplied grade level. Return only a JSON object with exactly these top-level keys: sharedTheme, learnerContext, materials, nextSessionNotes, grades, slots. The grades object must use each supplied grade label as a key, and each grade value must contain exactly these string keys: competency, competencyCode, contentStandard, performanceStandard, objective, formativeAssessment, exitTask, successCriteria, reflectionQuestion, remediation, enrichment. The slots array must contain objects with exactly these keys: stage, durationMinutes, teacherFocus, gradeTasks. Each gradeTasks object must use every supplied grade label as a key. Make the slot durations add up to the supplied lesson duration and design a realistic multigrade rotation in which every grade always has meaningful work. Use these ILAW stages where appropriate: Preliminary Activities, Motivation, Direct Teaching, Guided Practice, Independent Practice, Application, Generalization, Assessment. Competencies and codes are editable draft suggestions unless an exact verified source appears in the context; never claim they are official DepEd entries. Ways Forward entries are proposed supports, not invented post-lesson results. Every field must be specific to the stated lesson topic and, where given, the teacher's notes. Name the actual skill, content, and examples: never write generic filler such as "worksheet", "observe work", "80% correct", or "practice problems" on its own. Success criteria must state what a learner can do with this topic. If the teacher's notes mention materials or constraints, build the activities around them. Write every field in the plan's stated language of instruction: if it is Filipino, write in formal classroom Filipino; if it is English & Filipino, write activities and questions in Filipino and standards and criteria in English; otherwise write in English. Keep every field brief enough to fit a printable lesson plan.`
+        ? `Create one complete but concise editable ILAW lesson-plan draft for every supplied grade level. Return only a JSON object with exactly these top-level keys: sharedTheme, learnerContext, materials, nextSessionNotes, grades, slots. The grades object must use each supplied grade label as a key, and each grade value must contain exactly these string keys: competency, competencyCode, contentStandard, performanceStandard, objective, formativeAssessment, exitTask, successCriteria, reflectionQuestion, remediation, enrichment. The slots array must contain objects with exactly these keys: stage, durationMinutes, teacherFocus, gradeTasks. Each gradeTasks object must use every supplied grade label as a key. Make the slot durations add up to the supplied lesson duration and design a realistic multigrade rotation in which every grade always has meaningful work. Use these ILAW stages where appropriate: Preliminary Activities, Motivation, Direct Teaching, Guided Practice, Independent Practice, Application, Generalization, Assessment. Competencies and codes are editable draft suggestions unless an exact verified source appears in the context; never claim they are official DepEd entries. Ways Forward entries are proposed supports, not invented post-lesson results. Every field must be specific to the stated lesson topic and, where given, the teacher's notes. Name the actual skill, content, and examples: never write generic filler such as "worksheet", "observe work", "80% correct", or "practice problems" on its own. Success criteria must state what a learner can do with this topic. If the teacher's notes mention materials or constraints, build the activities around them. ${gabayLessonLanguage(pageContext.language)} Keep every field brief enough to fit a printable lesson plan.`
       : "";
 
   const groqResponse = await fetch(

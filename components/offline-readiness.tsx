@@ -1,4 +1,5 @@
 "use client";
+import { T } from "@/components/language-switch";
 import { useEffect, useState } from "react";
 import { readOfflineAvailability, prepareOfflineApplication } from "@/lib/offline-availability";
 import { listOfflineResources } from "@/lib/offline-resources";
@@ -18,5 +19,5 @@ export function OfflineReadiness({ scope, persisted, storageError, pendingCount,
     return () => { active = false; window.removeEventListener("kalinga:offline-availability", update); window.removeEventListener("kalinga:downloads", refresh); window.removeEventListener("storage", storage); };
   }, [scope]);
   const state = offlineReadiness({ appPrepared: app.prepared, workspacePersisted: persisted, storageError, downloadCount: downloads.count, downloadBytes: downloads.bytes, pendingCount, cloudVerified, online });
-  return <details className={`offline-card sidebar-status offline-readiness ${state.readyForOffline ? "prepared" : ""}`}><summary><span className="status-dot" /><span><strong>{state.summary}</strong><small>{downloads.count} PDFs downloaded · {(downloads.bytes / 1048576).toFixed(1)} MB</small></span></summary><div><p>{app.message}</p><p>{state.syncMessage}</p>{error && <p role="status">{error}</p>}<p>{state.limitations.join(" ")}</p><button className="text-button" type="button" onClick={() => { void prepareOfflineApplication(); void navigator.storage?.persist?.().catch(() => false); }}>Check preparation</button></div></details>;
+  return <details className={`offline-card sidebar-status offline-readiness ${state.readyForOffline ? "prepared" : ""}`}><summary><span className="status-dot" /><span><strong>{state.summary}</strong><small>{downloads.count} PDFs downloaded · {(downloads.bytes / 1048576).toFixed(1)} MB</small></span></summary><div><p>{app.message}</p><p>{state.syncMessage}</p>{error && <p role="status">{error}</p>}<p>{state.limitations.join(" ")}</p><button className="text-button" type="button" onClick={() => { void prepareOfflineApplication(); void navigator.storage?.persist?.().catch(() => false); }}><T>Check preparation</T></button></div></details>;
 }

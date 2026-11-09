@@ -1,4 +1,5 @@
 "use client";
+import { T } from "@/components/language-switch";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { GabayThinking } from "@/components/gabay-thinking";
@@ -61,7 +62,7 @@ export function LessonRevisionPanel({ plan, initialScope, onClose, onApply, avai
   }
 
   return <aside className="lesson-revision-panel" role="dialog" aria-modal="false" aria-labelledby={titleId}>
-    <header><div><p className="eyebrow">YOUR EDITING PARTNER</p><h2 ref={titleRef} tabIndex={-1} id={titleId}>Improve lesson with Gabay</h2></div><button type="button" aria-label="Close lesson suggestions" onClick={onClose}>×</button></header>
+    <header><div><p className="eyebrow">YOUR EDITING PARTNER</p><h2 ref={titleRef} tabIndex={-1} id={titleId}><T>Improve lesson with Gabay</T></h2></div><button type="button" aria-label="Close lesson suggestions" onClick={onClose}>×</button></header>
     <div className="lesson-revision-body"><p>Your lesson stays unchanged until you choose and apply suggestions.</p>
       <form onSubmit={suggest}><label>What would you like to improve?<select value={scope} onChange={(event) => changeScope(event.target.value as RevisionScope)}>{Object.entries(revisionScopes).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><small>Includes all grades in this lesson. Curriculum references and teaching times stay unchanged.</small>
         <label>Your instructions<textarea value={instruction} maxLength={2000} rows={3} onChange={(event) => setInstruction(event.target.value)} placeholder="e.g. Make the activities easier and use leaves instead of printed worksheets." required /></label>

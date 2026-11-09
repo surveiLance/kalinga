@@ -1,4 +1,5 @@
 "use client";
+import { T } from "@/components/language-switch";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -9,7 +10,7 @@ import { pageGuideLabels, pageGuideSteps, type PageGuidePage, type PageGuideStep
 export function WalkthroughOffer({ pageLabel, onShown, onStart, onDismiss }: { pageLabel: string; onShown: () => void; onStart: () => void; onDismiss: () => void }) {
   const titleId = useId();
   useEffect(() => { onShown(); }, [onShown]);
-  return <section className="page-guide-offer" aria-labelledby={titleId}><GabayMascot size="medium" motion={false} /><div><p className="eyebrow">GABAY · {pageLabel}</p><h2 id={titleId}>Want me to show you how this page works?</h2><p>You stay in control. I’ll explain where to click, without changing your work.</p><small>You can always choose Guide this page beside Ask Gabay.</small></div><div className="page-guide-offer-actions"><button type="button" className="primary-button" onClick={onStart}>Show me</button><button type="button" className="secondary-button" onClick={onDismiss}>Not now</button></div></section>;
+  return <section className="page-guide-offer" aria-labelledby={titleId}><GabayMascot size="medium" motion={false} /><div><p className="eyebrow">GABAY · <T>{pageLabel}</T></p><h2 id={titleId}><T>Want me to show you how this page works?</T></h2><p><T>You stay in control. I’ll explain where to click, without changing your work.</T></p><small><T>You can always choose Guide this page beside Ask Gabay.</T></small></div><div className="page-guide-offer-actions"><button type="button" className="primary-button" onClick={onStart}><T>Show me</T></button><button type="button" className="secondary-button" onClick={onDismiss}><T>Not now</T></button></div></section>;
 }
 
 export function WalkthroughCard({ item, pageLabel, step, total, targetFound, onMove, onExit, onLocate, onMinimize }: { item: PageGuideStep; pageLabel: string; step: number; total: number; targetFound: boolean; onMove: (step: number) => void; onExit: () => void; onLocate: () => void; onMinimize?: () => void }) {
@@ -18,7 +19,7 @@ export function WalkthroughCard({ item, pageLabel, step, total, targetFound, onM
     <header><GabayMascot size="medium" motion={false} /><div><b>Gabay’s page guide</b><small>{pageLabel}</small></div><div className="walkthrough-window-actions">{onMinimize && <button type="button" onClick={onMinimize} aria-label="Minimize guide" title="Move Gabay out of the way">−</button>}<button type="button" className="walkthrough-exit" onClick={onExit} aria-label="Exit guide">×</button></div></header>
     <div className="walkthrough-copy" aria-live="polite" aria-atomic="true"><p className="walkthrough-count">{step + 1} of {total}</p><h2 id={titleId} tabIndex={-1}>{targetFound ? item.title : "This control is not visible right now"}</h2>{targetFound ? <p>{item.body}</p> : <p className="walkthrough-where">You can continue through this page’s hints or close the guide. Nothing needs to be filled or saved to finish.</p>}</div>
     <div className="walkthrough-tools">{targetFound && <button className="walkthrough-locate" type="button" onClick={onLocate}>Show the highlighted area</button>}{onMinimize && <button className="walkthrough-locate" type="button" onClick={onMinimize}>Move Gabay aside</button>}</div>
-    <footer><button type="button" className="walkthrough-back" disabled={step === 0} onClick={() => onMove(Math.max(0, step - 1))}>Back</button><button type="button" className="walkthrough-next" onClick={() => onMove(step + 1)}>{step === total - 1 ? "Finish guide" : "Next"}<span aria-hidden="true"> →</span></button></footer>
+    <footer><button type="button" className="walkthrough-back" disabled={step === 0} onClick={() => onMove(Math.max(0, step - 1))}><T>Back</T></button><button type="button" className="walkthrough-next" onClick={() => onMove(step + 1)}><T>{step === total - 1 ? "Finish guide" : "Next"}</T><span aria-hidden="true"> →</span></button></footer>
   </section>;
 }
 
