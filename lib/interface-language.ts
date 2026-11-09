@@ -289,6 +289,9 @@ export const interfaceTranslations: Record<string, [string, string]> = {
   "Gabay is busy. Please wait a moment and try again. Your classroom data is safe.": ["Maraming kahilingan kay Gabay ngayon. Maghintay sandali at subukan muli. Ligtas ang datos ng klase mo.", "Madamo sang pangabay kay Gabay subong. Maghulat anay kag tilawi liwat. Luwas ang datos sang imo klase."],
   "Gabay could not connect right now. Please try again shortly. Your classroom data is safe.": ["Hindi makakonekta si Gabay ngayon. Subukan muli mamaya. Ligtas ang datos ng klase mo.", "Indi makakonekta si Gabay subong. Tilawi liwat karon. Luwas ang datos sang imo klase."],
   "Removed here, but cloud cleanup is waiting for a connection.": ["Naalis na rito, pero kailangan ng koneksyon upang maalis din sa cloud.", "Nakuha na diri, pero kinahanglan sang koneksyon agod makuha man sa cloud."],
+  "Minimize Gabay": ["I-minimize si Gabay", "I-minimize si Gabay"],
+  "Close prompt helper": ["Isara ang tulong sa pagtatanong", "Siraduhon ang bulig sa pagpamangkot"],
+  "Nothing is sent automatically. Review your text, then press Send.": ["Walang awtomatikong ipinapadala. Suriin ang teksto, saka pindutin ang Send.", "Wala sang awtomatiko nga ginapadala. Usisaon ang teksto, dayon pinduta ang Send."],
   "Clear helper": ["Linisin ang helper", "Haw-asan ang helper"],
 };
 
