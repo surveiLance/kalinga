@@ -1,4 +1,6 @@
 "use client";
+import { PromptHelper } from "@/components/prompt-helper";
+import promptStyles from "@/components/prompt-helper.module.css";
 import { T, useInterfaceLanguage, LanguageSwitch, GabayLanguageLabel, useInterfaceLanguageScope } from "@/components/language-switch";
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -1909,7 +1911,8 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     <div className="gabay-chat-body">
       {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b>Opening your chats…</b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b><T>How can I help?</T></b><p><T>{pagePrompt[view]}</T></p>{!authenticated && <button type="button" disabled={pageContext.offline} onClick={onRequestSignIn}>{pageContext.offline ? t("Gabay AI needs internet") : t("Sign in to start chatting")}</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>Now helping with {gabayPageLabels[message.view]}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{thinking && <GabayThinking motion={motion} />}</div>}
     </div>
-    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><input id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady} onChange={(event) => setChatInput(event.target.value)} placeholder={!authenticated ? pageContext.offline ? "Gabay AI needs internet" : "Sign in to chat" : contextReady ? `Ask about ${gabayPageLabels[view]}…` : "Reading this page…"} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
+    <PromptHelper key={`${teacherAccountId}:${view}:${pageContext.classId || ""}`} mode="chat" context={[pageContext.className, pageContext.gradeLevels.map(gradeLabel).join(", "), pageContext.subject].filter(Boolean).join(" · ")} existingText={chatInput} onUse={setChatInput} disabled={isReplying} />
+    <form className="gabay-chat-composer" onSubmit={sendChat}><label className="sr-only" htmlFor={chatInputId}>Ask Gabay a question</label><textarea rows={2} className={promptStyles.chatInput} id={chatInputId} value={chatInput} maxLength={2000} disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady} onChange={(event) => setChatInput(event.target.value)} placeholder={!authenticated ? pageContext.offline ? "Gabay AI needs internet" : "Sign in to chat" : contextReady ? `Ask about ${gabayPageLabels[view]}…` : "Reading this page…"} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><button type="submit" disabled={!authenticated || hydratedChatAccountId !== teacherAccountId || !contextReady || !chatInput.trim() || isReplying} aria-label="Send question to Gabay">↑</button>{connectionIssue && <small>Gabay could not connect. Please try again.</small>}</form>
   </aside>;
 }
 
@@ -2477,11 +2480,12 @@ function PlanView({ cloudAvailable, classes, persistedPlans, onAllPlans, onDelet
       lessonTopic: lessonTitle || "Untitled lesson",
       lessonDuration: `${targetMinutes} minutes starting at ${startTime}`,
       language,
+      teacherNotes: draftNotes,
       incompleteSections: incompletePlanSections,
       currentSummary: [`Language: ${language}`, `Multigrade approach: ${multigradeModel}`, sharedTheme ? `Shared theme: ${sharedTheme}` : "No shared theme entered", ...grades.map((grade) => `${gradeLabel(grade)} competency: ${competencies[grade]?.trim() || "blank"}; objective: ${objectives[grade]?.trim() || "blank"}`), saved ? "Draft is saved" : "Draft has unsaved changes"],
       availableActions: ["Draft the whole plan with Gabay", "Edit any cell of the plan directly", "Redraft one grade's intentions or assessment", "Download as Word or print to PDF", "Save the lesson"],
     });
-  }, [competencies, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, saved, selectedClass, setupOpen, sharedTheme, startTime, subject, targetMinutes]);
+  }, [competencies, draftNotes, grades, incompletePlanSections, language, lessonTitle, multigradeModel, objectives, onGabayContext, saved, selectedClass, setupOpen, sharedTheme, startTime, subject, targetMinutes]);
 
   useEffect(() => {
     function finishPrinting() { setPrintingPlan(false); }
@@ -2595,8 +2599,9 @@ function PlanView({ cloudAvailable, classes, persistedPlans, onAllPlans, onDelet
       lessonTopic: lessonTitle.trim(),
       lessonDuration: `${targetMinutes} minutes starting at ${startTime}`,
       language,
+      teacherNotes: draftNotes,
       incompleteSections: incompletePlanSections,
-      currentSummary: [...(draftNotes.trim() ? [`Teacher's notes for this draft: ${draftNotes.trim()}`] : []), ...summary],
+      currentSummary: summary,
       availableActions: ["Edit any field directly", "Redraft again", "Save the lesson"],
       offline: typeof navigator !== "undefined" && !navigator.onLine,
     };
@@ -2790,7 +2795,7 @@ function PlanView({ cloudAvailable, classes, persistedPlans, onAllPlans, onDelet
             <label><T>Teaching date</T><input type="date" value={teachingDate} onChange={(event) => { setTeachingDate(event.target.value); touch(); }} /></label>
           </div>
           {topicPrompt && <p className="topic-prompt" role="alert">{topicPrompt}</p>}
-          <details className="plan-context-details"><summary>Add classroom needs or available materials <span><T>Optional</T></span></summary><label className="plan-setup-notes"><T>Anything Gabay should know</T> <small>Do not include learner names or sensitive details</small><textarea rows={3} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder={`e.g. ${setupHints.notes}`} /></label></details>
+          <details className="plan-context-details"><summary>Add classroom needs or available materials <span><T>Optional</T></span></summary><PromptHelper inline key={selectedClassId} mode="lesson" context={[selectedClass?.name, gradeList(grades), subject].filter(Boolean).join(" · ")} existingText={draftNotes} onUse={(text) => { setDraftNotes(text); touch(); }} disabled={draftingFullPlan} /><label className="plan-setup-notes"><T>Anything Gabay should know</T> <small>Do not include learner names or sensitive details</small><textarea rows={3} maxLength={2000} value={draftNotes} onChange={(event) => { setDraftNotes(event.target.value); touch(); }} placeholder={`e.g. ${setupHints.notes}`} /></label></details>
           <details className="plan-setup-more">
             <summary><span>{quarter} · {startTime} · {targetMinutes} min · {language} · {multigradeModel}</span><b>Change</b></summary>
             <div className="plan-setup-grid">

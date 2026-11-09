@@ -17,6 +17,7 @@ type PageContext = {
   scheduleSummary?: string[];
   subject?: string;
   lessonTopic?: string;
+  teacherNotes?: string;
   lessonDuration?: string;
   language?: string;
   responseLanguage?: "en" | "fil" | "hil";
@@ -95,6 +96,7 @@ function safeContext(value: unknown): PageContext {
     scheduleSummary: cleanList(input.scheduleSummary, 12, 180),
     subject: cleanText(input.subject, 100),
     lessonTopic: cleanText(input.lessonTopic, 200),
+    teacherNotes: cleanText(input.teacherNotes, 2000),
     lessonDuration: cleanText(input.lessonDuration, 120),
     language: cleanText(input.language, 60),
     responseLanguage: safeResponseLanguage(input.responseLanguage),
@@ -266,6 +268,7 @@ Deno.serve(async (request) => {
   }
   const message = redact(rawMessage);
   pageContext.lessonTopic = redact(pageContext.lessonTopic || "");
+  pageContext.teacherNotes = redact(pageContext.teacherNotes || "");
   pageContext.currentSummary = (pageContext.currentSummary || []).map(redact);
   const history = safeHistory(payload.history).map((item) => ({ ...item, content: redact(item.content) }));
   const draftTask = safeDraftTask(payload.task);
@@ -297,6 +300,7 @@ Enrolled learner count (aggregate only): ${pageContext.learnerCount ?? 0}
 Class schedule: ${(pageContext.scheduleSummary ?? []).join(" | ") || "not supplied"}
 Subject: ${pageContext.subject || "not supplied"}
 Lesson topic: ${pageContext.lessonTopic || "not supplied"}
+Teacher planning notes (guidance, not verified curriculum): ${JSON.stringify(pageContext.teacherNotes || "not supplied")}
 Lesson duration: ${pageContext.lessonDuration || "not supplied"}
 Preferred response language: ${pageContext.responseLanguage || "en"}
 Language of instruction for this plan: ${pageContext.language || "not supplied"}

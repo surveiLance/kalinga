@@ -1,4 +1,5 @@
 "use client";
+import { PromptHelper } from "@/components/prompt-helper";
 import { T } from "@/components/language-switch";
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -66,6 +67,7 @@ export function LessonRevisionPanel({ plan, initialScope, onClose, onApply, avai
     <div className="lesson-revision-body"><p>Your lesson stays unchanged until you choose and apply suggestions.</p>
       <form onSubmit={suggest}><label>What would you like to improve?<select value={scope} onChange={(event) => changeScope(event.target.value as RevisionScope)}>{Object.entries(revisionScopes).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><small>Includes all grades in this lesson. Curriculum references and teaching times stay unchanged.</small>
         <label>Your instructions<textarea value={instruction} maxLength={2000} rows={3} onChange={(event) => setInstruction(event.target.value)} placeholder="e.g. Make the activities easier and use leaves instead of printed worksheets." required /></label>
+        <PromptHelper mode="revision" context={[plan.title, plan.subject, plan.grades.join(", ")].filter(Boolean).join(" · ")} existingText={instruction} disabled={busy} onUse={(text) => { lifecycle.cancel(); setInstruction(text); setState({}); setSelected(new Set()); }} />
         <button className="primary-button" type="submit" disabled={!instruction.trim() || busy}>{busy ? "Preparing suggestions…" : "Suggest changes"}</button>
       </form>
       {busy && <div className="lesson-revision-wait"><GabayThinking /><p role="status">Gabay is reviewing your lesson. You can keep editing.</p></div>}

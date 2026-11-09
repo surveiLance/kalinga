@@ -14,6 +14,7 @@ export type GabayPageContext = {
   scheduleSummary?: string[];
   subject?: string;
   lessonTopic?: string;
+  teacherNotes?: string;
   lessonDuration?: string;
   language?: string;
   responseLanguage?: "en" | "fil" | "hil";
