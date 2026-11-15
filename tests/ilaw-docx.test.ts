@@ -244,6 +244,28 @@ describe("ILAW Word export", () => {
     expect(xml.split("Magpakita ng babala.").length - 1).toBe(1);
   });
 
+  it("exports mixed-language wording in the correct section and block", async () => {
+    const customized: SavedPlan = {
+      ...plan,
+      documentText: {
+        "Document heading": "Plano sang Leksyon",
+        "School": "Paaralan",
+        "Teaching date text": "4 Agosto 2026",
+        "Section A": "A  Pagtataya",
+        "grade:I:3": "Baitang Tatlo",
+        "grade:A:3": "Grado Tres",
+        "Prepared by:": "Inihanda ni:",
+      },
+      slots: plan.slots.map((slot, index) => index === 0 ? { ...slot, timeText: "10 minuto\nAlas otso" } : slot),
+    };
+    const { xml } = await documentXml(buildIlawDocument(customized, teachingClass, "Ana", "School"));
+    for (const wording of ["Plano sang Leksyon", "Paaralan", "4 Agosto 2026", "A  PAGTATAYA", "Baitang Tatlo", "Grado Tres", "Inihanda ni:", "10 minuto", "Alas otso", "8:10 AM"]) {
+      expect(xml).toContain(wording);
+    }
+    expect(xml.indexOf("Baitang Tatlo")).toBeLessThan(xml.indexOf("A  PAGTATAYA"));
+    expect(xml.indexOf("Grado Tres")).toBeGreaterThan(xml.indexOf("A  PAGTATAYA"));
+  });
+
   it("names the file from the subject and title", () => {
     expect(ilawDocumentFileName(plan)).toBe("filipino-tekstong-impormatibo-at-pangatnig-ilaw-dlp.docx");
     expect(ilawDocumentFileName({ ...plan, title: "", subject: "" })).toBe("lesson-plan-ilaw-dlp.docx");

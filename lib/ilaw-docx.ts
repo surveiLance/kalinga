@@ -1,7 +1,7 @@
 import { AlignmentType, BorderStyle, Document, Packer, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, VerticalAlign, WidthType } from "docx";
 import { gradeLabel, gradeList } from "@/lib/grades";
 import { ILAW_FORMAT, ILAW_SECTION_COLORS } from "@/lib/ilaw-format";
-import { learnerCountSummary, planTitleLine, slotIsWholeClass, wholeClassTask } from "@/lib/lesson-plan";
+import { ilawText, learnerCountSummary, planTitleLine, slotTimeText, slotIsWholeClass, wholeClassTask } from "@/lib/lesson-plan";
 import type { GradeLevel, SavedPlan, TeachingClass } from "@/lib/teaching-types";
 
 // Editable Word export using the supplied ILAW reference's typography, page
@@ -56,7 +56,7 @@ function sectionBanner(letter: keyof typeof ILAW_SECTION_COLORS, title: string) 
       borders,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       shading: { type: ShadingType.CLEAR, fill: ILAW_SECTION_COLORS[letter], color: "auto" },
-      children: [para(`${letter}  ${title.toUpperCase()}`, { bold: true, color: "FFFFFF", keepNext: true })],
+      children: [para(`${title.toUpperCase()}`, { bold: true, color: "FFFFFF", keepNext: true })],
     })] })],
   });
 }
@@ -72,8 +72,8 @@ function gradeWidths(total: number, count: number) {
   return Array.from({ length: count }, (_, index) => width + (index < total % count ? 1 : 0));
 }
 
-function gradeHeader(grade: GradeLevel, width: number, index: number) {
-  return cell(gradeLabel(grade).toUpperCase(), width, { header: true, centered: true, fill: ILAW_FORMAT.gradeHeaderFills[index % ILAW_FORMAT.gradeHeaderFills.length] });
+function gradeHeader(label: string, width: number, index: number) {
+  return cell(label, width, { header: true, centered: true, fill: ILAW_FORMAT.gradeHeaderFills[index % ILAW_FORMAT.gradeHeaderFills.length] });
 }
 
 function sharedTable(rows: Array<[string, string | undefined]>, theme = false) {
@@ -82,16 +82,18 @@ function sharedTable(rows: Array<[string, string | undefined]>, theme = false) {
 }
 
 // A label column plus one column per grade, for every per-grade section.
-function gradeTable(grades: GradeLevel[], rows: Array<[string, Record<GradeLevel, string> | undefined]>) {
+function gradeTable(grades: GradeLevel[], heading: (grade: GradeLevel) => string, rows: Array<[string, Record<GradeLevel, string> | undefined]>) {
   const labelWidth = ILAW_FORMAT.labelWidthDxa;
   const widths = [labelWidth, ...gradeWidths(pageWidth - labelWidth, grades.length)];
   return table(widths, [
-    new TableRow({ tableHeader: true, children: [cell("", labelWidth, { header: true, fill: ILAW_FORMAT.neutralHeaderFill }), ...grades.map((grade, index) => gradeHeader(grade, widths[index + 1], index))] }),
+    new TableRow({ tableHeader: true, children: [cell("", labelWidth, { header: true, fill: ILAW_FORMAT.neutralHeaderFill }), ...grades.map((grade, index) => gradeHeader(heading(grade), widths[index + 1], index))] }),
     ...rows.map(([label, values]) => new TableRow({ children: [cell(label, labelWidth, { label: true }), ...grades.map((grade, index) => cell(values?.[grade] || "", widths[index + 1]))] })),
   ]);
 }
 
 export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass, teacherName: string, schoolName: string) {
+  const wording = (key: string, fallback = key) => ilawText(plan.documentText, key, fallback);
+  const gradeHeading = (section: string) => (grade: GradeLevel) => wording(`grade:${section}:${grade}`, gradeLabel(grade).toUpperCase());
   const printedTeacher = plan.teacherName ?? teacherName;
   const printedSchool = plan.schoolName ?? schoolName;
   const grades = plan.grades;
@@ -106,38 +108,38 @@ export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass,
   const flowWidths = [timeWidth, stageWidth, ...flowGradeWidths];
 
   const children = [
-    para(planTitleLine(grades), { bold: true, size: ILAW_FORMAT.titleSizePt * 2, align: AlignmentType.CENTER, after: 120, keepNext: true }),
+    para(wording("Document heading", planTitleLine(grades)), { bold: true, size: ILAW_FORMAT.titleSizePt * 2, align: AlignmentType.CENTER, after: 120, keepNext: true }),
     para(plan.title, { bold: true, size: ILAW_FORMAT.lessonTitleSizePt * 2, align: AlignmentType.CENTER, after: 120, keepNext: true }),
     table(metaWidths, [
-      metaRow("School", printedSchool.trim() || "—", "Grade Levels", gradeList(grades)),
-      metaRow("Teacher", printedTeacher, "Learning Area", plan.subject),
-      metaRow("Teaching Date", printedDate || "—", "Quarter/Term", plan.quarter),
-      metaRow("Time / Sessions", `1 session, ${plan.duration} · ${plan.startTime || ""}`, "No. of Learners", learnerCountSummary(teachingClass, grades)),
-      new TableRow({ children: [cell("Multigrade Model", metaWidths[0], { header: true }), cell(plan.multigradeModel || "—", pageWidth - metaWidths[0], { span: 3 })] }),
+      metaRow(wording("School"), printedSchool.trim() || "—", wording("Grade Levels"), wording("Grade levels text", gradeList(grades))),
+      metaRow(wording("Teacher"), printedTeacher, wording("Learning Area"), plan.subject),
+      metaRow(wording("Teaching Date"), wording("Teaching date text", printedDate), wording("Quarter/Term"), wording("Quarter text", plan.quarter)),
+      metaRow(wording("Time / Sessions"), wording("Session text", `1 session, ${plan.duration} · ${plan.startTime || ""}`), wording("No. of Learners"), wording("Learner count text", learnerCountSummary(teachingClass, grades))),
+      new TableRow({ children: [cell(wording("Multigrade Model"), metaWidths[0], { header: true }), cell(plan.multigradeModel || "—", pageWidth - metaWidths[0], { span: 3 })] }),
     ]),
     gap(),
 
-    sectionBanner("I", "Intentions"),
+    sectionBanner("I", wording("Section I", "I  Intentions")),
     gap(60, true),
-    sharedTable([["Shared Sub-theme", plan.sharedTheme]], true),
+    sharedTable([[wording("Shared Sub-theme"), plan.sharedTheme]], true),
     gap(120),
-    gradeTable(grades, [
-      ["Pamantayang Pangnilalaman (Content Standard)", plan.contentStandards],
-      ["Pamantayan sa Pagganap (Performance Standard)", plan.performanceStandards],
-      ["Learning Competencies and Codes", Object.fromEntries(grades.map((grade) => [grade, [plan.competencies?.[grade], plan.competencyCodes?.[grade]].filter((value) => value?.trim()).join("\n")]))],
-      ["Learning Objectives", plan.objectives],
+    gradeTable(grades, gradeHeading("I"), [
+      [wording("Pamantayang Pangnilalaman (Content Standard)"), plan.contentStandards],
+      [wording("Pamantayan sa Pagganap (Performance Standard)"), plan.performanceStandards],
+      [wording("Learning Competencies and Codes"), Object.fromEntries(grades.map((grade) => [grade, [plan.competencies?.[grade], plan.competencyCodes?.[grade]].filter((value) => value?.trim()).join("\n")]))],
+      [wording("Learning Objectives"), plan.objectives],
     ]),
     gap(),
 
-    sectionBanner("L", "Learning Experience"),
+    sectionBanner("L", wording("Section L", "L  Learning Experience")),
     gap(60, true),
-    sharedTable([["Learner Context", plan.learnerContext], ["Instructional Materials and Resources", plan.materials]]),
+    sharedTable([[wording("Learner Context"), plan.learnerContext], [wording("Instructional Materials and Resources"), plan.materials]]),
     gap(100),
-    para("Flow of the Lesson", { bold: true, after: 60, keepNext: true }),
+    para(wording("Flow of the Lesson"), { bold: true, after: 60, keepNext: true }),
     table(flowWidths, [
-      new TableRow({ tableHeader: true, children: [cell("Time", timeWidth, { header: true, fill: ILAW_FORMAT.neutralHeaderFill }), cell("Stage", stageWidth, { header: true, fill: ILAW_FORMAT.neutralHeaderFill }), ...grades.map((grade, index) => gradeHeader(grade, flowGradeWidths[index], index))] }),
+      new TableRow({ tableHeader: true, children: [cell(wording("Time"), timeWidth, { header: true, fill: ILAW_FORMAT.neutralHeaderFill }), cell(wording("Stage"), stageWidth, { header: true, fill: ILAW_FORMAT.neutralHeaderFill }), ...grades.map((grade, index) => gradeHeader(gradeHeading("L")(grade), flowGradeWidths[index], index))] }),
       ...plan.slots.map((slot) => new TableRow({ children: [
-        cell([slot.durationMinutes ? `${slot.durationMinutes} min` : "", slot.time].filter(Boolean).join("\n"), timeWidth),
+        cell(slotTimeText(slot), timeWidth),
         cell([slot.stage || "Learning activity", slot.teacherFocus].filter((value) => value?.trim()).join("\n"), stageWidth, { label: true }),
         ...(slotIsWholeClass(slot)
           ? [cell(wholeClassTask(slot), pageWidth - timeWidth - stageWidth, { span: grades.length })]
@@ -146,24 +148,24 @@ export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass,
     ]),
     gap(),
 
-    sectionBanner("A", "Assessment"),
+    sectionBanner("A", wording("Section A", "A  Assessment")),
     gap(120, true),
-    gradeTable(grades, [
-      ["Formative", plan.formativeAssessments],
-      ["Exit Task", plan.exitTasks],
-      ["Success Criteria", plan.successCriteria],
+    gradeTable(grades, gradeHeading("A"), [
+      [wording("Formative"), plan.formativeAssessments],
+      [wording("Exit Task"), plan.exitTasks],
+      [wording("Success Criteria"), plan.successCriteria],
     ]),
     gap(),
 
-    sectionBanner("W", "Ways Forward"),
+    sectionBanner("W", wording("Section W", "W  Ways Forward")),
     gap(120, true),
-    gradeTable(grades, [
-      ["Reflection Questions", plan.reflectionQuestions],
-      ["Remediation", plan.remediations],
-      ["Enrichment", plan.enrichments],
+    gradeTable(grades, gradeHeading("W"), [
+      [wording("Reflection Questions"), plan.reflectionQuestions],
+      [wording("Remediation"), plan.remediations],
+      [wording("Enrichment"), plan.enrichments],
     ]),
     gap(100),
-    sharedTable([["Notes for Next Session / Whole-School Follow-Up", plan.nextSessionNotes]]),
+    sharedTable([[wording("Notes for Next Session / Whole-School Follow-Up"), plan.nextSessionNotes]]),
     gap(400),
 
     new Table({
@@ -171,8 +173,8 @@ export function buildIlawDocument(plan: SavedPlan, teachingClass: TeachingClass,
       layout: TableLayoutType.FIXED,
       columnWidths: [pageWidth / 2, pageWidth / 2],
       rows: [new TableRow({ cantSplit: true, children: [
-        new TableCell({ width: { size: pageWidth / 2, type: WidthType.DXA }, borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } }, children: [para("Prepared by:", { after: 360, italics: true }), para(printedTeacher.toUpperCase(), { bold: true, align: AlignmentType.CENTER }), para("Classroom Adviser", { align: AlignmentType.CENTER })] }),
-        new TableCell({ width: { size: pageWidth / 2, type: WidthType.DXA }, borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } }, children: [para("Checked by:", { after: 360, italics: true }), para((plan.schoolHeadName || "").toUpperCase() || " ", { bold: true, align: AlignmentType.CENTER }), para("School Head", { align: AlignmentType.CENTER })] }),
+        new TableCell({ width: { size: pageWidth / 2, type: WidthType.DXA }, borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } }, children: [para(wording("Prepared by:"), { after: 360, italics: true }), para(printedTeacher.toUpperCase(), { bold: true, align: AlignmentType.CENTER }), para(wording("Classroom Adviser"), { align: AlignmentType.CENTER })] }),
+        new TableCell({ width: { size: pageWidth / 2, type: WidthType.DXA }, borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } }, children: [para(wording("Checked by:"), { after: 360, italics: true }), para((plan.schoolHeadName || "").toUpperCase() || " ", { bold: true, align: AlignmentType.CENTER }), para(wording("School Head"), { align: AlignmentType.CENTER })] }),
       ] })],
     }),
   ];

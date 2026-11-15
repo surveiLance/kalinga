@@ -2332,3 +2332,14 @@ html { scroll-behavior: smooth; }
 @media (max-width: 720px) {
   .gabay-chat-popover { top: 144px; height: min(620px, calc(100dvh - 224px)); max-height: calc(100dvh - 224px); }
 }
+
+.ilaw-editor .ilaw-wording { display: block; padding: 0 2px; min-height: 0; }
+.ilaw-editor th .ilaw-wording, .ilaw-editor h2 .ilaw-wording { font-weight: inherit; line-height: inherit; }
+.ilaw-editor th .ilaw-wording:focus, .ilaw-editor h2 .ilaw-wording:focus { color: #111; }
+.ilaw-editor .ilaw-print-title .ilaw-wording, .ilaw-editor thead .ilaw-wording, .ilaw-editor .ilaw-print-signatures small .ilaw-wording { text-align: center; }
+.ilaw-editor .flow-heading .ilaw-wording { font-weight: 700; }
+.ilaw-editor .flow-time .ilaw-wording { margin-bottom: 6px; }
+.ilaw-editor .flow-printed-headers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ilaw-editor .flow-focus-setting { display: grid; gap: 3px; margin-top: 8px; font: 600 11px var(--font-ui); }
+.ilaw-editor .flow-focus-setting select { width: 100%; min-width: 0; padding: 3px; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 4px; font: inherit; }
+.ilaw-export-document .ilaw-print-section h2 { white-space: pre-wrap; overflow-wrap: anywhere; }

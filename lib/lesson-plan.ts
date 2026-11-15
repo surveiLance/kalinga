@@ -8,6 +8,7 @@ const perGradeFields = ["competencies", "competencyCodes", "contentStandards", "
 // Whether the teacher has typed anything worth keeping. Slots are excluded: a fresh
 // plan always carries a default timetable, so they say nothing about teacher effort.
 export function planHasTeacherContent(plan: SavedPlan) {
+  if (Object.keys(plan.documentText || {}).length) return true;
   if ([plan.sharedTheme, plan.learnerContext, plan.materials, plan.nextSessionNotes].some((value) => value?.trim())) return true;
   return perGradeFields.some((field) => Object.values(plan[field] || {}).some((value) => value?.trim()));
 }
@@ -77,4 +78,20 @@ export function wholeClassTask(slot: PlanSlot) {
 
 export function withWholeClassTask(slot: PlanSlot, grades: GradeLevel[], task: string): PlanSlot {
   return { ...slot, wholeClass: true, gradeTasks: Object.fromEntries(grades.map((grade) => [grade, task])) };
+}
+
+
+export function ilawText(overrides: SavedPlan["documentText"], key: string, fallback = key) {
+  const value = overrides && Object.hasOwn(overrides, key) ? overrides[key] : undefined;
+  return typeof value === "string" ? value : fallback;
+}
+
+export function slotTimeText(slot: PlanSlot) {
+  return slot.timeText ?? [slot.durationMinutes ? `${slot.durationMinutes} min` : "", slot.time].filter(Boolean).join("\n");
+}
+
+export function slotFocusGrade(slot: PlanSlot, grades: GradeLevel[]) {
+  if (slot.focusGrade !== undefined) return grades.find((grade) => grade === slot.focusGrade);
+  const focus = slot.teacherFocus.toLowerCase();
+  return [...grades].sort((first, second) => second.length - first.length).find((grade) => focus.includes(gradeLabel(grade).toLowerCase()));
 }

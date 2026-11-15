@@ -7,6 +7,6 @@ export function preserveLessonObservations(plan: SavedPlan, notes: ReturnType<ty
   return { ...plan, ...notes };
 }
 export function hasInstructionalEdits(slots: PlanSlot[], defaults: PlanSlot[]) {
-  const content = (items: PlanSlot[]) => items.map(({ time, stage, durationMinutes, teacherFocus, gradeTasks }) => ({ time, stage, durationMinutes, teacherFocus, gradeTasks }));
+  const content = (items: PlanSlot[]) => items.map(({ time, timeText, stage, durationMinutes, teacherFocus, focusGrade, gradeTasks }) => ({ time, timeText, stage, durationMinutes, teacherFocus, focusGrade, gradeTasks }));
   return JSON.stringify(content(slots)) !== JSON.stringify(content(defaults));
 }

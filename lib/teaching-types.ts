@@ -49,10 +49,12 @@ export type LegacyTeachingClass = Omit<Partial<TeachingClass>, "grades" | "learn
 export type PlanSlot = {
   id: string;
   time: string;
+  timeText?: string;
   stage?: string;
   durationMinutes?: number;
   wholeClass?: boolean;
   teacherFocus: string;
+  focusGrade?: GradeLevel | null;
   gradeTasks: Record<GradeLevel, string>;
 };
 
@@ -90,6 +92,7 @@ export type SavedPlan = {
   nextSessionNotes?: string;
   schoolHeadName?: string;
   draftNotes?: string;
+  documentText?: Record<string, string>;
   slots: PlanSlot[];
   savedAt: string;
 };
