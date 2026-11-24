@@ -1,5 +1,5 @@
 "use client";
-import { T } from "@/components/language-switch";
+import { T, useInterfaceLanguage } from "@/components/language-switch";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GabayWalkthrough, WalkthroughOffer } from "@/components/gabay-walkthrough";
@@ -11,6 +11,7 @@ export function PageGuideButton({ onStart, compact = false }: { onStart: () => v
 }
 
 export function GabayPageGuides({ scope, page, motion, blocked, request, onStart }: { scope: string; page: PageGuidePage; motion: boolean; blocked: boolean; request: PageGuideRequest | null; onStart: () => void }) {
+  const { t } = useInterfaceLanguage();
   const [status, setStatus] = useState<PageGuideStatus>(() => readPageGuideStatus(null));
   const statusRef = useRef(status);
   const [ready, setReady] = useState(false);
@@ -82,6 +83,6 @@ export function GabayPageGuides({ scope, page, motion, blocked, request, onStart
   return <>
     {ready && offerPage === page && !blocked && !hasModal && !guiding && <WalkthroughOffer key={page} pageLabel={pageGuideLabels[page]} onShown={markShown} onStart={() => { setOfferPage(null); onStart(); }} onDismiss={() => setOfferPage(null)} />}
     {guiding && <GabayWalkthrough key={`${scope}:${page}:${request?.id || 0}`} page={page} motion={motion} onComplete={finish} onExit={() => setActive(null)} />}
-    {storageMessage && (guiding || offerPage === page) && <p className="page-guide-storage" role="status">{storageMessage}</p>}
+    {storageMessage && (guiding || offerPage === page) && <p className="page-guide-storage" role="status">{t(storageMessage)}</p>}
   </>;
 }

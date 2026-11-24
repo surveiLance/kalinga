@@ -1,5 +1,5 @@
 "use client";
-import { T } from "@/components/language-switch";
+import { T, useInterfaceLanguage } from "@/components/language-switch";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -14,16 +14,18 @@ export function WalkthroughOffer({ pageLabel, onShown, onStart, onDismiss }: { p
 }
 
 export function WalkthroughCard({ item, pageLabel, step, total, targetFound, onMove, onExit, onLocate, onMinimize }: { item: PageGuideStep; pageLabel: string; step: number; total: number; targetFound: boolean; onMove: (step: number) => void; onExit: () => void; onLocate: () => void; onMinimize?: () => void }) {
+  const { t } = useInterfaceLanguage();
   const titleId = useId();
   return <section className="walkthrough-card" aria-labelledby={titleId}>
-    <header><GabayMascot size="medium" motion={false} /><div><b>Gabay’s page guide</b><small>{pageLabel}</small></div><div className="walkthrough-window-actions">{onMinimize && <button type="button" onClick={onMinimize} aria-label="Minimize guide" title="Move Gabay out of the way">−</button>}<button type="button" className="walkthrough-exit" onClick={onExit} aria-label="Exit guide">×</button></div></header>
-    <div className="walkthrough-copy" aria-live="polite" aria-atomic="true"><p className="walkthrough-count">{step + 1} of {total}</p><h2 id={titleId} tabIndex={-1}>{targetFound ? item.title : "This control is not visible right now"}</h2>{targetFound ? <p>{item.body}</p> : <p className="walkthrough-where">You can continue through this page’s hints or close the guide. Nothing needs to be filled or saved to finish.</p>}</div>
-    <div className="walkthrough-tools">{targetFound && <button className="walkthrough-locate" type="button" onClick={onLocate}>Show the highlighted area</button>}{onMinimize && <button className="walkthrough-locate" type="button" onClick={onMinimize}>Move Gabay aside</button>}</div>
-    <footer><button type="button" className="walkthrough-back" disabled={step === 0} onClick={() => onMove(Math.max(0, step - 1))}><T>Back</T></button><button type="button" className="walkthrough-next" onClick={() => onMove(step + 1)}><T>{step === total - 1 ? "Finish guide" : "Next"}</T><span aria-hidden="true"> →</span></button></footer>
+    <header><GabayMascot size="medium" motion={false} /><div><b><T>{"Gabay’s page guide"}</T></b><small>{t(pageLabel)}</small></div><div className="walkthrough-window-actions">{onMinimize && <button type="button" onClick={onMinimize} aria-label={t("Minimize guide")} title={t("Move Gabay out of the way")}>−</button>}<button type="button" className="walkthrough-exit" onClick={onExit} aria-label={t("Exit guide")}>×</button></div></header>
+    <div className="walkthrough-copy" aria-live="polite" aria-atomic="true"><p className="walkthrough-count">{step + 1} <T>{"of"}</T>{" "}{total}</p><h2 id={titleId} tabIndex={-1}>{targetFound ? t(item.title) : t("This control is not visible right now")}</h2>{targetFound ? <p>{t(item.body)}</p> : <p className="walkthrough-where"><T>{"You can continue through this page’s hints or close the guide. Nothing needs to be filled or saved to finish."}</T></p>}</div>
+    <div className="walkthrough-tools">{targetFound && <button className="walkthrough-locate" type="button" onClick={onLocate}><T>{"Show the highlighted area"}</T></button>}{onMinimize && <button className="walkthrough-locate" type="button" onClick={onMinimize}><T>{"Move Gabay aside"}</T></button>}</div>
+    <footer><button type="button" className="walkthrough-back" disabled={step === 0} onClick={() => onMove(Math.max(0, step - 1))}><T>Back</T></button><button type="button" className="walkthrough-next" onClick={() => onMove(step + 1)}><T>{step === total - 1 ? t("Finish guide") : t("Next")}</T><span aria-hidden="true"> →</span></button></footer>
   </section>;
 }
 
 export function GabayWalkthrough({ page, motion, onComplete, onExit }: { page: PageGuidePage; motion: boolean; onComplete: () => void; onExit: () => void }) {
+  const { t } = useInterfaceLanguage();
   const targetRef = useRef<HTMLElement | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [stepId, setStepId] = useState("");
@@ -125,6 +127,6 @@ export function GabayWalkthrough({ page, motion, onComplete, onExit }: { page: P
   function move(next: number) { if (next >= location!.items.length) onComplete(); else setStepId(location!.items[next].id); }
   return createPortal(<div className={`walkthrough-layer${location.docked ? " docked" : ""}${motion ? " motion" : ""}`}>
     {location.rect && location.rect.height > 0 && <div className="walkthrough-highlight" aria-hidden="true" style={{ left: location.rect.left, top: location.rect.top, width: location.rect.width, height: location.rect.height }} />}
-    {minimized ? <button type="button" className="walkthrough-resume" onClick={() => setMinimized(false)} aria-label="Continue with Gabay"><GabayMascot size="small" motion={false} /><span>Continue guide</span></button> : <div ref={cardRef} className="walkthrough-position" style={location.docked ? undefined : { left: location.left, top: location.top, width: location.width }}>{item ? <WalkthroughCard item={item} pageLabel={pageGuideLabels[page]} step={step} total={location.items.length} targetFound={location.matched} onMove={move} onExit={onExit} onMinimize={() => setMinimized(true)} onLocate={() => targetRef.current?.scrollIntoView({ block: "center", behavior: motion ? "smooth" : "instant" })} /> : <section className="walkthrough-card"><div className="walkthrough-copy"><h2>Nothing to explain here yet</h2><p>Continue using this page, then choose Guide this page when its controls are available.</p></div><footer><button className="walkthrough-next" type="button" onClick={onExit}>Close guide</button></footer></section>}</div>}
+    {minimized ? <button type="button" className="walkthrough-resume" onClick={() => setMinimized(false)} aria-label={t("Continue with Gabay")}><GabayMascot size="small" motion={false} /><span><T>{"Continue guide"}</T></span></button> : <div ref={cardRef} className="walkthrough-position" style={location.docked ? undefined : { left: location.left, top: location.top, width: location.width }}>{item ? <WalkthroughCard item={item} pageLabel={pageGuideLabels[page]} step={step} total={location.items.length} targetFound={location.matched} onMove={move} onExit={onExit} onMinimize={() => setMinimized(true)} onLocate={() => targetRef.current?.scrollIntoView({ block: "center", behavior: motion ? "smooth" : "instant" })} /> : <section className="walkthrough-card"><div className="walkthrough-copy"><h2><T>{"Nothing to explain here yet"}</T></h2><p><T>{"Continue using this page, then choose Guide this page when its controls are available."}</T></p></div><footer><button className="walkthrough-next" type="button" onClick={onExit}><T>{"Close guide"}</T></button></footer></section>}</div>}
   </div>, location.host);
 }

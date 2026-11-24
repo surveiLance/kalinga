@@ -1,8 +1,10 @@
 "use client";
+import { T, useInterfaceLanguage } from "@/components/language-switch";
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 export function OfflinePdfViewer({ blob, title }: { blob: Blob; title: string }) {
+  const { t } = useInterfaceLanguage();
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   const [page, setPage] = useState(1);
   const [text, setText] = useState("");
@@ -58,5 +60,5 @@ export function OfflinePdfViewer({ blob, title }: { blob: Blob; title: string })
     })().catch((cause: unknown) => { if (active && !(cause instanceof Error && cause.name === "RenderingCancelledException")) setError("This page could not be rendered. Try opening the local file."); });
     return () => { active = false; cancel?.(); };
   }, [pdf, page, width, zoom]);
-  return <div className="offline-pdf-viewer" ref={panel}><div className="offline-pdf-controls"><button type="button" disabled={!pdf || page === 1} onClick={() => setPage((p) => p - 1)}>← Previous page</button><span role="status">{pdf ? `Page ${page} of ${pdf.numPages}` : "Opening downloaded PDF…"}</span><button type="button" disabled={!pdf || page >= pdf.numPages} onClick={() => setPage((p) => p + 1)}>Next page →</button><button type="button" disabled={!pdf || zoom >= 3} onClick={() => setZoom((value) => Math.min(3, value + .5))}>Zoom in</button><button type="button" disabled={!pdf || zoom <= 1} onClick={() => setZoom((value) => Math.max(1, value - .5))}>Zoom out</button></div>{error && <p role="alert">{error}</p>}<canvas ref={canvas} style={{ maxWidth: zoom === 1 ? "100%" : "none" }} aria-label={`${title}, page ${page}`} />{text && <details><summary>Read page text</summary><p>{text}</p></details>}{url && <a href={url} target="_blank" rel="noreferrer">Open downloaded PDF in your browser ↗</a>}</div>;
+  return <div className="offline-pdf-viewer" ref={panel}><div className="offline-pdf-controls"><button type="button" disabled={!pdf || page === 1} onClick={() => setPage((p) => p - 1)}><T>{"← Previous page"}</T></button><span role="status">{pdf ? t("Page {value1} of {value2}", { value1: page, value2: pdf.numPages }) : t("Opening downloaded PDF…")}</span><button type="button" disabled={!pdf || page >= pdf.numPages} onClick={() => setPage((p) => p + 1)}><T>{"Next page →"}</T></button><button type="button" disabled={!pdf || zoom >= 3} onClick={() => setZoom((value) => Math.min(3, value + .5))}><T>{"Zoom in"}</T></button><button type="button" disabled={!pdf || zoom <= 1} onClick={() => setZoom((value) => Math.max(1, value - .5))}><T>{"Zoom out"}</T></button></div>{error && <p role="alert">{t(error)}</p>}<canvas ref={canvas} style={{ maxWidth: zoom === 1 ? "100%" : "none" }} aria-label={t("{value1}, page {value2}", { value1: title, value2: page })} />{text && <details><summary><T>{"Read page text"}</T></summary><p>{text}</p></details>}{url && <a href={url} target="_blank" rel="noreferrer"><T>{"Open downloaded PDF in your browser ↗"}</T></a>}</div>;
 }
