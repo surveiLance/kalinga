@@ -4,7 +4,7 @@ import promptStyles from "@/components/prompt-helper.module.css";
 import { formatInterfaceDate, formatInterfaceMeetingDays } from "@/lib/interface-language";
 import { T, useInterfaceLanguage, LanguageSwitch, GabayLanguageLabel, useInterfaceLanguageScope } from "@/components/language-switch";
 
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { OfflineReadiness } from "@/components/offline-readiness";
@@ -1678,14 +1678,21 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
   const [conversationDeleteError, setConversationDeleteError] = useState("");
   const [readyContextSignature, setReadyContextSignature] = useState("");
   const chatInputId = useId();
+  const chatBodyRef = useRef<HTMLDivElement>(null);
 
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
   const chatMessages = activeConversation?.messages || [];
-  const thinking = isGabayThinking(isReplying, chatMessages.at(-1)?.role);
+  const lastMessage = chatMessages.at(-1);
+  const thinking = isGabayThinking(isReplying, lastMessage?.role);
   const chatCacheKey = teacherAccountId ? `kalinga:teacher-${teacherAccountId}:gabay-chat` : "";
   const deletedChatIdsKey = teacherAccountId ? `kalinga:teacher-${teacherAccountId}:gabay-deleted-chats` : "";
   const contextSignature = JSON.stringify({ view, pageStep: pageContext.pageStep, classId: pageContext.classId, subject: pageContext.subject, lessonTopic: pageContext.lessonTopic, incompleteSections: pageContext.incompleteSections });
   const contextReady = readyContextSignature === contextSignature;
+
+  useLayoutEffect(() => {
+    const body = chatBodyRef.current;
+    if (open && body) body.scrollTop = body.scrollHeight;
+  }, [open, lastMessage?.id, thinking]);
 
   useEffect(() => {
     const contextTimer = window.setTimeout(() => setReadyContextSignature(contextSignature), 280);
@@ -1911,7 +1918,7 @@ function GabayGuide({ open, view, pageContext, activeClass, motion, authenticate
     <header><GabayMascot size="small" motion={motion} speaking={thinking} /><div><h2 id="gabay-title">Gabay</h2><GabayLanguageLabel /></div><div className="gabay-chat-header-actions"><button type="button" aria-label={t("Conversation options")} aria-expanded={conversationMenuOpen} onClick={() => setConversationMenuOpen((shown) => !shown)}>•••</button><button type="button" aria-label={t("Minimize Gabay")} onClick={closeGuide}>−</button><button className="gabay-close" type="button" aria-label={t("Close Gabay")} onClick={closeGuide}>×</button></div></header>
     <div className={`gabay-context-status ${contextReady ? "ready" : "loading"}`} role="status" aria-live="polite"><i />{t(!authenticated ? pageContext.offline ? "Connect to use Gabay AI" : "Sign in for AI" : thinking ? "Thinking with your page context…" : contextReady ? "Ready to help with {page}" : "Loading the current page context…", { page: t(gabayPageLabels[view]) })}</div>
     {conversationMenuOpen && <div className="gabay-conversation-menu"><button className="gabay-walkthrough-start" type="button" onClick={() => { setConversationMenuOpen(false); onStartWalkthrough(); }}><T>Guide this page</T></button><div><b><T>Conversations</T></b><button type="button" disabled={isReplying} onClick={startNewConversation}><T>＋ New chat</T></button></div>{conversations.length ? <div className="gabay-recent-chats">{conversations.slice(0, 12).map((conversation) => <button className={conversation.id === activeConversationId ? "active" : ""} type="button" onClick={() => openConversation(conversation.id)} key={conversation.id}><span>{conversation.title}</span><small>{t("{count} messages", { count: conversation.messages.length })}</small></button>)}</div> : <p><T>No saved conversations yet.</T></p>}<div className="gabay-delete-actions">{activeConversationId && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearCurrentConversation}><T>Delete this conversation</T></button>}{conversations.length > 1 && <button className="gabay-clear-chat" type="button" disabled={isReplying} onClick={clearAllConversations}><T>Delete all conversations</T></button>}</div>{conversationDeleteError && <p className="gabay-delete-error">{conversationDeleteError}</p>}<small><T>Private to this teacher account. Avoid learner names or sensitive details.</T></small></div>}
-    <div className="gabay-chat-body">
+    <div className="gabay-chat-body" ref={chatBodyRef}>
       {authenticated && hydratedChatAccountId !== teacherAccountId ? <div className="gabay-chat-empty"><b><T>Opening your chats…</T></b></div> : !chatMessages.length ? <div className="gabay-chat-empty"><b><T>How can I help?</T></b><p><T>{pagePrompt[view]}</T></p>{!authenticated && <button type="button" disabled={pageContext.offline} onClick={onRequestSignIn}>{pageContext.offline ? t("Gabay AI needs internet") : t("Sign in to start chatting")}</button>}</div> : <div className="gabay-chat-thread" aria-live="polite">{chatMessages.map((message, index) => <Fragment key={message.id}>{index > 0 && chatMessages[index - 1].view !== message.view && <div className="gabay-context-divider"><span>{t("Now helping with {page}", { page: t(gabayPageLabels[message.view]) })}</span></div>}<div className={message.role}><p><FormattedGabayMessage text={message.text} /></p></div></Fragment>)}{thinking && <GabayThinking motion={motion} />}</div>}
     </div>
     <PromptHelper key={`${teacherAccountId}:${view}:${pageContext.classId || ""}`} mode="chat" visible={open} context={[pageContext.className, pageContext.gradeLevels.map(gradeLabel).join(", "), pageContext.subject].filter(Boolean).join(" · ")} existingText={chatInput} onUse={setChatInput} disabled={isReplying} />
